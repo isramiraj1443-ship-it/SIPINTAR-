@@ -15,7 +15,7 @@
 //  (URL tersimpan di perangkat masing-masing pengguna).
 // ============================================================
 window.APP_CONFIG = {
-  GAS_WEB_APP_URL: "",
+  GAS_WEB_APP_URL: "https://script.google.com/macros/s/AKfycbwqgPRA85cEduLdx9ev2kt_RB0aOZbEUZpzD5QxJ5C53T_s-kNA-hM6IDNDmq_q_whSzQ/exec",
   APP_NAME: "SIPINTAR MATEMATIKA",
   APP_TAGLINE: "Portal Ujian Digital",
   APP_VERSION: "1.1.0"
