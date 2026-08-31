@@ -118,7 +118,7 @@
 <body>
 
 <!-- Layar transisi saat aplikasi yang sudah di-install meluncur ke web app -->
-<div id="splash" class="splash"><div><div class="spin" style="margin:0 auto 14px"></div>Memuat aplikasi…</div></div>
+<div id="splash" class="splash"><div><div class="spin" style="margin:0 auto 14px"></div>Membuka aplikasi SIPINTAR…<p style="font-size:.68rem;font-weight:500;opacity:.8;margin-top:10px;text-align:center;max-width:300px;line-height:1.5">Jika halaman Google muncul, tekan <b>Lanjut</b> &rarr; <b>Continue</b> (hanya pertama kali, lalu tidak muncul lagi)</p></div></div>
 
 <main class="card">
   <img class="logo-img" src="logo.png" alt="Logo SIPINTAR — Burung Hantu" referrerpolicy="no-referrer">
@@ -157,6 +157,7 @@
   </details>
 
   <p class="note" id="net-note"></p>
+  <p class="note" style="margin-top:10px;line-height:1.6"><b>Petunjuk pertama kali:</b> setelah menekan <b>Buka Aplikasi</b>, browser akan pindah ke Google. Bila muncul halaman <b>&#8220;aplikasi tidak terverifikasi&#8221;</b> atau diminta <b>login/izin</b>, itu <b>normal &amp; hanya sekali</b> — tekan <b>Lanjut &rarr; Continue &rarr; Izinkan</b>. Setelah itu aplikasi langsung terbuka.</p>
   <p class="foot">v<span id="app-ver">-</span> &middot; Ditenagai Google Apps Script + Google Sheets</p>
 </main>
 
@@ -214,7 +215,7 @@
     var url = getGasUrl();
     if (!url || !validUrl(url)) { refresh(); setupBox.setAttribute('open', ''); return; }
     splash.classList.add('on');
-    setTimeout(function () { window.location.href = url; }, 450);
+    setTimeout(function () { window.location.href = url; }, 300);
   }
 
   btnOpen.addEventListener('click', openApp);
@@ -281,5 +282,5 @@
     Aktifkan JavaScript untuk menggunakan portal ini.
   </div>
 </noscript>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a338b7625e5bfd7c',t:'MTc4ODE0NDUwNw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
