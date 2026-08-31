@@ -10,6 +10,7 @@ const SHELL_ASSETS = [
   './config.js',
   './manifest.webmanifest',
   './logo.png',
+  './background.png',
   './icon-192.png',
   './icon-512.png'
 ];
