@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>SIPINTAR MATEMATIKA — Portal</title>
+<meta name="description" content="Portal ujian digital SIPINTAR MATEMATIKA. Buka atau install di perangkat Anda.">
+<meta name="theme-color" content="#1e1b4b">
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SIPINTAR">
+
+<style>
+  :root{
+    --bg-1:#1e1b4b; --bg-2:#312e81; --bg-3:#4c1d95;
+    --indigo:#6366f1; --violet:#8b5cf6;
+    --card:rgba(255,255,255,.07);
+    --line:rgba(255,255,255,.14);
+    --txt:#f1f5f9; --dim:#a5b4fc;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    color:var(--txt);
+    background:
+      radial-gradient(1000px 600px at 85% -10%, rgba(139,92,246,.35), transparent 60%),
+      radial-gradient(900px 700px at -10% 110%, rgba(99,102,241,.4), transparent 60%),
+      linear-gradient(160deg, var(--bg-1) 0%, var(--bg-2) 55%, var(--bg-3) 100%);
+    background-attachment:fixed;
+    display:flex; align-items:center; justify-content:center;
+    padding:24px; min-height:100dvh;
+  }
+  .card{
+    width:100%; max-width:420px;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:28px;
+    padding:36px 28px 28px;
+    backdrop-filter:blur(18px);
+    -webkit-backdrop-filter:blur(18px);
+    box-shadow:0 30px 80px rgba(0,0,0,.45);
+    text-align:center;
+    animation:rise .5s ease both;
+  }
+  @keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+  /* [BARU 2026] Logo resmi SIPINTAR (burung hantu) */
+  .logo-img{
+    width:250px;max-width:78%;margin:0 auto 16px;display:block;
+    filter:drop-shadow(0 14px 34px rgba(0,0,0,.5));
+  }
+  h1{font-size:1.45rem;font-weight:800;letter-spacing:.06em}
+  .tagline{color:var(--dim);font-size:.9rem;margin-top:6px;font-weight:500}
+  .pill{
+    display:inline-flex;align-items:center;gap:7px;margin:20px auto 4px;
+    font-size:.75rem;font-weight:700;letter-spacing:.04em;
+    background:rgba(255,255,255,.08);border:1px solid var(--line);
+    padding:7px 14px;border-radius:999px;color:#cbd5e1;
+  }
+  .dot{width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 0 4px rgba(52,211,153,.18)}
+  .dot.off{background:#f59e0b;box-shadow:0 0 0 4px rgba(245,158,11,.18)}
+  .btn{
+    width:100%;border:none;cursor:pointer;font:inherit;
+    display:flex;align-items:center;justify-content:center;gap:10px;
+    padding:16px 20px;border-radius:16px;font-weight:800;font-size:1.02rem;
+    transition:transform .12s ease, box-shadow .2s ease, opacity .2s;
+  }
+  .btn:active{transform:scale(.97)}
+  .btn-primary{
+    margin-top:22px;color:#fff;
+    background:linear-gradient(135deg,#6366f1,#8b5cf6 70%);
+    box-shadow:0 14px 34px rgba(109,94,247,.45), inset 0 1px 0 rgba(255,255,255,.3);
+  }
+  .btn-primary:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+  .btn-ghost{
+    margin-top:12px;color:#e0e7ff;background:rgba(255,255,255,.08);
+    border:1px solid var(--line);font-size:.92rem;font-weight:700;
+  }
+  .hidden{display:none !important}
+  .setup{
+    margin-top:18px;text-align:left;background:rgba(0,0,0,.22);
+    border:1px dashed var(--line);border-radius:16px;padding:16px;
+  }
+  .setup summary{
+    cursor:pointer;font-size:.82rem;font-weight:800;color:var(--dim);
+    list-style:none;display:flex;align-items:center;gap:8px;
+  }
+  .setup summary::-webkit-details-marker{display:none}
+  .setup p{font-size:.78rem;line-height:1.55;color:#c7d2fe;margin-top:10px}
+  .setup ol{margin:8px 0 10px 18px;font-size:.78rem;color:#c7d2fe;line-height:1.6}
+  .setup input{
+    width:100%;margin-top:10px;padding:12px 14px;border-radius:12px;
+    border:1px solid var(--line);background:rgba(255,255,255,.08);
+    color:#fff;font:inherit;font-size:.85rem;outline:none;
+  }
+  .setup input:focus{border-color:var(--indigo)}
+  .setup .row{display:flex;gap:8px;margin-top:10px}
+  .setup .row .btn{padding:12px;font-size:.85rem}
+  .setup .btn-save{flex:1;margin-top:0;background:linear-gradient(135deg,#059669,#10b981);color:#fff}
+  .setup .btn-clear{background:rgba(255,255,255,.1);color:#fca5a5;border:1px solid rgba(248,113,113,.35)}
+  .note{margin-top:14px;font-size:.72rem;color:#94a3b8;line-height:1.5}
+  .foot{margin-top:20px;font-size:.7rem;color:rgba(199,210,254,.6);letter-spacing:.03em}
+  .splash{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;
+    background:linear-gradient(160deg,var(--bg-1),var(--bg-3));color:var(--dim);font-weight:700;letter-spacing:.05em}
+  .splash .spin{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.15);
+    border-top-color:#8b5cf6;animation:sp 1s linear infinite;margin-bottom:14px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .splash.on{display:flex}
+</style>
+</head>
+<body>
+
+<!-- Layar transisi saat aplikasi yang sudah di-install meluncur ke web app -->
+<div id="splash" class="splash"><div><div class="spin" style="margin:0 auto 14px"></div>Memuat aplikasi…</div></div>
+
+<main class="card">
+  <img class="logo-img" src="logo.png" alt="Logo SIPINTAR — Burung Hantu" referrerpolicy="no-referrer">
+  <h1 id="app-name">SIPINTAR MATEMATIKA</h1>
+  <p class="tagline" id="app-tagline">Portal Ujian Digital</p>
+
+  <div class="pill"><span id="dot" class="dot"></span><span id="status-text">Memeriksa koneksi…</span></div>
+
+  <button id="btn-open" class="btn btn-primary" disabled>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    Buka Aplikasi
+  </button>
+
+  <button id="btn-install" class="btn btn-ghost hidden">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16"/></svg>
+    Install ke Perangkat
+  </button>
+
+  <details class="setup" id="setup-box">
+    <summary>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+      Pengaturan Portal
+    </summary>
+    <p>Portal ini terhubung ke <b>Web App Google Apps Script</b> Anda. Masukkan URL-nya satu kali:</p>
+    <ol>
+      <li>Google Spreadsheet → <b>Extensions → Apps Script</b></li>
+      <li><b>Deploy → Manage deployments</b> (atau New deployment → Web app)</li>
+      <li>Salin <b>URL</b> web app, tempel di bawah</li>
+    </ol>
+    <input id="inp-url" type="url" placeholder="https://script.google.com/macros/s/…/exec" spellcheck="false">
+    <div class="row">
+      <button id="btn-save" class="btn btn-save">Simpan &amp; Uji</button>
+      <button id="btn-clear" class="btn btn-clear">Hapus</button>
+    </div>
+    <p class="note">Tips: agar semua pengguna langsung terhubung (tanpa isi manual), tempel URL yang sama ke file <b>web/config.js</b> di GitHub, lalu push.</p>
+  </details>
+
+  <p class="note" id="net-note"></p>
+  <p class="foot">v<span id="app-ver">-</span> &middot; Ditenagai Google Apps Script + Google Sheets</p>
+</main>
+
+<script src="config.js"></script>
+<script>
+(function () {
+  'use strict';
+  var CFG = window.APP_CONFIG || {};
+  var LS_KEY = 'sipintar_gas_url';
+
+  document.getElementById('app-name').textContent = CFG.APP_NAME || 'SIPINTAR MATEMATIKA';
+  document.getElementById('app-tagline').textContent = CFG.APP_TAGLINE || 'Portal Ujian Digital';
+  document.getElementById('app-ver').textContent = CFG.APP_VERSION || '1.0.0';
+
+  var btnOpen = document.getElementById('btn-open');
+  var btnInstall = document.getElementById('btn-install');
+  var setupBox = document.getElementById('setup-box');
+  var inpUrl = document.getElementById('inp-url');
+  var netNote = document.getElementById('net-note');
+  var splash = document.getElementById('splash');
+
+  function getGasUrl() {
+    return ((localStorage.getItem(LS_KEY) || CFG.GAS_WEB_APP_URL || '') + '').trim();
+  }
+  function validUrl(u) {
+    return /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec/.test(u) || /^https?:\/\/.+\//.test(u);
+  }
+
+  function refresh() {
+    var url = getGasUrl();
+    var online = navigator.onLine;
+    var dot = document.getElementById('dot');
+    var st = document.getElementById('status-text');
+    dot.className = 'dot' + (online ? '' : ' off');
+    st.textContent = !online ? 'Offline — halaman portal tetap tampil'
+      : url ? 'Terhubung · siap dibuka'
+      : 'Belum disetel — masukkan URL web app';
+    btnOpen.disabled = !url;
+    netNote.textContent = !online
+      ? 'Anda sedang offline. Aplikasi utama (di server Google) membutuhkan koneksi internet.'
+      : (url ? '' : 'Langkah pertama: buka "Pengaturan Portal" di bawah dan tempel URL web app Anda.');
+    if (url && setupBox.open) setupBox.removeAttribute('open');
+  }
+
+  function openApp() {
+    var url = getGasUrl();
+    if (!url || !validUrl(url)) { refresh(); setupBox.setAttribute('open', ''); return; }
+    splash.classList.add('on');
+    setTimeout(function () { window.location.href = url; }, 450);
+  }
+
+  btnOpen.addEventListener('click', openApp);
+
+  // ===== Auto-launch: aplikasi yang sudah di-install langsung membuka web app =====
+  if (new URLSearchParams(window.location.search).get('launch') === '1') {
+    var u = getGasUrl();
+    if (u && validUrl(u)) { openApp(); }
+  }
+
+  // ===== Prompt install PWA (Android/Chrome/Edge) =====
+  var deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    btnInstall.classList.remove('hidden');
+  });
+  btnInstall.addEventListener('click', function () {
+    if (!deferredPrompt) {
+      alert('Gunakan menu browser: “Install aplikasi” / “Tambahkan ke layar utama”.');
+      return;
+    }
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(function (r) {
+      if (r.outcome === 'accepted') btnInstall.classList.add('hidden');
+      deferredPrompt = null;
+    });
+  });
+  window.addEventListener('appinstalled', function () { btnInstall.classList.add('hidden'); });
+
+  // ===== Pengaturan URL =====
+  if (getGasUrl()) inpUrl.value = getGasUrl();
+  document.getElementById('btn-save').addEventListener('click', function () {
+    var v = inpUrl.value.trim();
+    if (!validUrl(v)) {
+      alert('URL belum valid. Contoh: https://script.google.com/macros/s/XXXX/exec');
+      return;
+    }
+    localStorage.setItem(LS_KEY, v);
+    inpUrl.value = v;
+    refresh();
+  });
+  document.getElementById('btn-clear').addEventListener('click', function () {
+    localStorage.removeItem(LS_KEY);
+    inpUrl.value = getGasUrl();
+    refresh();
+  });
+
+  // ===== Status online/offline =====
+  window.addEventListener('online', refresh);
+  window.addEventListener('offline', refresh);
+  refresh();
+
+  // ===== Daftarkan Service Worker (portal tetap bisa dibuka offline) =====
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js', { scope: '/' }).catch(function () {});
+    });
+  }
+})();
+</script>
+<noscript>
+  <div style="position:fixed;inset:auto 0 0 0;background:#7f1d1d;color:#fff;text-align:center;padding:10px;font-size:.8rem;z-index:99">
+    Aktifkan JavaScript untuk menggunakan portal ini.
+  </div>
+</noscript>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a33812f58adba2c5',t:'MTc4ODEzNzc3Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
