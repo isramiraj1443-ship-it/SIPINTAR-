@@ -10,7 +10,7 @@
 //  tidak mengubah URL).
 // ============================================================
 window.APP_CONFIG = {
-  GAS_WEB_APP_URL: "https://script.google.com/macros/s/AKfycbwmC5YJE_6KK4j89KQhvGIC6Wedh-F_622Y41MM7oO7T39AJRjDYUFQCpsnA08Ow-u7lg/exec",
+  GAS_WEB_APP_URL: "https://script.google.com/macros/s/AKfycbzWtHP_FL3f4zCMnIcnrtAZqlYdsQ3EiU5UkiQDe2eKErnJd9EB33_Buqss-poaGRGQGg/exec",
   APP_NAME: "SIPINTAR MATEMATIKA",
   APP_TAGLINE: "Portal Ujian Digital",
   APP_VERSION: "1.2.0"
