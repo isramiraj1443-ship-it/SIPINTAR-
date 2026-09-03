@@ -3,7 +3,7 @@
  *  Meng-cache halaman portal agar bisa terbuka walau offline
  *  (aplikasi utama tetap membutuhkan koneksi ke server Google).
  * ============================================================ */
-const CACHE_NAME = 'sipintar-portal-v1';
+const CACHE_NAME = 'sipintar-portal-v2';
 const SHELL_ASSETS = [
   './',
   './index.html',
