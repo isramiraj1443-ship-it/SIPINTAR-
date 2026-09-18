@@ -1,12 +1,16 @@
-/* Service Worker portal — dinonaktifkan.
-   Halaman Vercel langsung membuka Apps Script, tanpa cache portal. */
+/* Service Worker portal SIPINTAR */
+const CACHE_NAME = 'sipintar-portal-v5';
 self.addEventListener('install', function (e) { self.skipWaiting(); });
 self.addEventListener('activate', function (e) {
   e.waitUntil(
     caches.keys().then(function (keys) {
       return Promise.all(keys.map(function (k) { return caches.delete(k); }));
-    }).then(function () { return self.registration.unregister(); })
-      .then(function () { return self.clients.claim(); })
+    }).then(function () { return self.clients.claim(); })
   );
 });
-self.addEventListener('fetch', function () {});
+self.addEventListener('fetch', function (event) {
+  if (event.request.method !== 'GET') return;
+  event.respondWith(fetch(event.request, { cache: 'no-store' }).catch(function () {
+    return caches.match(event.request);
+  }));
+});
