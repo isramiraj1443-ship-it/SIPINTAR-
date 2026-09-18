@@ -1,9 +1,5 @@
-/* ============================================================
- *  Service Worker — Portal SIPINTAR MATEMATIKA
- *  Meng-cache halaman portal agar bisa terbuka walau offline
- *  (aplikasi utama tetap membutuhkan koneksi ke server Google).
- * ============================================================ */
-const CACHE_NAME = 'sipintar-portal-v2';
+/* Service Worker — Portal SIPINTAR (SMPN 26 Surakarta) */
+const CACHE_NAME = 'sipintar-portal-v3';
 const SHELL_ASSETS = [
   './',
   './index.html',
@@ -36,12 +32,9 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
-
   const url = new URL(req.url);
-  // Permintaan lintas-origen (mis. script.google.com) → biarkan jaringan biasa
   if (url.origin !== self.location.origin) return;
 
-  // Navigasi halaman: network-first, fallback ke cache (tombak offline)
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req)
@@ -55,7 +48,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Aset statis: cache-first, lalu jaringan
   event.respondWith(
     caches.match(req).then((hit) => {
       if (hit) return hit;
