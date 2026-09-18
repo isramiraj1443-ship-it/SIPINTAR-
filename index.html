@@ -6,7 +6,10 @@
 <title>SIPINTAR</title>
 <meta name="description" content="Portal ujian digital SIPINTAR, SMP Negeri 26 Surakarta. Buka atau install di perangkat Anda.">
 <meta name="theme-color" content="#1b3a6b">
-<link rel="manifest" href="manifest.webmanifest">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<link rel="manifest" href="manifest.webmanifest?v=4">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
@@ -114,6 +117,7 @@
 
   <button id="btn-open" class="btn btn-primary" disabled>Buka Aplikasi</button>
   <button id="btn-install" class="btn btn-ghost hidden">Install ke Perangkat</button>
+  <button id="btn-fresh" class="btn btn-ghost" type="button">Muat ulang versi baru</button>
 
   <details class="setup" id="setup-box">
     <summary>Pengaturan Portal</summary>
@@ -175,11 +179,27 @@
       ? 'Aplikasi utama membutuhkan koneksi internet.'
       : (url ? '' : 'Buka Pengaturan Portal dan tempel URL web app.');
   }
+  function purgeLocalCache(done) {
+    var tasks = [];
+    if ('serviceWorker' in navigator) {
+      tasks.push(navigator.serviceWorker.getRegistrations().then(function (regs) {
+        return Promise.all(regs.map(function (r) { return r.unregister(); }));
+      }));
+    }
+    if (window.caches) {
+      tasks.push(caches.keys().then(function (keys) {
+        return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+      }));
+    }
+    Promise.all(tasks).then(function () { if (done) done(); }).catch(function () { if (done) done(); });
+  }
   function openApp() {
     var url = getGasUrl();
     if (!url || !validUrl(url)) { refresh(); setupBox.setAttribute('open', ''); return; }
+    var sep = url.indexOf('?') >= 0 ? '&' : '?';
+    url = url + sep + 'nocache=' + Date.now();
     splash.classList.add('on');
-    setTimeout(function () { window.location.href = url; }, 300);
+    setTimeout(function () { window.location.href = url; }, 200);
   }
   btnOpen.addEventListener('click', openApp);
   if (new URLSearchParams(window.location.search).get('launch') === '1') {
@@ -210,12 +230,19 @@
   window.addEventListener('online', refresh);
   window.addEventListener('offline', refresh);
   refresh();
+  document.getElementById('btn-fresh').addEventListener('click', function () {
+    purgeLocalCache(function () {
+      location.reload(true);
+    });
+  });
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('sw.js', { scope: '/' }).catch(function () {});
+      purgeLocalCache(function () {
+        navigator.serviceWorker.register('sw.js?v=4', { scope: '/' }).catch(function () {});
+      });
     });
   }
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3ce0ce0a9e7f8c6',t:'MTc4OTcxMDM4Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
