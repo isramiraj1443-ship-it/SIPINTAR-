@@ -1,6 +1,4 @@
 <!DOCTYPE html>
-<!-- SIPINTAR frontend GitHub — JANGAN tempel ke Apps Script. GAS code.gs memuat file ini otomatis. -->
-
 <html lang="id">
 <head>
   <base target="_top">
@@ -33,9 +31,8 @@
       display:block;padding:10px 44px 10px 42px!important;border:1px solid #cbd5e1;border-radius:.5rem;font-size:16px!important;line-height:1.25!important;
       background:#fff!important;color:#0f172a;user-select:text!important;-webkit-user-select:text!important;
     }
-    #loginForm input#pin{padding-right:12px!important;background:#fef2f2!important}
-    /* PIN sesi ujian tidak di halaman login — hanya di modul Ujian siswa */
-    #pin-container{display:none!important}
+    #pin-container, #loginForm #pin-container {display:none!important;visibility:hidden!important;height:0!important;max-height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;border:0!important}
+    #loginForm input#pin[type="text"]{display:none!important}
     #loginForm .login-ico{position:absolute;left:12px;top:0;bottom:0;width:20px;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:2}
     #loginForm .login-eye{position:absolute;right:10px;top:0;bottom:0;width:28px;display:flex;align-items:center;justify-content:center;z-index:3;cursor:pointer}
     #loginForm input#isAdmin{width:16px!important;height:16px!important;min-width:16px;padding:0!important;display:inline-block}
@@ -168,7 +165,26 @@
       target.onerror = null;
       if (window.SP_OWL_LOGO && target.src !== window.SP_OWL_LOGO) target.src = window.SP_OWL_LOGO;
     }
+    function sipintarKillLoginPin() {
+      var c = document.getElementById('pin-container');
+      if (c) {
+        c.setAttribute('hidden', '');
+        c.classList.add('hidden');
+        c.style.setProperty('display', 'none', 'important');
+        c.innerHTML = '';
+      }
+      var p = document.getElementById('pin');
+      if (p) {
+        try { p.type = 'hidden'; } catch (eT) {}
+        p.value = '';
+        p.removeAttribute('required');
+        p.required = false;
+      }
+    }
+    sipintarKillLoginPin();
     document.addEventListener('DOMContentLoaded', function () {
+      sipintarKillLoginPin();
+
       // 1) Slot ikon aplikasi (sidebar admin, header ujian, header hasil)
       var slots = document.querySelectorAll('.sp-owl-slot');
       for (var i = 0; i < slots.length; i++) {
@@ -983,6 +999,7 @@
             <div id="login-clock" class="text-xl font-bold text-white font-mono tracking-widest">--:--:--</div>
             <div id="login-date-display" class="text-xs text-slate-300 font-medium"></div>
             <div id="login-tz-label" class="text-[10px] text-slate-400 font-mono"></div>
+            <div id="sipintar-ui-build" class="text-[9px] text-slate-400 mt-0.5 tracking-wide">UI 2.0.3</div>
           </div>
         </div>
 
@@ -1007,13 +1024,9 @@
             </div>
           </div>
 
-          <div id="pin-container" class="hidden">
-            <label class="block text-xs font-bold text-red-600 uppercase tracking-wide mb-1">PIN Sesi Ujian</label>
-            <div class="relative login-field-wrap">
-              <span class="login-ico text-red-500"><i class="fas fa-key"></i></span>
-              <input type="text" id="pin" name="pin" autocomplete="one-time-code" inputmode="numeric" class="block w-full text-sm border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 bg-red-50 tracking-widest font-bold text-slate-800" placeholder="Contoh: 123456">
-            </div>
-          </div>
+          <!-- PIN sesi ujian TIDAK di login; hanya di menu Ujian siswa -->
+          <input type="hidden" id="pin" name="pin" value="" autocomplete="off">
+          <div id="pin-container" class="hidden" style="display:none!important;height:0;overflow:hidden;visibility:hidden" hidden></div>
 
           <div id="login-exam-reauth-note" class="hidden p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">
             Masuk kembali untuk membuka <b>modul ujian</b>. Gunakan User ID dan password yang sama.
@@ -14618,5 +14631,5 @@ function saveRandomConfigFromModal() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3cf9b531a548225',t:'MTc4OTcyNjcwNw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>l>
