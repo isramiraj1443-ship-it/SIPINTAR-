@@ -1,8 +1,8 @@
 {
-  "name": "SIPINTAR",
+  "name": "SIPINTAR — SMPN 26 Surakarta",
   "short_name": "SIPINTAR",
   "description": "Portal ujian digital SIPINTAR, SMP Negeri 26 Surakarta.",
-  "start_url": "./?launch=1",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
