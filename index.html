@@ -47,6 +47,10 @@
     .login-dev-bar .login-dev-n{display:block;margin-top:3px;font-size:12px;font-weight:700}
     .login-dev-bar .login-dev-y{display:block;margin-top:2px;font-size:11px;font-weight:800;letter-spacing:.16em}
     .glass{background:rgba(255,255,255,.92);backdrop-filter:blur(8px)}
+    #login-clock-box{margin-top:8px;padding:8px 16px;border-radius:12px;background:#1e293b;color:#fff;display:inline-flex;flex-direction:column;align-items:center;border:1px solid #334155}
+    #login-clock{color:#fff!important;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:1.25rem;font-weight:800;letter-spacing:.14em;line-height:1.2}
+    #login-date-display{color:#cbd5e1;font-size:12px;font-weight:600}
+    #login-tz-label,#sipintar-ui-build{color:#94a3b8;font-size:10px}
     #swal-lite{position:fixed;inset:0;z-index:99999;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.55);padding:16px}
   </style>
   <script>
@@ -1067,7 +1071,7 @@
           <p id="login-subtitle" class="text-sm text-slate-600 mt-1 font-medium"><?= cfg.app_subtitle ?></p>
 
           <!-- Jam Real-time Login -->
-          <div class="mt-2 py-2 px-4 rounded-xl bg-slate-800/70 inline-flex flex-col items-center gap-0.5 shadow-inner border border-slate-700/50">
+          <div id="login-clock-box" class="mt-2 py-2 px-4 rounded-xl bg-slate-800/70 inline-flex flex-col items-center gap-0.5 shadow-inner border border-slate-700/50">
             <div id="login-clock" class="text-xl font-bold text-white font-mono tracking-widest">--:--:--</div>
             <div id="login-date-display" class="text-xs text-slate-300 font-medium"></div>
             <div id="login-tz-label" class="text-[10px] text-slate-400 font-mono"></div>
@@ -1822,36 +1826,75 @@ function setDateDisplay() {
 window._appTimezone  = null;
 window._clockInterval = null;
 
+function _sipPad2_(n) {
+  n = String(n);
+  return n.length < 2 ? '0' + n : n;
+}
+function _sipValidTz_(tz) {
+  if (!tz || typeof tz !== 'string') return false;
+  if (tz.indexOf('<?') >= 0) return false;
+  try {
+    Intl.DateTimeFormat('en-GB', { timeZone: tz }).format(new Date());
+    return true;
+  } catch (e) { return false; }
+}
+function _sipResolveTz_() {
+  if (_sipValidTz_(window._appTimezone)) return window._appTimezone;
+  try {
+    if (typeof APP_TIMEZONE === 'string' && _sipValidTz_(APP_TIMEZONE)) return APP_TIMEZONE;
+  } catch (e0) {}
+  return 'Asia/Jakarta';
+}
+function _sipFmtHms_(date, tz) {
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: tz, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+    }).formatToParts(date);
+    const get = function(tp) {
+      for (var i = 0; i < parts.length; i++) if (parts[i].type === tp) return parts[i].value;
+      return '00';
+    };
+    return _sipPad2_(get('hour')) + ':' + _sipPad2_(get('minute')) + ':' + _sipPad2_(get('second'));
+  } catch (e) {
+    return _sipPad2_(date.getHours()) + ':' + _sipPad2_(date.getMinutes()) + ':' + _sipPad2_(date.getSeconds());
+  }
+}
+function sipStartClockLocal_() {
+  window._appTimezone = _sipResolveTz_();
+  try { _tickClock(); } catch (e) {}
+  if (window._clockInterval) clearInterval(window._clockInterval);
+  window._clockInterval = setInterval(function() {
+    try { _tickClock(); } catch (e2) {}
+  }, 1000);
+}
 function fetchAndStartClock() {
-  google.script.run
-    .withSuccessHandler(function(tz) {
-      window._appTimezone = tz || 'Asia/Jakarta';
-      _tickClock();
-      if (window._clockInterval) clearInterval(window._clockInterval);
-      window._clockInterval = setInterval(_tickClock, 1000);
-    })
-    .withFailureHandler(function() {
-      window._appTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      _tickClock();
-      if (window._clockInterval) clearInterval(window._clockInterval);
-      window._clockInterval = setInterval(_tickClock, 1000);
-    })
-    .getScriptTimezone();
+  sipStartClockLocal_();
+  try {
+    if (!(typeof google !== 'undefined' && google.script && google.script.run)) return;
+    google.script.run
+      .withSuccessHandler(function(tz) {
+        if (_sipValidTz_(tz)) window._appTimezone = tz;
+        try { _tickClock(); } catch (e) {}
+      })
+      .withFailureHandler(function() {})
+      .getScriptTimezone();
+  } catch (e3) {}
 }
 
 function _tickClock() {
   const now = new Date();
-  const tz  = window._appTimezone || 'Asia/Jakarta';
-
-  const timeStr = now.toLocaleTimeString('id-ID', {
-    timeZone: tz, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
-  });
-  const dateStr = now.toLocaleDateString('id-ID', {
-    timeZone: tz, weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-  });
+  const tz  = _sipResolveTz_();
+  const timeStr = _sipFmtHms_(now, tz);
+  var dateStr = '';
+  try {
+    dateStr = now.toLocaleDateString('id-ID', {
+      timeZone: tz, weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+  } catch (eD) {
+    dateStr = now.toLocaleDateString('id-ID');
+  }
   const tzLabel = _getTimezoneLabel(tz);
 
-  // Login form
   const loginClock = document.getElementById('login-clock');
   const loginDate  = document.getElementById('login-date-display');
   const loginTz    = document.getElementById('login-tz-label');
@@ -1859,7 +1902,6 @@ function _tickClock() {
   if (loginDate)  loginDate.innerText  = dateStr;
   if (loginTz)    loginTz.innerText    = tzLabel;
 
-  // Navbar Admin/Guru
   const navTime = document.getElementById('current-time-display');
   const navDate = document.getElementById('current-date-display');
   if (navTime) navTime.innerText = timeStr;
@@ -1875,6 +1917,12 @@ function _getTimezoneLabel(tz) {
     'Asia/Jayapura':      'WIT (UTC+9)',
   };
   return tzMap[tz] || tz;
+}
+try { sipStartClockLocal_(); } catch (eSipClk) {}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() { try { sipStartClockLocal_(); } catch (e2) {} });
+} else {
+  try { sipStartClockLocal_(); } catch (e3) {}
 }
 
 /* ==========================================================================
@@ -15020,5 +15068,5 @@ function hermesTolak(id) {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3e52a150c1209c2',t:'MTc4OTk1Mjc1Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3e536181d23f93f',t:'MTc4OTk1MzI0OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>l>
