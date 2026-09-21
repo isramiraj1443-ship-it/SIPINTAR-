@@ -1,5 +1,4 @@
-/* Service Worker portal SIPINTAR */
-const CACHE_NAME = 'sipintar-portal-v5';
+const CACHE_NAME = 'sipintar-portal-v9';
 self.addEventListener('install', function (e) { self.skipWaiting(); });
 self.addEventListener('activate', function (e) {
   e.waitUntil(
