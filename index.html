@@ -43,7 +43,8 @@
     #btnLogin{width:100%;background:#2563eb;color:#fff;border:0;border-radius:.75rem;padding:.7rem 1rem;font-weight:700;cursor:pointer}
     @keyframes sipDevShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
     .login-dev-bar{margin-top:10px;width:100%;box-sizing:border-box;padding:10px 12px;border-radius:12px;text-align:center;color:#f8fafc;background:linear-gradient(120deg,#1b3a6b,#2563eb,#0e7490,#2b369e,#1e3a8a,#1b3a6b);background-size:280% 280%;animation:sipDevShift 9s ease infinite;border:1px solid rgba(255,255,255,.18)}
-    .login-dev-bar .login-dev-k{display:block;font-size:10px;font-weight:700}
+    .login-dev-bar .login-dev-k{display:block;font-size:12px;font-weight:800}
+    .login-dev-bar .login-dev-n{display:block;margin-top:3px;font-size:12px;font-weight:700}
     .login-dev-bar .login-dev-y{display:block;margin-top:2px;font-size:11px;font-weight:800;letter-spacing:.16em}
     .glass{background:rgba(255,255,255,.92);backdrop-filter:blur(8px)}
     #swal-lite{position:fixed;inset:0;z-index:99999;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.55);padding:16px}
@@ -408,7 +409,8 @@
     box-shadow: 0 8px 22px rgba(37, 99, 235, .28);
     border: 1px solid rgba(255,255,255,.18);
   }
-  .login-dev-bar .login-dev-k { display: block; font-size: 10px; font-weight: 700; letter-spacing: .04em; opacity: .92; }
+  .login-dev-bar .login-dev-k { display: block; font-size: 12px; font-weight: 800; letter-spacing: .02em; opacity: .96; }
+  .login-dev-bar .login-dev-n { display: block; margin-top: 3px; font-size: 12px; font-weight: 700; opacity: .95; }
   .login-dev-bar .login-dev-y { display: block; margin-top: 2px; font-size: 11px; font-weight: 800; letter-spacing: .16em; opacity: .9; }
 
   /* --- MODERN DASHBOARD CARDS --- */
@@ -1117,14 +1119,10 @@
             <span id="errorText">Error message here</span>
           </div>
 
-          <div id="login-developer" class="login-dev-bar" aria-label="Pengembang sistem">
-            <span class="login-dev-k">Pengembang : Arif Nuur Iswahyudi, S.Pd., Gr</span>
+          <div id="login-developer" class="login-dev-bar" aria-label="Kredit sistem">
+            <span class="login-dev-k">Inovasi Pembelajaran version 2</span>
+            <span class="login-dev-n">Arif Nuur Iswahyudi</span>
             <span class="login-dev-y">2026</span>
-          </div>
-          <div id="mj-secure-footer" class="cbt-secure-badge">
-            <span class="cbt-copy">© Copyright Inovasi Pembelajaran Version 2</span>
-            <span class="cbt-author">Arif Nuur Iswahyudi, S.Pd., Gr</span>
-            <span class="cbt-year">2026</span>
           </div>
 
         </form>
@@ -1665,32 +1663,24 @@
    1. GLOBAL VARIABLES & STATE MANAGEMENT
    ========================================================================== */
 
-// --- Footer / Badge Injection (IIFE) ---
+// --- Kredit login (IIFE) ---
 (function() {
-  const _idArr = [109, 106, 45, 115, 101, 99, 117, 114, 101, 45, 102, 111, 111, 116, 101, 114];
-  // Updated with " Version 3.3"
-  const _txtArr = [169, 32, 67, 111, 112, 121, 114, 105, 103, 104, 116, 32, 77, 74, 32, 79, 102, 102, 105, 99, 105, 97, 108, 32, 66, 75, 76, 32, 86, 101, 114, 115, 105, 111, 110, 32, 51, 46, 50];
-  const _dec = (arr) => String.fromCharCode(...arr);
-
-  setInterval(() => {
-    const _id = _dec(_idArr);
-    const _el = document.getElementById(_id);
-    if (!_el) {
-      const _d = document.createElement('div');
-      _d.id = _id;
-      _d.className = 'cbt-secure-badge';
-      // Ikon & Teks
-      // Footer Updated
-    _d.className = 'cbt-secure-badge';
-      _d.innerHTML = '<span class="cbt-copy">© Copyright Inovasi Pembelajaran Version 2</span><span class="cbt-author">Arif Nuur Iswahyudi, S.Pd., Gr</span><span class="cbt-year">2026</span>';
-
-      const existing = document.getElementById('mj-secure-footer');
-      if (existing) {
-        existing.innerHTML = _d.innerHTML;
-      } else {
-        const targetContainer = document.getElementById('loginForm');
-        if (targetContainer) targetContainer.appendChild(_d);
-      }
+  const HTML = '<span class="login-dev-k">Inovasi Pembelajaran version 2</span><span class="login-dev-n">Arif Nuur Iswahyudi</span><span class="login-dev-y">2026</span>';
+  setInterval(function() {
+    const foot = document.getElementById('mj-secure-footer');
+    if (foot && foot.parentNode) foot.parentNode.removeChild(foot);
+    let el = document.getElementById('login-developer');
+    if (!el) {
+      const form = document.getElementById('loginForm');
+      if (!form) return;
+      el = document.createElement('div');
+      el.id = 'login-developer';
+      el.className = 'login-dev-bar';
+      form.appendChild(el);
+    }
+    if (el.innerHTML.indexOf('Inovasi Pembelajaran version 2') < 0) {
+      el.className = 'login-dev-bar';
+      el.innerHTML = HTML;
     }
   }, 1500);
 })();
@@ -15030,5 +15020,5 @@ function hermesTolak(id) {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3e50ce84a4afdc3',t:'MTc4OTk1MTU2MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3e52a150c1209c2',t:'MTc4OTk1Mjc1Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>l>
