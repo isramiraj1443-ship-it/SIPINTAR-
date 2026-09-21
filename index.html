@@ -1948,7 +1948,12 @@ function handleLogin(e) {
   const pin = '';
 
   // Logika Baru: Siswa adalah ketika Admin TIDAK dicentang
-  const isAdmin = document.getElementById('isAdmin').checked;
+  const adminBox = document.getElementById('isAdmin');
+  const uidHint = String(user || '').toLowerCase().trim();
+  if (adminBox && !adminBox.checked && (uidHint === 'admin' || uidHint.indexOf('adm-') === 0 || uidHint.indexOf('gru-') === 0)) {
+    adminBox.checked = true;
+  }
+  const isAdmin = !!(adminBox && adminBox.checked);
 
   // 2. Ambil elemen UI untuk Loading
   const btn = document.getElementById('btnLogin');
@@ -1956,6 +1961,7 @@ function handleLogin(e) {
   const errText = document.getElementById('errorText');
 
   // 3. Set status Loading
+  window._sipLoginBusy = true;
   btn.disabled = true;
   btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Memverifikasi...';
   errDiv.classList.add('hidden');
@@ -1966,11 +1972,12 @@ function handleLogin(e) {
   google.script.run
     .withSuccessHandler(res => {
       // Reset tombol
+      window._sipLoginBusy = false;
       btn.disabled = false;
       btn.innerHTML = '<span>Masuk Aplikasi</span> <i class="fas fa-arrow-right"></i>';
       if (logoWrap) logoWrap.classList.remove('is-validating');
 
-      if (res.success) {
+      if (res && res.success) {
         // === SIMPAN SESI KE LOCAL STORAGE ===
         try {
           localStorage.setItem('sipadu_session', JSON.stringify({
@@ -2026,6 +2033,7 @@ function handleLogin(e) {
       }
     })
     .withFailureHandler(err => {
+      window._sipLoginBusy = false;
       if (logoWrap) logoWrap.classList.remove('is-validating');
       btn.disabled = false;
       btn.innerHTML = 'Coba Lagi';
@@ -9772,13 +9780,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 2. Cek Sesi (yang sudah ada sebelumnya)
     fetchAndStartClock();
-    try {
-      google.script.run
-        .withSuccessHandler(function () {})
-        .withFailureHandler(function () {})
-        .pingLoginWarm();
-    } catch (eWarm) {}
-    checkSavedSession(); 
+    setTimeout(function() {
+      if (window._sipLoginBusy) return;
+      checkSavedSession();
+    }, 1200); 
 });
 
 /* -----------------------------------------------------------
@@ -15096,5 +15101,5 @@ function hermesTolak(id) {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3e5f2514ab31ed9',t:'MTc4OTk2MDk1Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3e68fdeaf398bd0',t:'MTc4OTk2NzQxMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>l>
