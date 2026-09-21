@@ -56,30 +56,6 @@
   <script>
     window._restrictedDevice = false;
     window._cdnStatus = { tailwind:false, fa:false, swal:false, xlsx:false, tinymce:false, mathjax:false };
-    window.sipRun = function sipRun() {
-      var g = null;
-      try { if (typeof google !== 'undefined') g = google; } catch (e0) {}
-      if (!g) { try { g = window.google; } catch (e1) {} }
-      if (g && g.script && g.script.run) return g.script.run;
-      var failMsg = 'Aplikasi tidak terhubung ke server Apps Script. Buka lewat URL Web App /exec (bukan file HTML, GitHub, atau pratinjau), lalu hard-refresh (Ctrl+Shift+R).';
-      var dummy = {
-        withSuccessHandler: function () { return dummy; },
-        withFailureHandler: function (cb) { dummy._fail = cb; return dummy; },
-        withUserObject: function () { return dummy; }
-      };
-      if (typeof Proxy === 'function') {
-        return new Proxy(dummy, {
-          get: function (target, prop) {
-            if (prop in target) return target[prop];
-            return function () {
-              try { if (typeof target._fail === 'function') target._fail(failMsg); } catch (e2) {}
-              return dummy;
-            };
-          }
-        });
-      }
-      return dummy;
-    };
     (function detectRestricted(){
       try {
         if (document.fullscreenEnabled === false && document.webkitFullscreenEnabled === false) window._restrictedDevice = true;
@@ -1894,8 +1870,8 @@ function sipStartClockLocal_() {
 function fetchAndStartClock() {
   sipStartClockLocal_();
   try {
-    if (!(typeof google !== 'undefined' && google.script && sipRun())) return;
-    sipRun()
+    if (!(typeof google !== 'undefined' && google.script && google.script.run)) return;
+    google.script.run
       .withSuccessHandler(function(tz) {
         if (_sipValidTz_(tz)) window._appTimezone = tz;
         try { _tickClock(); } catch (e) {}
@@ -1987,20 +1963,8 @@ function handleLogin(e) {
   if (logoWrap) logoWrap.classList.add('is-validating');
 
   // 4. Panggil Fungsi Server (loginUser)
-  var loginWatch = setTimeout(function () {
-    try {
-      if (logoWrap) logoWrap.classList.remove('is-validating');
-      btn.disabled = false;
-      btn.innerHTML = '<span>Masuk Aplikasi</span> <i class="fas fa-arrow-right"></i>';
-      errText.textContent = 'Login terlalu lama. Periksa koneksi, buka URL /exec Apps Script, lalu coba lagi.';
-      errDiv.classList.remove('hidden');
-    } catch (eW) {}
-  }, 8000);
-  function sipLoginClearWatch_() { try { clearTimeout(loginWatch); } catch (eC) {} }
-  try {
-  sipRun()
+  google.script.run
     .withSuccessHandler(res => {
-      sipLoginClearWatch_();
       // Reset tombol
       btn.disabled = false;
       btn.innerHTML = '<span>Masuk Aplikasi</span> <i class="fas fa-arrow-right"></i>';
@@ -2062,24 +2026,12 @@ function handleLogin(e) {
       }
     })
     .withFailureHandler(err => {
-      sipLoginClearWatch_();
       if (logoWrap) logoWrap.classList.remove('is-validating');
       btn.disabled = false;
       btn.innerHTML = 'Coba Lagi';
       Swal.fire('Error', 'Terjadi kesalahan koneksi server: ' + err, 'error');
     })
     .loginUser(user, pass, pin, isAdmin);
-  } catch (eLogin) {
-    sipLoginClearWatch_();
-    if (logoWrap) logoWrap.classList.remove('is-validating');
-    btn.disabled = false;
-    btn.innerHTML = 'Coba Lagi';
-    var msg = (eLogin && eLogin.message) ? eLogin.message : String(eLogin);
-    if (/google is not defined/i.test(msg) || /NO_GAS/i.test(msg)) {
-      msg = 'Aplikasi tidak terhubung ke server Apps Script. Buka lewat URL Web App /exec, lalu hard-refresh.';
-    }
-    try { Swal.fire('Error', msg, 'error'); } catch (eS) { errText.textContent = msg; errDiv.classList.remove('hidden'); }
-  }
 }
 
 
@@ -2109,7 +2061,7 @@ function startAdminSessionTimer() {
 
 function forceLogoutSession() {
   if (typeof disableAntiCheat === 'function') disableAntiCheat();
-  if (currentUser && currentUser.userID) sipRun().logoutUser(currentUser.userID);
+  if (currentUser && currentUser.userID) google.script.run.logoutUser(currentUser.userID);
 
   localStorage.removeItem('sipadu_session');
   currentUser = null;
@@ -2191,7 +2143,7 @@ function logout() {
 
       // 3. Logout di Server (Background process)
       if (typeof currentUser !== 'undefined' && currentUser && currentUser.userID) {
-        sipRun().logoutUser(currentUser.userID);
+        google.script.run.logoutUser(currentUser.userID);
       }
 
       // 4. === RESET VARIABEL MEMORI ===
@@ -2304,7 +2256,7 @@ function initAdminPanel() {
   try { showAdminTab('dash-home'); } catch (eHome) {}
 
   // Daftar ujian dimuat di latar, tidak menahan masuk dashboard
-  sipRun()
+  google.script.run
     .withSuccessHandler(exams => {
       cachedExams = exams || [];
       if (typeof sipRestoreMenuMods_ === 'function') sipRestoreMenuMods_();
@@ -2527,7 +2479,7 @@ function showStudentHub(optTab) {
   }
   const formBox = document.getElementById('siswa-hub-form');
   if (formBox) formBox.innerHTML = '<p class="text-sm text-slate-400">Memuat profil…</p>';
-  sipRun()
+  google.script.run
     .withSuccessHandler(function (res) {
       window._siswaProfilCache = (res && res.profil) || null;
       if (!res || !res.success) {
@@ -2553,7 +2505,7 @@ function startSiswaExamRelogin_() {
   window._pendingExamData = null;
   try { localStorage.removeItem('sipadu_session'); } catch (eL) {}
   if (currentUser && currentUser.userID) {
-    try { sipRun().logoutUser(currentUser.userID); } catch (eO) {}
+    try { google.script.run.logoutUser(currentUser.userID); } catch (eO) {}
   }
   currentUser = null;
   const hub = document.getElementById('page-siswa-hub');
@@ -2617,7 +2569,7 @@ function renderSiswaDashboard_() {
   }
   const statusUjian = ed.waiting ? 'MENUNGGU WAKTU MULAI' : (ed.subject ? 'SIAP DIKERJAKAN' : 'TIDAK ADA JADWAL');
   box.innerHTML = '<p class="text-sm text-slate-500">Memuat informasi ujian…</p>';
-  sipRun()
+  google.script.run
     .withSuccessHandler(function (res) {
       const info = (res && res.data) || {};
       const judulEl = document.getElementById('siswa-eb-title');
@@ -2670,7 +2622,7 @@ function renderSiswaDashboard_() {
 function saveHubProfil() {
   const payload = collectProfilForm_();
   payload.userID = currentUser.userID;
-  sipRun()
+  google.script.run
     .withSuccessHandler(function (res) {
       if (res && res.success) {
         Swal.fire({ icon: 'success', title: 'Tersimpan', text: res.message, timer: 1400, showConfirmButton: false });
@@ -2699,7 +2651,7 @@ function continueFromStudentHub() {
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-1"></i> Memeriksa PIN…';
   }
-  sipRun()
+  google.script.run
     .withSuccessHandler(function (res) {
       if (btn) {
         btn.disabled = false;
@@ -2753,7 +2705,7 @@ function continueFromStudentHub() {
 function paintDashInfoUjian_() {
   const box = document.getElementById('dash-info-ujian-box');
   if (!box) return;
-  sipRun()
+  google.script.run
     .withSuccessHandler(function (res) {
       const d = (res && res.data) || {};
       const isAdmin = currentUser && currentUser.role === 'Admin';
@@ -2797,7 +2749,7 @@ function saveDashInfoUjian_() {
     proktor: (document.getElementById('dash-info-proktor') || {}).value || '',
     pengumuman: (document.getElementById('dash-info-pengumuman') || {}).value || ''
   };
-  sipRun()
+  google.script.run
     .withSuccessHandler(function (res) {
       Swal.fire({ icon: res && res.success ? 'success' : 'error', title: (res && res.message) || 'Selesai' });
     })
@@ -2853,7 +2805,7 @@ function exportBankSoalA4_(format) {
       }
     } catch (eX) {}
     Swal.fire({ title: 'Menyimpan salinan ke Drive…', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
-    sipRun()
+    google.script.run
       .withSuccessHandler(function (res) {
         if (res && res.success) {
           Swal.fire({
@@ -2888,7 +2840,7 @@ function exportBankSoalA4_(format) {
     + '<script>function go(){if(window.MathJax&&MathJax.typesetPromise){MathJax.typesetPromise().then(function(){window.print()}).catch(function(){window.print()});}else setTimeout(function(){window.print()},800);}window.onload=go;<\/script>'
     + '</body></html>';
   sipintarPrintHtml_(doc);
-  sipRun().exportBankSoalFile(examId, 'pdf', currentUser.userID, currentUser.token);
+  google.script.run.exportBankSoalFile(examId, 'pdf', currentUser.userID, currentUser.token);
 }
 
 function openProfilModal(userID, mode) {
@@ -2903,7 +2855,7 @@ function openProfilModal(userID, mode) {
     cancelButtonText: wantEdit ? 'Batal' : 'Tutup',
     confirmButtonColor: '#0d9488',
     didOpen: function () {
-      sipRun()
+      google.script.run
         .withSuccessHandler(function (res) {
           if (!res || !res.success) {
             Swal.update({ html: '<p class="text-sm text-red-500">' + escapeHtmlProfil_((res && res.message) || 'Gagal memuat.') + '</p>' });
@@ -2925,7 +2877,7 @@ function openProfilModal(userID, mode) {
       const payload = collectProfilForm_();
       payload.userID = userID;
       return new Promise(function (resolve, reject) {
-        sipRun()
+        google.script.run
           .withSuccessHandler(function (res) {
             if (res && res.success) resolve(res);
             else reject(new Error((res && res.message) || 'Gagal menyimpan'));
@@ -2954,7 +2906,7 @@ function hapusProfilDariModal(userID) {
     confirmButtonText: 'Hapus'
   }).then(function (r) {
     if (!r.isConfirmed) return;
-    sipRun()
+    google.script.run
       .withSuccessHandler(function (res) {
         Swal.fire({ icon: res && res.success ? 'success' : 'error', title: (res && res.message) || 'Selesai' });
         const box = document.getElementById('admin-profil-table');
@@ -2983,7 +2935,7 @@ function renderProfilSiswaPage(container) {
         <div id="admin-profil-table" class="text-sm text-slate-400">Memuat profil…</div>
       </div>
     </div>`;
-  sipRun()
+  google.script.run
     .withSuccessHandler(function (res) {
       window._profilListCache = (res && res.items) || [];
       window._profilCanEdit = !!(res && res.canEdit);
@@ -3047,7 +2999,7 @@ function exportProfilExcelFromList_() {
   });
   const ids = filtered.map(function (it) { return it.userID; });
   Swal.fire({ title: 'Menyimpan ke folder Kartu Ujian…', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
-  sipRun()
+  google.script.run
     .withSuccessHandler(function (res) {
       if (!res || !res.success) {
         Swal.fire({ icon: 'error', title: 'Gagal ekspor', text: (res && res.message) || '' });
@@ -3126,7 +3078,7 @@ function renderKartuUjianPage(container) {
         </div>
       </div>
     </div>`;
-  sipRun()
+  google.script.run
     .withSuccessHandler(function (res) {
       window._kartuTemplates = (res && res.items) || [];
       const sel = document.getElementById('kartu-tpl-select');
@@ -3141,7 +3093,7 @@ function renderKartuUjianPage(container) {
     .listKartuTemplates(currentUser.userID, currentUser.token);
 
   try {
-    sipRun()
+    google.script.run
       .withSuccessHandler(function (exams) {
         const sel = document.getElementById('kartu-exam-select');
         if (!sel) return;
@@ -3159,7 +3111,7 @@ function renderKartuUjianPage(container) {
       .getExamList(currentUser.userID, currentUser.token);
   } catch (eEx) {}
 
-  sipRun()
+  google.script.run
     .withSuccessHandler(function (res) {
       window._kartuStudents = (res && res.items) || [];
       const sel = document.getElementById('kartu-filter-kelas');
@@ -3184,7 +3136,7 @@ function renderKartuUjianPage(container) {
 
 function refreshKartuFolderFiles_() {
   const box = document.getElementById('kartu-folder-files');
-  sipRun()
+  google.script.run
     .withSuccessHandler(function (res) {
       const link = document.getElementById('kartu-folder-link');
       if (res && res.success && link) {
@@ -3272,7 +3224,7 @@ function newKartuTemplate_() {
 
 function saveKartuTemplateFromForm_() {
   const payload = collectKartuTemplateForm_();
-  sipRun()
+  google.script.run
     .withSuccessHandler(function (res) {
       if (res && res.success) {
         Swal.fire({ icon: 'success', title: 'Template tersimpan', timer: 1200, showConfirmButton: false });
@@ -3288,7 +3240,7 @@ function deleteKartuTemplateUi_() {
   Swal.fire({ title: 'Hapus template?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc2626', confirmButtonText: 'Hapus' })
     .then(function (r) {
       if (!r.isConfirmed) return;
-      sipRun()
+      google.script.run
         .withSuccessHandler(function (res) {
           Swal.fire({ icon: res && res.success ? 'success' : 'error', title: (res && res.message) || '' });
           renderKartuUjianPage(document.getElementById('admin-content'));
@@ -3354,7 +3306,7 @@ function fetchKartuData_(cb) {
     return;
   }
   const p = kartuExportPayload_();
-  sipRun()
+  google.script.run
     .withSuccessHandler(function (res) {
       if (!res || !res.success) {
         Swal.fire({ icon: 'error', title: 'Gagal', text: (res && res.message) || '' });
@@ -3445,7 +3397,7 @@ function exportKartuToFolder_(format) {
     return;
   }
   Swal.fire({ title: 'Menyimpan ke folder Kartu Ujian…', html: 'File Excel/PDF akan masuk folder Drive SIPINTAR_Kartu_Ujian.', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
-  sipRun()
+  google.script.run
     .withSuccessHandler(function (res) {
       if (!res || !res.success) {
         Swal.fire({ icon: 'error', title: 'Gagal ekspor', text: (res && res.message) || '' });
@@ -3497,7 +3449,7 @@ function validasiSelectHtml_(r) {
 }
 
 function attachValidasiThenRender(eid) {
-  sipRun()
+  google.script.run
     .withSuccessHandler(function (map) {
       map = map || {};
       (allResultsData || []).forEach(function (r) {
@@ -3523,7 +3475,7 @@ function attachValidasiThenRender(eid) {
 
 function setRowValidasi(responseId, studentId, status) {
   const eid = (document.getElementById('select-result-exam') || {}).value || '';
-  sipRun()
+  google.script.run
     .withSuccessHandler(function (res) {
       if (!res || !res.success) {
         Swal.fire({ icon: 'error', title: 'Gagal validasi', text: (res && res.message) || '' });
@@ -3626,7 +3578,7 @@ function renderMasterDataPage(container) {
           subjects: subjects
         };
 
-        sipRun()
+        google.script.run
           .withSuccessHandler(res => {
             document.getElementById('global-loading').classList.add('hidden');
             if (res.success) {
@@ -3702,7 +3654,7 @@ function renderMasterDataPage(container) {
   `;
 
   // Panggil backend untuk ambil data
-  sipRun()
+  google.script.run
     .withSuccessHandler(data => {
       masterData = data; // Simpan ke cache global
       renderListToContainer(data.classes, 'master-classes-container', 'class');
@@ -4410,7 +4362,7 @@ function handleExamInfoImageAutocomplete(input) {
     resultDiv.classList.remove('hidden');
   };
   if (!allImagesData || allImagesData.length === 0) {
-    sipRun().withSuccessHandler(imgs => {
+    google.script.run.withSuccessHandler(imgs => {
       allImagesData = imgs || [];
       render();
     }).getSavedImages();
@@ -4496,7 +4448,7 @@ function handleExamSubmit(e) {
 
   if (data.examId) {
     // --- UPDATE ---
-    sipRun()
+    google.script.run
       .withSuccessHandler(res => {
         document.getElementById('global-loading').classList.add('hidden');
         if (res.success) {
@@ -4509,7 +4461,7 @@ function handleExamSubmit(e) {
       .updateExam(data, currentUser.userID, currentUser.token);
   } else {
     // --- CREATE ---
-    sipRun()
+    google.script.run
       .withSuccessHandler(res => {
         document.getElementById('global-loading').classList.add('hidden');
         // Cek respon (Server sekarang mengembalikan object success/message utk create juga)
@@ -4537,7 +4489,7 @@ function handleDeleteExam(examId) {
     if (result.isConfirmed) {
       document.getElementById('global-loading').classList.remove('hidden');
 
-      sipRun()
+      google.script.run
         .withSuccessHandler(res => {
           document.getElementById('global-loading').classList.add('hidden');
           if (res.success) {
@@ -4596,7 +4548,7 @@ function switchStatus(id, currentStatus) {
     }
   });
 
-  sipRun()
+  google.script.run
     .withSuccessHandler(function(res) {
       if (res.success) {
         Swal.fire({
@@ -4618,7 +4570,7 @@ function switchStatus(id, currentStatus) {
 }
 
 function refreshExamList() {
-  sipRun()
+  google.script.run
     .withSuccessHandler(exams => {
       cachedExams = exams;
       renderExamForm(document.getElementById('admin-content'));
@@ -4630,7 +4582,7 @@ function refreshDashboard() {
   const content = document.getElementById('admin-content');
   content.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-slate-400 fade-in"><i class="fas fa-circle-notch fa-spin text-3xl mb-3 text-blue-500"></i> Memuat ulang data dashboard...</div>';
 
-  sipRun()
+  google.script.run
     .withSuccessHandler(exams => {
       cachedExams = exams;
       renderAdminHome(content);
@@ -4649,7 +4601,7 @@ function renderQuestionBank(container) {
 
   // Load Data Gambar jika belum ada
   if (allImagesData.length === 0) {
-    sipRun().withSuccessHandler(imgs => {
+    google.script.run.withSuccessHandler(imgs => {
       allImagesData = imgs || [];
     }).getSavedImages();
   }
@@ -5232,7 +5184,7 @@ function handleImageAutocomplete(input) {
 
   // Pastikan data gambar sudah ada
   if (!allImagesData || allImagesData.length === 0) {
-    sipRun().withSuccessHandler(imgs => {
+    google.script.run.withSuccessHandler(imgs => {
       allImagesData = imgs || [];
     }).getSavedImages();
     return;
@@ -5319,7 +5271,7 @@ function loadQuestionsTable(examId) {
   };
 
   // 4. Ambil Data dari Server
-  sipRun().withSuccessHandler(qs => {
+  google.script.run.withSuccessHandler(qs => {
     // Backend bisa mengembalikan { error: ... } jika akses ditolak / gagal
     if (qs && qs.error) {
       showQError(qs.error);
@@ -5829,7 +5781,7 @@ function handleAddQuestion(e) {
   if (qId) {
     // --- MODE UPDATE (EDIT SOAL) ---
     data.questionId = qId;
-    sipRun()
+    google.script.run
       .withSuccessHandler(res => {
         restoreBtn();
         if (res && res.success) {
@@ -5849,7 +5801,7 @@ function handleAddQuestion(e) {
       .updateQuestion(data);
   } else {
     // --- MODE ADD (SOAL BARU) ---
-    sipRun()
+    google.script.run
       .withSuccessHandler(res => {
         restoreBtn();
         if (res && res.success === false) {
@@ -5888,7 +5840,7 @@ function handleConfigLogoSearch(input) {
 
   // Load data gambar jika belum ada
   if (typeof allImagesData === 'undefined' || allImagesData.length === 0) {
-    sipRun().withSuccessHandler(data => {
+    google.script.run.withSuccessHandler(data => {
       allImagesData = data;
       if (input.value.length > 0) handleConfigLogoSearch(input);
     }).getAllImages();
@@ -5935,7 +5887,7 @@ function handleConfigBgSearch(input) {
   const resultDiv = document.getElementById('cfg-bg-results');
 
   if (typeof allImagesData === 'undefined' || allImagesData.length === 0) {
-    sipRun().withSuccessHandler(data => {
+    google.script.run.withSuccessHandler(data => {
       allImagesData = data;
       if (input.value.length > 0) handleConfigBgSearch(input);
     }).getAllImages();
@@ -6004,7 +5956,7 @@ function triggerImport() {
   btn.disabled = true;
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memproses...';
 
-  sipRun()
+  google.script.run
     .withSuccessHandler(res => {
       btn.disabled = false;
       btn.innerHTML = originalText;
@@ -6035,7 +5987,7 @@ function deleteQuestion(qid, eid) {
     confirmButtonColor: '#d33'
   }).then(r => {
     if (r.isConfirmed) {
-      sipRun().withSuccessHandler(() => loadQuestionsTable(eid)).deleteQuestion(qid);
+      google.script.run.withSuccessHandler(() => loadQuestionsTable(eid)).deleteQuestion(qid);
     }
   });
 }
@@ -6095,7 +6047,7 @@ function bulkDeleteQuestions() {
 
     Swal.fire({ title: 'Menghapus...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
-    sipRun()
+    google.script.run
       .withSuccessHandler(res => {
         if (res.success) {
           Swal.fire({ icon: 'success', title: 'Berhasil!', text: `${res.deleted} soal dihapus.`, timer: 1800, showConfirmButton: false });
@@ -6225,7 +6177,7 @@ function regradeSelectedExam() {
   }).then(function(result) {
     if (!result.isConfirmed) return;
     Swal.fire({ title: 'Mengoreksi jawaban...', html: 'Mohon tunggu, nilai sedang dihitung.', allowOutsideClick: false, didOpen: function() { Swal.showLoading(); } });
-    sipRun()
+    google.script.run
       .withSuccessHandler(function(res) {
         if (res && res.success) {
           Swal.fire({ icon: 'success', title: 'Nilai sudah diisi', text: res.message || (res.count + ' siswa dikoreksi.'), timer: 2500, showConfirmButton: false });
@@ -6276,7 +6228,7 @@ function loadResultsTable(eid) {
       </div>`;
 
   // Ambil Data dari Server
-  sipRun()
+  google.script.run
     .withSuccessHandler(res => {
       // SIMPAN DATA KE MEMORI BROWSER
       allResultsData = res || [];
@@ -6479,7 +6431,7 @@ function unlockStudent(responseId, studentName) {
             });
 
             // Panggil Server
-            sipRun()
+            google.script.run
                 .withSuccessHandler((res) => {
                     if (res.success) {
                         Swal.fire({
@@ -6607,7 +6559,7 @@ function fillReportTplPrefix(prefix, data) {
 
 function loadReportTemplateInto(prefix) {
   if (!currentUser) return;
-  sipRun()
+  google.script.run
     .withSuccessHandler(function(res) {
       if (res && res.success) {
         _reportTplCache = res.data;
@@ -6660,7 +6612,7 @@ function handleReportLogoSearch(input, key) {
     box.classList.remove('hidden');
   };
   if (typeof allImagesData === 'undefined' || !allImagesData || !allImagesData.length) {
-    sipRun().withSuccessHandler(function(imgs) {
+    google.script.run.withSuccessHandler(function(imgs) {
       allImagesData = imgs || [];
       render();
     }).getSavedImages();
@@ -6685,7 +6637,7 @@ function saveReportTemplateFromPage() {
   if (!currentUser) return;
   const data = collectReportTplFromPrefix('rtpl-');
   Swal.fire({ title: 'Menyimpan...', allowOutsideClick: false, didOpen: function() { Swal.showLoading(); } });
-  sipRun()
+  google.script.run
     .withSuccessHandler(function(res) {
       if (res && res.success) {
         _reportTplCache = res.data || data;
@@ -6743,7 +6695,7 @@ function openReportDownloadModal(kind) {
   const apply = function(data) { fillReportTplPrefix('rdl-', data); };
   if (_reportTplCache) apply(_reportTplCache);
   else if (currentUser) {
-    sipRun().withSuccessHandler(function(res) {
+    google.script.run.withSuccessHandler(function(res) {
       if (res && res.success) { _reportTplCache = res.data; apply(res.data); }
     }).getReportTemplate(currentUser.userID, currentUser.token);
   }
@@ -6764,7 +6716,7 @@ function confirmReportDownload() {
     else executePdfRecapDownload(tpl);
   };
   if (saveDef && saveDef.checked && currentUser) {
-    sipRun()
+    google.script.run
       .withSuccessHandler(function(res) {
         if (res && res.success) _reportTplCache = res.data || tpl;
         proceed();
@@ -6780,7 +6732,7 @@ function executePdfRecapDownload(tpl) {
   const btn = document.getElementById('btn-pdf-recap');
   const originalText = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memproses...'; }
-  sipRun()
+  google.script.run
     .withSuccessHandler(res => {
       if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
       if (res.success) openExternalUrl(res.url);
@@ -7103,7 +7055,7 @@ function viewStudentAnswers(responseId) {
 
   if (cachedAns && cachedAns.success) paintViewAnswers(cachedAns);
 
-  sipRun()
+  google.script.run
     .withSuccessHandler(res => {
       if (res && res.success) {
         window._answerDetailCache = window._answerDetailCache || {};
@@ -7165,7 +7117,7 @@ function downloadStudentPDF(responseId, btnElement) {
   btnElement.disabled = true;
   btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
-  sipRun().withSuccessHandler(res => {
+  google.script.run.withSuccessHandler(res => {
     btnElement.disabled = false;
     btnElement.innerHTML = originalHtml;
 
@@ -7322,7 +7274,7 @@ function returnToLoginSilent() {
   if (typeof stopMathGame === 'function') stopMathGame();
   localStorage.removeItem('sipadu_session');
   if (currentUser && currentUser.userID) {
-    try { sipRun().logoutUser(currentUser.userID); } catch (e) {}
+    try { google.script.run.logoutUser(currentUser.userID); } catch (e) {}
   }
   currentUser = null;
   currentExam = null;
@@ -7475,7 +7427,7 @@ function initStudentExam(examData) {
           }
         };
 
-        sipRun().withSuccessHandler(res => {
+        google.script.run.withSuccessHandler(res => {
           if (_examLoadDone) return;
           _examLoadDone = true;
           clearTimeout(_examLoadWatchdog);
@@ -7954,7 +7906,7 @@ function toggleComplexPG(qid, val, el) {
 
   // [FIX] Sync ke server agar jawaban PG_KOMPLEKS tersimpan (auto-save & resume)
   if (currentUser && currentExam) {
-    sipRun()
+    google.script.run
       .withFailureHandler(err => console.error('Sync PG_KOMPLEKS gagal:', err))
       .syncAnswers(currentUser.userID, currentExam.id, answers, violationCount);
   }
@@ -8077,7 +8029,7 @@ function updateNavStyle() {
         if (_syncInFlight) { _syncDirty = true; return; }
         _syncInFlight = true;
         _syncDirty = false;
-        sipRun()
+        google.script.run
           .withSuccessHandler(function() {
             _syncInFlight = false;
             if (_syncDirty) debouncedSync();
@@ -8431,7 +8383,7 @@ function handleSecurityTrigger(reason) {
 
     // 1. Log + reset sesi di server (status Curang, hapus token)
     if (currentUser && currentExam) {
-        sipRun().logViolation(currentUser.userID, currentExam.id, 1, reason, answers, false);
+        google.script.run.logViolation(currentUser.userID, currentExam.id, 1, reason, answers, false);
     }
 
     // 2. Matikan sistem keamanan agar alert tidak spam
@@ -8480,7 +8432,7 @@ function kickStudentSessionSilent() {
     if (typeof timerInterval !== 'undefined' && timerInterval) clearInterval(timerInterval);
     localStorage.removeItem('sipadu_session');
     if (currentUser && currentUser.userID) {
-        try { sipRun().logoutUser(currentUser.userID); } catch (e) {}
+        try { google.script.run.logoutUser(currentUser.userID); } catch (e) {}
     }
     currentUser = null;
     currentExam = null;
@@ -8691,7 +8643,7 @@ function preloadExamMusic_(playWhenReady) {
   _examMusic.blobLoading = true;
   const tok = _examMusic.token;
   try {
-    sipRun()
+    google.script.run
       .withSuccessHandler(function(res) {
         _examMusic.blobLoading = false;
         if (tok !== _examMusic.token) return;
@@ -8744,7 +8696,7 @@ function armExamMusicUnlock() {}
 function pullExamMusicSettings(cb) {
   try {
     if (!currentExam || !currentExam.id || !currentUser) { if (cb) cb(); return; }
-    sipRun()
+    google.script.run
       .withSuccessHandler(function(mod) {
         if (mod && mod.success) {
           currentExam.musicOn = mod.musicOn;
@@ -8782,7 +8734,7 @@ function fillExamMusicSelect(selectedId, selectedUrl) {
   };
   if (window._examMusicLib && window._examMusicLib.length) apply(window._examMusicLib);
   if (!currentUser) return;
-  sipRun()
+  google.script.run
     .withSuccessHandler(function(res) {
       if (!res || !res.success) return;
       window._examMusicLib = res.files || [];
@@ -8843,7 +8795,7 @@ function refreshMusicFolderPage() {
   const link = document.getElementById('music-folder-link');
   if (!currentUser) return;
   if (list) list.innerHTML = '<p class="text-sm text-slate-400"><i class="fas fa-circle-notch fa-spin mr-1"></i> Memuat daftar lagu...</p>';
-  sipRun()
+  google.script.run
     .withSuccessHandler(function(res) {
       if (!res || !res.success) {
         if (list) list.innerHTML = '<p class="text-sm text-red-500">' + ((res && res.message) || 'Gagal memuat folder.') + '</p>';
@@ -8887,7 +8839,7 @@ function handleExamMusicFile(input) {
   const reader = new FileReader();
   reader.onload = function() {
     Swal.fire({ title: 'Mengunggah musik...', allowOutsideClick: false, didOpen: function() { Swal.showLoading(); } });
-    sipRun()
+    google.script.run
       .withSuccessHandler(function(res) {
         if (res && res.success) {
           const urlEl = document.getElementById('exam-music-url');
@@ -9385,7 +9337,7 @@ function executeSubmission(forced, statusLabel, returnToLogin) {
         } catch (eD) {}
     };
 
-    sipRun()
+    google.script.run
       .withSuccessHandler(paintDone)
       .withFailureHandler(function(err) {
         paintDone({ success: false, message: String(err && err.message ? err.message : err) });
@@ -9496,7 +9448,7 @@ function pumpAnswerPrefetch() {
     if (!id || window._answerDetailCache[id]) continue;
     window._answerPrefetchBusy++;
     (function(rid) {
-      sipRun()
+      google.script.run
         .withSuccessHandler(function(res) {
           window._answerPrefetchBusy = Math.max(0, window._answerPrefetchBusy - 1);
           if (res && res.success) {
@@ -9516,7 +9468,7 @@ function pumpAnswerPrefetch() {
 
 function prefetchEssayPack(examId) {
   if (!examId || !currentUser) return;
-  sipRun()
+  google.script.run
     .withSuccessHandler(function(res) {
       if (!res || !res.success) return;
       const map = {};
@@ -9593,7 +9545,7 @@ function openGradingModal(responseId) {
     } else {
       content.innerHTML = '<div class="flex flex-col items-center py-10 text-slate-400"><i class="fas fa-circle-notch fa-spin text-3xl mb-2 text-blue-500"></i> Memuat jawaban uraian...</div>';
     }
-    sipRun().withSuccessHandler(res => {
+    google.script.run.withSuccessHandler(res => {
         if (!res || !res.success) {
             if (!cached) content.innerHTML = '<div class="text-red-500 text-center p-4">' + ((res && res.message) || 'Gagal memuat') + '</div>';
             return;
@@ -9636,7 +9588,7 @@ function submitEssayGrade() {
     }
 
     // 4. Kirim ke server (Google Apps Script)
-    sipRun().withSuccessHandler(res => {
+    google.script.run.withSuccessHandler(res => {
         // Kembalikan tombol ke semula
         if (btn) {
             btn.disabled = false;
@@ -9751,7 +9703,7 @@ function checkSavedSession() {
             document.getElementById('global-loading').classList.remove('hidden');
 
             // 3. Validasi Token ke Server (Wajib ada fungsi checkSession di server/Code.gs)
-            sipRun().withSuccessHandler(res => {
+            google.script.run.withSuccessHandler(res => {
                 document.getElementById('global-loading').classList.add('hidden');
 
                 if (res.success) {
@@ -9821,7 +9773,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 2. Cek Sesi (yang sudah ada sebelumnya)
     fetchAndStartClock();
     try {
-      sipRun()
+      google.script.run
         .withSuccessHandler(function () {})
         .withFailureHandler(function () {})
         .pingLoginWarm();
@@ -9960,7 +9912,7 @@ function processExcelImport() {
 
             btn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Mengupload...';
             
-            sipRun()
+            google.script.run
                 .withSuccessHandler(res => {
                     btn.disabled = false;
                     btn.innerHTML = originalText;
@@ -10207,7 +10159,7 @@ function doSaveBatchQuestions(questionsArr) {
     showConfirmButton: false
   });
 
-  sipRun()
+  google.script.run
     .withSuccessHandler(res => {
       if (btn) btn.disabled = false;
       if (btnText) btnText.textContent = 'Simpan Semua Soal';
@@ -10262,7 +10214,7 @@ function resetExamAttempt(responseId, studentName) {
 
             // 3. Panggil Server
             // PENTING: Kita harus mengirimkan userID dan token admin saat ini agar lolos verifikasi keamanan di server
-            sipRun()
+            google.script.run
                 .withSuccessHandler((res) => {
                     if (res.success) {
                         Swal.fire({
@@ -10629,7 +10581,7 @@ function loadUserTable() {
     const reqToken = currentUser.token;
 
     // 3. Panggil Server dengan Parameter Keamanan
-    sipRun()
+    google.script.run
         .withSuccessHandler(users => {
             // SIMPAN DATA KE GLOBAL VARIABLES
             allUsersData = users || [];
@@ -11010,7 +10962,7 @@ function loadMonitorData(silent) {
     </div>`;
   if (!silent && btnRefresh) { btnRefresh.disabled = true; btnRefresh.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Memuat...'; }
  
-  sipRun()
+  google.script.run
     .withSuccessHandler(res => {
       _monitorLoading = false;
       if (btnRefresh) { btnRefresh.disabled = false; btnRefresh.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh'; }
@@ -11378,7 +11330,7 @@ function handleSingleUnlock(responseId, nama, btnEl) {
   }).then(r => {
     if (!r.isConfirmed) return;
     Swal.fire({ title: 'Memproses...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-    sipRun()
+    google.script.run
       .withSuccessHandler(res => {
         Swal.fire({ icon: res.success ? 'success' : 'error', title: res.success ? 'Berhasil!' : 'Gagal', text: res.message, timer: 2000, showConfirmButton: false });
         if (res.success) loadMonitorData();
@@ -11398,7 +11350,7 @@ function handleSingleReset(responseId, nama, btnEl) {
   }).then(r => {
     if (!r.isConfirmed) return;
     Swal.fire({ title: 'Memproses...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-    sipRun()
+    google.script.run
       .withSuccessHandler(res => {
         Swal.fire({ icon: res.success ? 'success' : 'error', title: res.success ? 'Berhasil!' : 'Gagal', text: res.message, timer: 2000, showConfirmButton: false });
         if (res.success) loadMonitorData();
@@ -11428,7 +11380,7 @@ function handleBulkUnlock() {
   }).then(r => {
     if (!r.isConfirmed) return;
     Swal.fire({ title: 'Memproses...', html: `Membuka blokir <b>${ids.length}</b> siswa...`, allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-    sipRun()
+    google.script.run
       .withSuccessHandler(res => {
         Swal.fire({ icon: res.success ? 'success' : 'error', title: res.success ? 'Berhasil!' : 'Gagal', text: res.message, timer: 2500, showConfirmButton: false });
         if (res.success) { monitorClearSelection(); loadMonitorData(); }
@@ -11458,7 +11410,7 @@ function handleBulkReset() {
       return;
     }
     Swal.fire({ title: 'Memproses...', html: `Me-reset ujian <b>${ids.length}</b> siswa...`, allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-    sipRun()
+    google.script.run
       .withSuccessHandler(res => {
         Swal.fire({ icon: res.success ? 'success' : 'error', title: res.success ? 'Berhasil!' : 'Gagal', text: res.message, timer: 2500, showConfirmButton: false });
         if (res.success) { monitorClearSelection(); loadMonitorData(); }
@@ -11703,7 +11655,7 @@ function handleUserSubmit(e) {
 
     if (isEditMode) {
         // --- PROSES UPDATE / EDIT ---
-        sipRun().withSuccessHandler(res => {
+        google.script.run.withSuccessHandler(res => {
             document.getElementById('global-loading').classList.add('hidden');
             if (res.success) { 
                 Swal.fire('Berhasil', 'Data user diperbarui.', 'success'); 
@@ -11717,7 +11669,7 @@ function handleUserSubmit(e) {
 
     } else {
         // --- PROSES CREATE / BARU ---
-        sipRun().withSuccessHandler(res => {
+        google.script.run.withSuccessHandler(res => {
             document.getElementById('global-loading').classList.add('hidden');
             if (res.success) { 
                 Swal.fire('Berhasil', 'User baru ditambahkan.', 'success'); 
@@ -11743,7 +11695,7 @@ function handleDeleteUser(uid) {
         if (res.isConfirmed) {
             document.getElementById('global-loading').classList.remove('hidden');
             
-            sipRun().withSuccessHandler(r => {
+            google.script.run.withSuccessHandler(r => {
                 document.getElementById('global-loading').classList.add('hidden');
                 if(r.success) { 
                     Swal.fire('Terhapus', '', 'success'); 
@@ -11779,7 +11731,7 @@ function handleToggleUser(uid, rawStatus) {
 
         document.getElementById('global-loading').classList.remove('hidden');
 
-        sipRun()
+        google.script.run
             .withSuccessHandler(res => {
                 document.getElementById('global-loading').classList.add('hidden');
                 if (res && res.success) {
@@ -11961,7 +11913,7 @@ function handleToggleUser(uid, rawStatus) {
                 }
 
                 // KIRIM KE SERVER
-                sipRun().withSuccessHandler(res => {
+                google.script.run.withSuccessHandler(res => {
                     document.getElementById('global-loading').classList.add('hidden');
                     
                     let msg = `Berhasil import <b>${res.imported}</b> user.`;
@@ -12096,7 +12048,7 @@ function handleGenerateImages() {
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memproses...';
 
-    sipRun().withSuccessHandler(res => {
+    google.script.run.withSuccessHandler(res => {
         btn.disabled = false;
         btn.innerHTML = originalText;
 
@@ -12116,7 +12068,7 @@ function loadImageTable() {
     container.innerHTML = `<div class="flex flex-col items-center justify-center py-12 text-slate-400"><i class="fas fa-circle-notch fa-spin text-3xl mb-2 text-pink-500"></i> Memuat galeri...</div>`;
     document.getElementById('img-pagination-controls').classList.add('hidden');
 
-    sipRun().withSuccessHandler(data => {
+    google.script.run.withSuccessHandler(data => {
         allImagesData = data || [];
         filteredImages = data || []; // Reset filter
         currentImgPage = 1;          // Reset page
@@ -12274,7 +12226,7 @@ function deleteImage(id) {
         showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Ya, Hapus'
     }).then(res => {
         if(res.isConfirmed) {
-            sipRun().withSuccessHandler(r => {
+            google.script.run.withSuccessHandler(r => {
                 if(r.success) loadImageTable();
                 else Swal.fire('Gagal', r.message, 'error');
             }).deleteSavedImage(id);
@@ -12428,7 +12380,7 @@ function updateLogoPreview(url) {
 // 1. Load Data ke Form Konfigurasi (Saat Menu Diklik)
 function loadConfigToForm() {
     // Panggil fungsi di Code.gs
-    sipRun().withSuccessHandler(res => {
+    google.script.run.withSuccessHandler(res => {
         if(res.success && res.data) {
             // 1. Isi Input Nama & Subjudul
             document.getElementById('cfg-app-name').value = res.data.app_name || '';
@@ -12465,7 +12417,7 @@ function handleSaveConfig(e) {
     const showResultCheckbox = document.getElementById('cfg-show-result');
     formObj.showExamResult = (showResultCheckbox && showResultCheckbox.checked) ? 'true' : 'false';
 
-    sipRun().withSuccessHandler(res => {
+    google.script.run.withSuccessHandler(res => {
         btn.disabled = false;
         btn.innerHTML = originalText;
 
@@ -12654,7 +12606,7 @@ function openExamModal(data = null) {
 
         // Jika Guru → filter hanya mapel & kelas yang diajarnya
         if (currentUser && currentUser.role === 'Guru') {
-            sipRun()
+            google.script.run
                 .withSuccessHandler(assignments => {
                     // Ambil daftar unik mapel & kelas dari tugas guru
                     const guruSubjects = [...new Set(assignments.map(a => a.subject))];
@@ -12676,7 +12628,7 @@ function openExamModal(data = null) {
 
     // Cek jika data master belum ada di cache
     if (!masterData.classes || masterData.classes.length === 0) {
-        sipRun().withSuccessHandler(md => {
+        google.script.run.withSuccessHandler(md => {
             if (md) {
                 masterData = md;
                 applySelection(md.subjects || [], md.classes || []);
@@ -12691,7 +12643,7 @@ function openExamModal(data = null) {
         if (data && data.id) {
             // Mode EDIT: tampilkan config tersimpan, lalu perbarui dengan statistik bank
             spRenderPanel('rc', data.randomConfig || null, null);
-            sipRun()
+            google.script.run
                 .withSuccessHandler(res => {
                     if (res && res.success) spRenderPanel('rc', res.randomConfig, res.stats);
                 })
@@ -12789,7 +12741,7 @@ function loadMasterDataForUser(selectedClass = null) {
     }
 
     if (!masterData || !masterData.classes || masterData.classes.length === 0) {
-        sipRun()
+        google.script.run
             .withSuccessHandler(res => {
                 masterData = res;
                 afterDataLoaded();
@@ -13118,7 +13070,7 @@ function handleCopyQuestions() {
         if (result.isConfirmed) {
             document.getElementById('global-loading').classList.remove('hidden');
 
-            sipRun().withSuccessHandler(res => {
+            google.script.run.withSuccessHandler(res => {
                 document.getElementById('global-loading').classList.add('hidden');
                 if (res.success) {
                     Swal.fire({
@@ -13164,7 +13116,7 @@ function downloadSingleStudentAnswers(responseId, studentName) {
   });
 
   // 2. Panggil Server
-  sipRun()
+  google.script.run
     .withSuccessHandler(res => {
       if (!res || !res.success) {
         Swal.fire('Gagal', res ? res.message : 'Respon server tidak valid.', 'error');
@@ -13459,7 +13411,7 @@ function showStudentResultPage(loginRes) {
 
   switchPage('page-result');
 
-  sipRun()
+  google.script.run
     .withSuccessHandler(function(res) {
       document.getElementById('result-loading').classList.add('hidden');
 
@@ -14130,7 +14082,7 @@ function renderAIGeneratorPage(container) {
     </div>`;
 
   // Muat status API key
-  sipRun()
+  google.script.run
     .withSuccessHandler(res => {
       if (res && res.success) {
         window._aiConfig = res.data;
@@ -14281,7 +14233,7 @@ function handleGenerateAI() {
     }
   };
 
-  sipRun()
+  google.script.run
     .withSuccessHandler(res => {
       if (!res || !res.success) {
         btn.disabled = false;
@@ -14319,7 +14271,7 @@ function generateAIImagesSequentially(questions, style, limit, onProgress, onDon
     if (i >= total) { onDone(questions); return; }
     const q = questions[i];
     onProgress(i, total);
-    sipRun()
+    google.script.run
       .withSuccessHandler(function(imgRes) {
         if (imgRes && imgRes.success && imgRes.image) q.image = imgRes.image;
         else if (imgRes && imgRes.message) q.imageNote = imgRes.message;
@@ -14414,7 +14366,7 @@ function handleSaveAIQuestions() {
   btn.disabled = true;
   btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Menyimpan...';
 
-  sipRun()
+  google.script.run
     .withSuccessHandler(res => {
       btn.disabled = false;
       btn.innerHTML = '<i class="fas fa-save"></i> Simpan ke Bank Soal';
@@ -14482,12 +14434,12 @@ function openAISettings() {
     }
   }).then(result => {
     if (result.isConfirmed && isAdmin && result.value) {
-      sipRun()
+      google.script.run
         .withSuccessHandler(res => {
           if (res && res.success) {
             Swal.fire('Tersimpan', res.message, 'success');
             // Refresh status
-            sipRun().withSuccessHandler(r => {
+            google.script.run.withSuccessHandler(r => {
               if (r && r.success) { window._aiConfig = r.data; updateAIProviderStatus(); }
             }).getAIConfig(currentUser.userID, currentUser.token);
           } else {
@@ -14510,7 +14462,7 @@ function openQuestionDiagnostics() {
     didOpen: () => Swal.showLoading()
   });
 
-  sipRun()
+  google.script.run
     .withSuccessHandler(res => {
       if (!res || !res.success) {
         Swal.fire('Gagal', (res && res.message) ? res.message : 'Tidak ada respon server.', 'error');
@@ -14592,7 +14544,7 @@ function fixOrphanQuestions(fromNorm, toExamId) {
     confirmButtonColor: '#059669'
   }).then(r => {
     if (!r.isConfirmed) return;
-    sipRun()
+    google.script.run
       .withSuccessHandler(res => {
         if (res && res.success) {
           Swal.fire('Berhasil', res.message, 'success').then(() => openQuestionDiagnostics());
@@ -14791,7 +14743,7 @@ function openRandomConfigModal(prefillExamId) {
     fillDropdown(cachedExams);
   } else {
     sel.innerHTML = '<option value="">Memuat daftar ujian...</option>';
-    sipRun()
+    google.script.run
       .withSuccessHandler(exams => { cachedExams = exams || []; fillDropdown(cachedExams); })
       .withFailureHandler(() => fillDropdown([]))
       .getExamList(currentUser.userID, currentUser.token);
@@ -14812,7 +14764,7 @@ function rcModalExamChanged(examId) {
     return;
   }
   if (panel) panel.innerHTML = '<p class="p-6 text-center text-sm text-slate-400"><i class="fas fa-circle-notch fa-spin mr-1"></i> Memuat statistik bank soal...</p>';
-  sipRun()
+  google.script.run
     .withSuccessHandler(res => {
       if (res && res.success) {
         spRenderPanel('rcm', res.randomConfig, res.stats);
@@ -14842,7 +14794,7 @@ function saveRandomConfigFromModal() {
   const cfg = spReadConfig('rcm');
   const btn = document.getElementById('rc-modal-save');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Menyimpan...'; }
-  sipRun()
+  google.script.run
     .withSuccessHandler(res => {
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Simpan'; }
       if (res && res.success) {
@@ -14881,10 +14833,10 @@ function saveRandomConfigFromModal() {
     if (now - lastSent < 4000) return;
     lastSent = now;
     try {
-      if (!(typeof google !== 'undefined' && google.script && sipRun())) return;
+      if (!(typeof google !== 'undefined' && google.script && google.script.run)) return;
       var uid = (window.currentUser && currentUser.userID) || '';
       var tok = (window.currentUser && currentUser.token) || '';
-      sipRun()
+      google.script.run
         .withFailureHandler(function() {})
         .hermesLogClientError({
           source: src,
@@ -14939,7 +14891,7 @@ function renderHermesPage(container) {
           <div class="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center text-2xl shrink-0"><i class="fas fa-user-shield"></i></div>
           <div>
             <h2 class="text-xl font-bold">Hermes AI Agent</h2>
-            <p class="text-sm text-cyan-100 mt-1">Mendeteksi script/soal/alur yang keliru, mengusulkan perbaikan, dan memperbaiki gangguan sesaat (cache, sheet, sambung ulang). <b>Tidak menimpa code.gs atau index.html</b> — setiap usulan menunggu persetujuan Anda.</p>
+            <p class="text-sm text-cyan-100 mt-1">Agen <b>gratis</b> (tanpa langganan OpenAI). Mendeteksi soal/alur yang keliru, mengusulkan perbaikan, dan self-heal runtime. <b>Tidak menimpa code.gs atau index.html</b> — usulan menunggu persetujuan Anda.</p>
             <p class="text-xs text-amber-200 mt-2 font-semibold"><i class="fas fa-ban mr-1"></i>Hermes tidak dapat mereset, membuka blokir, atau mengulang ujian siswa yang curang. Reset / lanjut hanya Admin atau Guru di menu Hasil &amp; Nilai.</p>
           </div>
         </div>
@@ -14992,7 +14944,7 @@ function hermesFillExams_() {
     fill(cachedExams);
     return;
   }
-  sipRun()
+  google.script.run
     .withSuccessHandler(function(exams) {
       cachedExams = exams || [];
       fill(cachedExams);
@@ -15003,7 +14955,7 @@ function hermesFillExams_() {
 
 function hermesReload() {
   if (!(currentUser && currentUser.role === 'Admin')) return;
-  sipRun()
+  google.script.run
     .withSuccessHandler(function(res) {
       if (!res || !res.success) {
         const box = document.getElementById('hermes-health-cards');
@@ -15030,7 +14982,7 @@ function hermesPaintHealth_(h) {
     ['Sheet', missing.length ? (missing.length + ' hilang') : 'Lengkap', missing.length ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-800'],
     ['Bank soal', (h.questionCount || 0) + ' butir · ujian tanpa soal: ' + (h.aktifTanpaSoal || 0), (h.aktifTanpaSoal ? 'bg-amber-50 text-amber-800' : 'bg-white text-slate-700')],
     ['Siswa curang', nCurang + ' respon terkunci · Hermes tidak boleh reset', 'bg-rose-50 text-rose-800'],
-    ['AI', h.aiReady ? 'Siap membuat usulan' : 'Tanpa API key (heuristik saja)', h.aiReady ? 'bg-cyan-50 text-cyan-800' : 'bg-slate-50 text-slate-600']
+    ['AI', 'Gratis · agen lokal (tanpa OpenAI/langganan)', 'bg-emerald-50 text-emerald-800']
   ].map(function(row) {
     return '<div class="dash-card p-4 ' + row[2] + '"><p class="text-[10px] font-bold uppercase tracking-widest opacity-70">' + row[0] + '</p><p class="text-sm font-semibold mt-1">' + hermesEsc_(row[1]) + '</p></div>';
   }).join('');
@@ -15046,7 +14998,7 @@ function hermesPaintLogs_(logs) {
 }
 
 function hermesLoadUsulan_() {
-  sipRun()
+  google.script.run
     .withSuccessHandler(function(res) {
       const el = document.getElementById('hermes-usulan');
       if (!el) return;
@@ -15072,7 +15024,7 @@ function hermesExamId_() {
 
 function hermesDoAudit() {
   Swal.fire({ title: 'Mengaudit...', text: 'Memeriksa bank soal dan alur ujian.', allowOutsideClick: false, didOpen: function() { Swal.showLoading(); } });
-  sipRun()
+  google.script.run
     .withSuccessHandler(function(res) {
       Swal.close();
       if (!res || !res.success) { Swal.fire('Gagal', (res && res.message) || 'Audit gagal', 'error'); return; }
@@ -15092,7 +15044,7 @@ function hermesDoAudit() {
 
 function hermesDoUsulan() {
   Swal.fire({ title: 'Menyusun usulan...', allowOutsideClick: false, didOpen: function() { Swal.showLoading(); } });
-  sipRun()
+  google.script.run
     .withSuccessHandler(function(res) {
       Swal.close();
       Swal.fire(res && res.success ? 'Usulan siap' : 'Gagal', (res && res.message) || '', res && res.success ? 'success' : 'error');
@@ -15108,7 +15060,7 @@ function hermesDoUsulan() {
 
 function hermesDoHeal() {
   Swal.fire({ title: 'Self-heal runtime...', text: 'Kode tidak diubah. Siswa curang tidak direset.', allowOutsideClick: false, didOpen: function() { Swal.showLoading(); } });
-  sipRun()
+  google.script.run
     .withSuccessHandler(function(res) {
       Swal.close();
       const acts = ((res && res.actions) || []).join('<br>');
@@ -15124,7 +15076,7 @@ function hermesDoHeal() {
 }
 
 function hermesSetujui(id) {
-  sipRun()
+  google.script.run
     .withSuccessHandler(function(res) {
       Swal.fire(res && res.success ? 'Disetujui' : 'Gagal', (res && res.message) || '', res && res.success ? 'success' : 'error');
       hermesLoadUsulan_();
@@ -15134,7 +15086,7 @@ function hermesSetujui(id) {
 }
 
 function hermesTolak(id) {
-  sipRun()
+  google.script.run
     .withSuccessHandler(function(res) {
       Swal.fire(res && res.success ? 'Ditolak' : 'Gagal', (res && res.message) || '', res && res.success ? 'info' : 'error');
       hermesLoadUsulan_();
@@ -15144,5 +15096,5 @@ function hermesTolak(id) {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3e5e57089ebeb9d',t:'MTc4OTk2MDQzMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3e5f2514ab31ed9',t:'MTc4OTk2MDk1Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>l>
