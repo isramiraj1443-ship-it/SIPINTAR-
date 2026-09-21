@@ -1965,18 +1965,6 @@ function handleLogin(e) {
   btn.disabled = true;
   btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Memverifikasi...';
   errDiv.classList.add('hidden');
-  if (window._sipLoginWatch) { try { clearTimeout(window._sipLoginWatch); } catch (e0) {} }
-  window._sipLoginWatch = setTimeout(function () {
-    if (!window._sipLoginBusy) return;
-    window._sipLoginBusy = false;
-    try {
-      btn.disabled = false;
-      btn.innerHTML = 'Coba Lagi';
-      if (logoWrap) logoWrap.classList.remove('is-validating');
-      errText.textContent = 'Verifikasi terlalu lama. Pastikan Anda membuka URL /exec, lalu coba lagi.';
-      errDiv.classList.remove('hidden');
-    } catch (e1) {}
-  }, 10000);
   const logoWrap = document.getElementById('login-logo-wrap');
   if (logoWrap) logoWrap.classList.add('is-validating');
 
@@ -1985,7 +1973,6 @@ function handleLogin(e) {
     .withSuccessHandler(res => {
       // Reset tombol
       window._sipLoginBusy = false;
-      try { clearTimeout(window._sipLoginWatch); } catch (eClr) {}
       btn.disabled = false;
       btn.innerHTML = '<span>Masuk Aplikasi</span> <i class="fas fa-arrow-right"></i>';
       if (logoWrap) logoWrap.classList.remove('is-validating');
@@ -2047,7 +2034,6 @@ function handleLogin(e) {
     })
     .withFailureHandler(err => {
       window._sipLoginBusy = false;
-      try { clearTimeout(window._sipLoginWatch); } catch (eClr2) {}
       if (logoWrap) logoWrap.classList.remove('is-validating');
       btn.disabled = false;
       btn.innerHTML = 'Coba Lagi';
@@ -15115,5 +15101,5 @@ function hermesTolak(id) {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3e6edb79e488235',t:'MTc4OTk3MTI1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3e6fdfdd8ebfd9a',t:'MTc4OTk3MTkyMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>l>
