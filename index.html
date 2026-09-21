@@ -1972,18 +1972,18 @@ function handleLogin(e) {
 
       if (res.success) {
         // === SIMPAN SESI KE LOCAL STORAGE ===
-        localStorage.setItem('sipadu_session', JSON.stringify({
-          userID: res.userID,
-          token: res.token,
-          role: res.role,
-          username: res.username,
-          loginTime: Date.now()
-        }));
+        try {
+          localStorage.setItem('sipadu_session', JSON.stringify({
+            userID: res.userID,
+            token: res.token,
+            role: res.role,
+            username: res.username,
+            loginTime: Date.now()
+          }));
+        } catch (eLs) {}
 
-        // Set variabel global
         currentUser = res;
 
-        // Logika Redirect Halaman
         if (res.role === 'Admin' || res.role === 'Guru') {
           startAdminSessionTimer();
           initAdminPanel();
@@ -2252,14 +2252,17 @@ function initAdminPanel() {
  
   // Pastikan Modal Ujian Siap
   initExamModalComponent();
- 
-  // Ambil daftar ujian lalu tampilkan Dashboard
+  if (typeof sipRestoreMenuMods_ === 'function') sipRestoreMenuMods_();
+  try { showAdminTab('dash-home'); } catch (eHome) {}
+
+  // Daftar ujian dimuat di latar, tidak menahan masuk dashboard
   google.script.run
     .withSuccessHandler(exams => {
-      cachedExams = exams;
+      cachedExams = exams || [];
       if (typeof sipRestoreMenuMods_ === 'function') sipRestoreMenuMods_();
       showAdminTab('dash-home');
     })
+    .withFailureHandler(function () { try { showAdminTab('dash-home'); } catch (e2) {} })
     .getExamList(currentUser.userID, currentUser.token);
 }
 
@@ -9769,6 +9772,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 2. Cek Sesi (yang sudah ada sebelumnya)
     fetchAndStartClock();
+    try {
+      google.script.run
+        .withSuccessHandler(function () {})
+        .withFailureHandler(function () {})
+        .pingLoginWarm();
+    } catch (eWarm) {}
     checkSavedSession(); 
 });
 
@@ -14919,13 +14928,29 @@ function renderHermesPage(container) {
   hermesReload();
 }
 
+function hermesNoteTransient(err) {
+  try { console.warn('Hermes', err); } catch (e) {}
+}
 function hermesFillExams_() {
   const sel = document.getElementById('hermes-exam');
   if (!sel) return;
-  const list = (typeof cachedExams !== 'undefined' && cachedExams) ? cachedExams : [];
-  sel.innerHTML = '<option value="">Semua ujian</option>' + list.map(function(e) {
-    return '<option value="' + hermesEsc_(e.id) + '">' + hermesEsc_(e.subject + ' (' + e.class + ')') + '</option>';
-  }).join('');
+  const fill = function(list) {
+    sel.innerHTML = '<option value="">Semua ujian</option>' + (list || []).map(function(e) {
+      const label = (e.subject || e.id || '') + (e.class ? ' (' + e.class + ')' : '');
+      return '<option value="' + hermesEsc_(e.id) + '">' + hermesEsc_(label) + '</option>';
+    }).join('');
+  };
+  if (typeof cachedExams !== 'undefined' && cachedExams && cachedExams.length) {
+    fill(cachedExams);
+    return;
+  }
+  google.script.run
+    .withSuccessHandler(function(exams) {
+      cachedExams = exams || [];
+      fill(cachedExams);
+    })
+    .withFailureHandler(function() { fill([]); })
+    .getExamList(currentUser.userID, currentUser.token);
 }
 
 function hermesReload() {
@@ -15004,14 +15029,17 @@ function hermesDoAudit() {
       Swal.close();
       if (!res || !res.success) { Swal.fire('Gagal', (res && res.message) || 'Audit gagal', 'error'); return; }
       const n = res.count || 0;
-      Swal.fire('Hasil audit', n ? (n + ' temuan. Klik Buat usulan agar masuk antrean persetujuan.') : 'Tidak ada temuan pada filter ini.', n ? 'warning' : 'success');
+      const detail = n
+        ? ((res.soalCount || 0) + ' temuan soal, ' + (res.alurCount || 0) + ' temuan alur. Klik Buat usulan.')
+        : 'Tidak ada temuan pada filter ini.';
+      Swal.fire('Hasil audit', detail, n ? 'warning' : 'success');
     })
     .withFailureHandler(function(err) {
       Swal.close();
       if (typeof hermesNoteTransient === 'function') hermesNoteTransient(err);
       Swal.fire('Error', (err && err.message) || String(err), 'error');
     })
-    .hermesAuditBankSoal(hermesExamId_(), currentUser.userID, currentUser.token);
+    .hermesAudit(hermesExamId_(), currentUser.userID, currentUser.token);
 }
 
 function hermesDoUsulan() {
@@ -15068,5 +15096,5 @@ function hermesTolak(id) {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3e536181d23f93f',t:'MTc4OTk1MzI0OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3e55f613e2ece43',t:'MTc4OTk1NDkzOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>l>
