@@ -1,0 +1,29 @@
+{
+  "name": "sipintar-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SIPINTAR — Sistem Penilaian Terintegrasi SMPN 26 Surakarta. UI di Vercel + GitHub, mesin (code.gs) di Google Apps Script, dihubungkan lewat API JSON.",
+  "scripts": {
+    "sipintar:build": "node scripts/build-gas.js && node scripts/build-app.js",
+    "sipintar:gas": "node scripts/build-gas.js",
+    "sipintar:app": "node scripts/build-app.js",
+    "test": "node tests/verify-api.js && node tests/verify-web.js && node tests/test-gas-api.js && node tests/test-api-client.js && node tests/test-proxy.js && node tests/test-halaman.js",
+    "test:verify": "node tests/verify-api.js",
+    "test:gas": "node tests/test-gas-api.js",
+    "test:client": "node tests/test-api-client.js",
+    "test:proxy": "node tests/test-proxy.js",
+    "test:web": "node tests/verify-web.js",
+    "test:halaman": "node tests/test-halaman.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "sipintar",
+    "apps-script",
+    "vercel",
+    "pwa",
+    "penilaian"
+  ],
+  "license": "UNLICENSED"
+}
