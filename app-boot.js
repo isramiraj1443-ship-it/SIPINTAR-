@@ -30,6 +30,48 @@
   }
 
   /* ---------------------------------------------------------------- 1. BRAND */
+
+  /**
+   * ujiGambar — memeriksa apakah sebuah gambar BENAR-BENAR bisa dimuat.
+   * Penting: bila tautan di menu Konfigurasi sudah mati (mis. CDN menolak
+   * dengan 403), gambar bawaan (background.png / logo.png) TIDAK boleh
+   * ditimpa — dahulu inilah penyebab "background hilang" pada halaman login.
+   */
+  function ujiGambar(url) {
+    return new Promise(function (selesai) {
+      if (!url) return selesai(false);
+      if (/^data:/i.test(url)) return selesai(true);       /* gambar tertanam */
+      var img = new Image();
+      var sudah = false;
+      var waktu = setTimeout(function () {
+        if (sudah) return;
+        sudah = true; img.onload = img.onerror = null; selesai(false);
+      }, 8000);
+      img.onload = function () {
+        if (sudah) return;
+        sudah = true; clearTimeout(waktu); selesai(true);
+      };
+      img.onerror = function () {
+        if (sudah) return;
+        sudah = true; clearTimeout(waktu); selesai(false);
+      };
+      img.src = url;
+    });
+  }
+
+  function terapkanLatar(url) {
+    var hal = document.getElementById('page-login');
+    if (!hal) return;
+    hal.style.backgroundImage = "url('" + url.replace(/'/g, "\\'") + "')";
+    hal.style.backgroundSize = 'cover';
+    hal.style.backgroundPosition = 'center';
+    hal.style.backgroundRepeat = 'no-repeat';
+  }
+
+  function catatLatar(pesan) {
+    try { console.info('[SIPINTAR] ' + pesan); } catch (e) {}
+  }
+
   function terapkanIdentitas(d) {
     if (!d) return;
     try {
@@ -46,20 +88,34 @@
         var elSub = document.getElementById('login-subtitle');
         if (elSub) elSub.textContent = sub;
       }
+
+      /* Logo: uji dulu; bila gagal, biarkan logo bawaan (logo.png) */
       if (logo && logo !== OLD_DEFAULT_LOGO) {
-        var img = document.getElementById('login-logo-img');
-        if (img) img.src = logo;
+        ujiGambar(logo).then(function (bisa) {
+          if (!bisa) {
+            catatLatar('logo dari menu Konfigurasi tidak dapat dimuat — memakai logo bawaan (logo.png).');
+            return;
+          }
+          var img = document.getElementById('login-logo-img');
+          if (img) img.src = logo;
+        });
       }
+
+      /* Latar: uji dulu; bila gagal, biarkan latar bawaan (background.png) */
       if (bg) {
-        var hal = document.getElementById('page-login');
-        if (hal) {
-          hal.style.backgroundImage = "url('" + bg.replace(/'/g, "\\'") + "')";
-          hal.style.backgroundSize = 'cover';
-          hal.style.backgroundPosition = 'center';
-          hal.style.backgroundRepeat = 'no-repeat';
-        }
+        ujiGambar(bg).then(function (bisa) {
+          if (!bisa) {
+            catatLatar('latar dari menu Konfigurasi tidak dapat dimuat (tautan mungkin sudah mati) — ' +
+                       'memakai latar bawaan background.png.');
+            return;
+          }
+          terapkanLatar(bg);
+        });
+      } else {
+        /* Konfigurasi mengosongkan latar → pakai background.png */
+        terapkanLatar('background.png');
       }
-    } catch (e) { /* diabaikan — tampilan default sudah benar */ }
+    } catch (e) { /* diabaikan — tampilan bawaan sudah benar */ }
   }
 
   /* ------------------------------------------------------------ 2. DIAGNOSTIK */
