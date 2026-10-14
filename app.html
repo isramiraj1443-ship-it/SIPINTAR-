@@ -1463,6 +1463,101 @@ input:focus, select:focus, textarea:focus {
 #siswa-side-nav.siswa-nav-min .siswa-menu-mod-head i { color: var(--emas-1); }
   </style>
 
+  <!-- TAMPILAN LENTUR (portrait/landscape) · sumber: web/tampilan-lentur.css -->
+  <style id="sipintar-tampilan-lentur">
+/* =============================================================================
+   TAMPILAN LENTUR (PORTRAIT ↔ LANDSCAPE)  ·  web/tampilan-lentur.css
+   -----------------------------------------------------------------------------
+   Tujuan (permintaan pengguna):
+     • aplikasi tetap nyaman dipakai pada posisi tegak (portrait) maupun
+       mendatar (landscape) di HP, tablet, dan komputer;
+     • tidak ada gambar yang terpotong — termasuk gambar pada soal;
+     • tidak ada bagian yang keluar dari layar (gulir mendatar).
+
+   Sifat berkas: MURNI TAMBAHAN tampilan. Tidak ada fungsi/menu yang diubah.
+   ============================================================================= */
+
+/* ---------------- 1. Gambar tidak boleh terpotong & tidak meluber ---------------- */
+#question-container img,
+#page-exam img,
+.sip-baris-soal img,
+#result-detail-container img,
+#admin-content img {
+  max-width: 100% !important;
+  height: auto !important;
+  object-fit: contain !important;   /* utuh, bukan dipotong */
+}
+
+/* Gambar soal: mengikuti tinggi layar, jadi tetap utuh di landscape maupun portrait */
+#question-container img,
+#page-exam #question-container img {
+  max-height: min(56vh, 440px) !important;
+}
+@media (orientation: landscape) and (max-height: 560px) {
+  #question-container img { max-height: 44vh !important; }
+}
+
+/* Wadah gambar di dalam soal ikut menyesuaikan (tidak terpotong di tepi) */
+#question-container .overflow-hidden { overflow: visible !important; }
+
+/* ---------------- 2. Tidak ada gulir mendatar di halaman mana pun ---------------- */
+#page-admin, #page-siswa-hub, #page-exam, #page-result, #page-lobby, #page-login {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+#admin-content, .siswa-tab { overflow-x: hidden; }
+
+/* Tabel panjang boleh diusap ke samping (tidak memotong isi) */
+@media (max-width: 900px) {
+  #admin-content table { font-size: .8rem; }
+  #admin-content { padding: 1rem !important; }
+}
+
+/* ---------------- 3. Portrait ↔ Landscape: kepala & tata letak menyesuaikan ---------------- */
+/* Kepala halaman dipadatkan bila layar mendatar dan tidak tinggi (HP landscape) */
+@media (orientation: landscape) and (max-height: 560px) {
+  #page-admin > div > header,
+  #page-siswa-hub header,
+  #page-result header,
+  .exam-header {
+    height: 3.2rem !important;
+    min-height: 3.2rem !important;
+    padding-top: .35rem !important;
+    padding-bottom: .35rem !important;
+  }
+  #admin-sidebar .h-20 { height: 3.2rem !important; }
+  #admin-sidebar { width: 15rem; }
+  #page-login { padding: .8rem !important; align-items: flex-start !important; }
+  #login-logo-img { width: 92px !important; height: 92px !important; }
+  #login-subtitle { font-size: .95rem !important; }
+  #login-school { font-size: .85rem !important; }
+  #sip-clock-time { font-size: 1.6rem !important; }
+  .sip-jendela { max-height: 92vh; }
+}
+
+/* Pada layar sempit (HP tegak), beri ruang lebih untuk isi */
+@media (orientation: portrait) and (max-width: 480px) {
+  #login-card { padding: 14px 12px !important; }
+  #sip-clock-full { padding: 10px 14px 8px !important; }
+  #admin-content { padding: .8rem !important; }
+  #question-container { padding: 14px !important; }
+}
+
+/* ---------------- 4. Perangkat sentuh: sasaran tekan lebih nyaman ---------------- */
+@media (pointer: coarse) {
+  .sip-nav-min-btn { width: 40px; height: 40px; }
+  #page-admin .sidebar-item, .siswa-nav-btn { min-height: 42px; }
+}
+
+/* ---------------- 5. Skala huruf menyesuaikan lebar & tinggi layar ---------------- */
+@media (max-width: 380px) {
+  html { font-size: 15px; }
+}
+@media (min-width: 1600px) {
+  #admin-content { max-width: 1500px; margin-left: auto; margin-right: auto; }
+}
+  </style>
+
   <!-- PEMBERSIH KATA ANTARMUKA · sumber: web/hapus-kata.js (dibangun otomatis)
        Kata ["SIPINTAR"] tidak ditampilkan pada teks antarmuka & judul halaman.
        Kode, fungsi, dan berkas aslinya TIDAK diubah — hanya tampilan tulisannya. -->
@@ -1634,6 +1729,43 @@ input:focus, select:focus, textarea:focus {
 #sipintar-ui-build{display:none !important}
 #siswa-nav-min-btn{display:none !important}
   </style>
+  <script id="sipintar-instruksi-bagian">
+  (function(){
+    var bagian = ["Pengaturan Hasil Ujian","Rekomendasi belajar"];
+    function cari(teks){
+      var semua = document.querySelectorAll("label, p, span, div, h1, h2, h3, h4, h5, strong");
+      for (var i = 0; i < semua.length; i++) {
+        var el = semua[i];
+        if (el.children.length) continue;
+        if ((el.textContent || "").indexOf(teks) >= 0) return el;
+      }
+      return null;
+    }
+    function terapkan(){
+      for (var j = 0; j < bagian.length; j++) {
+        var daun = cari(bagian[j]);
+        if (!daun) continue;
+        var kotak = null;
+        try { kotak = daun.closest(".border-t, .rounded-xl.border, section, .card, .sip-nilai-card"); } catch (e) {}
+        if (!kotak) kotak = daun.parentElement;
+        /* Jangan sampai menyembunyikan tombol simpan/formulir besar */
+        if (kotak && kotak.querySelector && kotak.querySelector("button[type=submit]")) {
+          kotak = daun.parentElement || daun;
+        }
+        if (kotak && kotak.style) { kotak.style.display = "none"; kotak.setAttribute("data-sip-bagian-disembunyikan", "1"); }
+      }
+    }
+    terapkan();
+    try {
+      if (window.MutationObserver && document.body) {
+        var tunggu = null;
+        new MutationObserver(function(){ if (tunggu) return; tunggu = setTimeout(function(){ tunggu = null; terapkan(); }, 300); })
+          .observe(document.body, { childList: true, subtree: true });
+      }
+    } catch (e) {}
+    setInterval(terapkan, 3000);
+  })();
+  </script>
 </head>
 <body class="overflow-x-hidden text-slate-800">
 
@@ -21723,5 +21855,425 @@ function sipSisipTandaGambar_() {
 })();
 
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4a4f3f07909ce85',t:'MTc5MTk2MzgwNA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+  <!-- FITUR SISWA & PAPAN PERINGKAT · sumber: web/papan-siswa.js -->
+  <script id="sipintar-papan-siswa">
+/* =============================================================================
+   FITUR SISWA & PAPAN PERINGKAT  ·  web/papan-siswa.js   (versi 1.0.0)
+   -----------------------------------------------------------------------------
+   Berkas ini MURNI TAMBAHAN di atas aplikasi yang sudah ada:
+     • tidak menghapus atau mengubah fungsi/menu apa pun;
+     • menambah tombol & jendela (modal) baru, serta memakai API yang sudah ada.
+
+   Isinya:
+     1. Tombol "Details" di bawah nilai → ringkasan per soal (nomor, ringkasan
+        soal, jawaban siswa, benar/salah). KUNCI JAWABAN tidak pernah dikirim
+        maupun ditampilkan.
+     2. Papan Peringkat (nama + kelas) untuk SEMUA pengguna.
+     3. Panel "Nilai Saya" pada tab Nilai siswa: hanya nilai + tombol Details.
+
+   Catatan: bila berkas ini gagal dimuat, aplikasi tetap berjalan seperti biasa.
+   ============================================================================= */
+(function () {
+  'use strict';
+
+  var WARNA = {
+    emas: '#f5d76e',
+    emasTua: '#d4a017',
+    gelap: 'rgba(8,18,38,.78)',
+    baik: '#10b981',
+    buruk: '#ef4444'
+  };
+
+  /* ---------------------------------------------------------------- penolong */
+  function sesi() {
+    var cu = window.currentUser;
+    if (cu && cu.userID && cu.token) return cu;
+    return null;
+  }
+  function runner() {
+    return (window.google && window.google.script && window.google.script.run) || null;
+  }
+  function panggil(aksi, args) {
+    return new Promise(function (selesai, gagal) {
+      var r = runner();
+      if (!r) { gagal(new Error('Mesin API belum siap. Muat ulang halaman.')); return; }
+      try {
+        var c = r.withSuccessHandler(selesai).withFailureHandler(gagal);
+        c[aksi].apply(c, args || []);
+      } catch (e) { gagal(e); }
+    });
+  }
+  function esc(t) {
+    return String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function el(tag, kelas, isi) {
+    var d = document.createElement(tag);
+    if (kelas) d.className = kelas;
+    if (isi != null) d.innerHTML = isi;
+    return d;
+  }
+  function terlihat(node) {
+    if (!node) return false;
+    var p = node;
+    while (p && p.nodeType === 1) {
+      if (p.classList && p.classList.contains('hidden')) return false;
+      p = p.parentElement;
+    }
+    return true;
+  }
+
+  /* ------------------------------------------------------------------- gaya */
+  function pasangGaya() {
+    if (document.getElementById('sip-papan-gaya')) return;
+    var css = ''
+      + '.sip-tb-emas{display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:11px;'
+      + 'font-size:.78rem;font-weight:800;cursor:pointer;border:1px solid rgba(245,215,110,.55);'
+      + 'background:linear-gradient(135deg,rgba(245,215,110,.22),rgba(212,160,23,.12));color:' + WARNA.emas + '}'
+      + '.sip-tb-emas:hover{filter:brightness(1.12)}'
+      + '.sip-tb-emas:active{transform:scale(.97)}'
+      + '.sip-tb-lapis{position:fixed;inset:0;z-index:9998;background:rgba(2,6,23,.72);display:flex;'
+      + 'align-items:center;justify-content:center;padding:14px}'
+      + '.sip-jendela{width:100%;max-width:640px;max-height:86vh;overflow:auto;border-radius:18px;'
+      + 'background:linear-gradient(180deg,#0f1b33,#0b1428);border:1px solid rgba(245,215,110,.45);'
+      + 'box-shadow:0 24px 60px rgba(0,0,0,.6);color:#e6eefc}'
+      + '.sip-jendela h3{margin:0;font-size:1rem;font-weight:900;letter-spacing:.04em;color:' + WARNA.emas + '}'
+      + '.sip-jendela .kepala{display:flex;align-items:center;justify-content:space-between;gap:10px;'
+      + 'padding:14px 16px;border-bottom:1px solid rgba(245,215,110,.28)}'
+      + '.sip-jendela .isi{padding:14px 16px}'
+      + '.sip-tutup{background:transparent;border:1px solid rgba(245,215,110,.4);color:' + WARNA.emas + ';'
+      + 'border-radius:9px;padding:4px 10px;font-weight:900;cursor:pointer}'
+      + '.sip-baris-soal{display:flex;gap:11px;padding:11px 12px;border-radius:13px;margin-bottom:9px;'
+      + 'background:rgba(255,255,255,.04);border:1px solid rgba(148,163,184,.22)}'
+      + '.sip-baris-soal.benar{border-color:rgba(16,185,129,.5);background:rgba(16,185,129,.08)}'
+      + '.sip-baris-soal.salah{border-color:rgba(239,68,68,.5);background:rgba(239,68,68,.08)}'
+      + '.sip-no{flex:0 0 34px;height:34px;border-radius:10px;display:flex;align-items:center;'
+      + 'justify-content:center;font-weight:900;font-size:.82rem;background:rgba(245,215,110,.16);color:' + WARNA.emas + '}'
+      + '.sip-ringkas{font-size:.82rem;line-height:1.5;color:#dbeafe}'
+      + '.sip-jawab{font-size:.78rem;margin-top:4px;color:#f8fafc}'
+      + '.sip-jawab b{color:' + WARNA.emas + '}'
+      + '.sip-tanda{font-size:.68rem;font-weight:900;letter-spacing:.06em;padding:2px 8px;border-radius:999px;'
+      + 'display:inline-block;margin-bottom:5px}'
+      + '.sip-tanda.benar{background:rgba(16,185,129,.2);color:#6ee7b7;border:1px solid rgba(16,185,129,.5)}'
+      + '.sip-tanda.salah{background:rgba(239,68,68,.2);color:#fca5a5;border:1px solid rgba(239,68,68,.5)}'
+      + '.sip-tabel-peringkat{width:100%;border-collapse:collapse;font-size:.82rem}'
+      + '.sip-tabel-peringkat th{text-align:left;padding:8px 10px;color:' + WARNA.emas + ';'
+      + 'font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;border-bottom:1px solid rgba(245,215,110,.32)}'
+      + '.sip-tabel-peringkat td{padding:9px 10px;border-bottom:1px solid rgba(148,163,184,.16)}'
+      + '.sip-tabel-peringkat tr.sip-saya td{background:rgba(245,215,110,.14);font-weight:800;color:' + WARNA.emas + '}'
+      + '.sip-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}'
+      + '.sip-filters button{border-radius:10px;padding:5px 11px;font-size:.72rem;font-weight:800;cursor:pointer;'
+      + 'background:rgba(255,255,255,.06);color:#e2e8f0;border:1px solid rgba(148,163,184,.3)}'
+      + '.sip-filters button.aktif{background:linear-gradient(135deg,' + WARNA.emas + ',' + WARNA.emasTua + ');'
+      + 'color:#3d2b00;border-color:' + WARNA.emasTua + '}'
+      + '.sip-nilai-saya{margin:18px auto 4px;max-width:36rem}'
+      + '.sip-nilai-kartu{display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap;'
+      + 'padding:13px 15px;border-radius:16px;background:rgba(255,255,255,.05);'
+      + 'border:1px solid rgba(148,163,184,.22);margin-bottom:10px}'
+      + '.sip-nilai-angka{font-size:1.5rem;font-weight:900;color:' + WARNA.emas + ';line-height:1}'
+      + '.sip-nilai-judul{font-size:.84rem;font-weight:800;color:#e6eefc}'
+      + '.sip-nilai-ket{font-size:.72rem;color:#94a3b8;margin-top:2px}'
+      + '.sip-kosong{font-size:.8rem;color:#94a3b8;padding:10px 2px}';
+    var s = el('style', null, css);
+    s.id = 'sip-papan-gaya';
+    document.head.appendChild(s);
+  }
+
+  /* ------------------------------------------------------------------ modal */
+  function tutupModal() {
+    var m = document.getElementById('sip-modal');
+    if (m) m.remove();
+  }
+  function bukaModal(judul, isiNode) {
+    tutupModal();
+    var lapis = el('div', 'sip-tb-lapis');
+    lapis.id = 'sip-modal';
+    var jendela = el('div', 'sip-jendela');
+    var kepala = el('div', 'kepala');
+    kepala.appendChild(el('h3', null, esc(judul)));
+    var tb = el('button', 'sip-tutup', '&times;');
+    tb.setAttribute('aria-label', 'Tutup');
+    tb.onclick = tutupModal;
+    kepala.appendChild(tb);
+    var isi = el('div', 'isi');
+    isi.appendChild(isiNode);
+    jendela.appendChild(kepala);
+    jendela.appendChild(isi);
+    lapis.appendChild(jendela);
+    lapis.addEventListener('click', function (e) { if (e.target === lapis) tutupModal(); });
+    document.addEventListener('keydown', function esc_(e) {
+      if (e.key === 'Escape') { tutupModal(); document.removeEventListener('keydown', esc_); }
+    });
+    document.body.appendChild(lapis);
+    return jendela;
+  }
+  function pesanIsi(teks) {
+    var d = el('div', 'sip-kosong');
+    d.textContent = teks;
+    return d;
+  }
+
+  /* ============================ 1. DETAIL JAWABAN ============================ */
+  function jendelaReview(res) {
+    var kepala = el('div');
+    kepala.innerHTML =
+      '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:12px">' +
+        '<div><div style="font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:#94a3b8">Nilai</div>' +
+        '<div style="font-size:1.9rem;font-weight:900;color:' + WARNA.emas + '">' + esc(res.nilai) + '</div></div>' +
+        '<div><div style="font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:#94a3b8">Benar</div>' +
+        '<div style="font-size:1.15rem;font-weight:800;color:#6ee7b7">' + esc(res.benar) + ' dari ' + esc(res.jumlah) + '</div></div>' +
+        '<div style="margin-left:auto;font-size:.7rem;color:#94a3b8;max-width:15rem">' +
+          esc(res.catatan || 'Kunci jawaban tidak ditampilkan.') + '</div>' +
+      '</div>';
+
+    var daftar = el('div');
+    var data = res.data || [];
+    if (!data.length) {
+      daftar.appendChild(pesanIsi('Belum ada jawaban yang bisa ditampilkan.'));
+    }
+    data.forEach(function (it) {
+      var baris = el('div', 'sip-baris-soal ' + (it.benar ? 'benar' : 'salah'));
+      baris.appendChild(el('div', 'sip-no', esc(it.number)));
+      var isi = el('div', null,
+        '<span class="sip-tanda ' + (it.benar ? 'benar">BENAR' : 'salah">SALAH') + '</span>' +
+        '<div class="sip-ringkas">' + esc(it.ringkas || '(ringkasan soal tidak tersedia)') + '</div>' +
+        '<div class="sip-jawab">Jawabanmu: <b>' + esc(it.jawabanSiswa) + '</b></div>' +
+        (it.type ? '<div class="sip-jawab" style="color:#94a3b8">Jenis soal: ' + esc(it.type) + '</div>' : '')
+      );
+      baris.appendChild(isi);
+      daftar.appendChild(baris);
+    });
+
+    var bungkus = el('div');
+    bungkus.appendChild(kepala);
+    bungkus.appendChild(daftar);
+    return bungkus;
+  }
+
+  function bukaReview(acuan) {
+    var s = sesi();
+    if (!s) { bukaModal('Detail Jawaban', pesanIsi('Sesi tidak ditemukan. Silakan login ulang.')); return; }
+    var judul = 'Detail Jawaban — ' + (s.name || s.username || 'Siswa');
+    var j = bukaModal(judul, pesanIsi('Memuat detail jawaban…'));
+    panggil('getReviewJawabanSiswa', [acuan || '', s.userID, s.token]).then(function (res) {
+      tutupModal();
+      if (!res || !res.success) {
+        bukaModal(judul, pesanIsi((res && res.message) || 'Detail jawaban belum tersedia.'));
+        return;
+      }
+      bukaModal(judul, jendelaReview(res));
+    }, function (err) {
+      tutupModal();
+      bukaModal(judul, pesanIsi('Gagal memuat: ' + (err && err.message ? err.message : err)));
+    });
+  }
+  window.sipBukaReviewJawaban = bukaReview;
+
+  /* ========================== 2. PAPAN PERINGKAT ========================== */
+  function jendelaPeringkat(res, kelasAktif, muatUlang) {
+    var bungkus = el('div');
+    var filters = el('div', 'sip-filters');
+    [['Kelas saya', 'kelas'], ['Semua kelas', 'semua']].forEach(function (f) {
+      var b = el('button', kelasAktif === f[1] ? 'aktif' : null, f[0]);
+      b.onclick = function () { muatUlang(f[1]); };
+      filters.appendChild(b);
+    });
+    bungkus.appendChild(filters);
+
+    if (res.peringkatSaya) {
+      var info = el('div', null,
+        '<div style="font-size:.78rem;color:#cbd5e1;margin-bottom:10px">Peringkatmu: <b style="color:' +
+        WARNA.emas + '">#' + esc(res.peringkatSaya) + '</b> dari ' + esc(res.jumlahPeserta) +
+        ' siswa (' + esc(res.kelas) + ')</div>');
+      bungkus.appendChild(info);
+    }
+
+    var tabel = el('table', 'sip-tabel-peringkat');
+    tabel.innerHTML =
+      '<thead><tr><th>#</th><th>Nama</th><th>Kelas</th><th style="text-align:right">Nilai</th>' +
+      '<th style="text-align:right">Ujian</th></tr></thead>';
+    var tbody = el('tbody');
+    (res.data || []).forEach(function (r) {
+      var tr = el('tr', r.saya ? 'sip-saya' : null);
+      tr.innerHTML =
+        '<td>' + esc(r.peringkat) + '</td>' +
+        '<td>' + esc(r.nama) + (r.saya ? ' <span style="font-size:.66rem">(saya)</span>' : '') + '</td>' +
+        '<td>' + esc(r.kelas || '-') + '</td>' +
+        '<td style="text-align:right;font-weight:900">' + esc(r.nilai) + '</td>' +
+        '<td style="text-align:right;color:#94a3b8">' + esc(r.ujian) + '</td>';
+      tbody.appendChild(tr);
+    });
+    tabel.appendChild(tbody);
+    bungkus.appendChild(tabel);
+    if (!(res.data || []).length) bungkus.appendChild(pesanIsi('Belum ada nilai yang bisa ditampilkan.'));
+    return bungkus;
+  }
+
+  function bukaPeringkat(mode) {
+    var s = sesi();
+    if (!s) { bukaModal('Papan Peringkat', pesanIsi('Sesi tidak ditemukan. Silakan login ulang.')); return; }
+    var kelasAktif = mode || 'kelas';
+    var kelas = kelasAktif === 'semua' ? '' : (s.kelas || s.kelasSiswa || '');
+    if (!kelas && kelasAktif === 'kelas') {
+      /* Siswa tanpa data kelas → tampilkan semua */
+      kelasAktif = 'semua';
+      kelas = '';
+    }
+    var judul = 'Papan Peringkat';
+    bukaModal(judul, pesanIsi('Memuat papan peringkat…'));
+    panggil('getPapanPeringkatSiswa', [s.userID, s.token, kelas]).then(function (res) {
+      tutupModal();
+      if (!res || !res.success) {
+        bukaModal(judul, pesanIsi((res && res.message) || 'Papan peringkat belum tersedia.'));
+        return;
+      }
+      bukaModal(judul, jendelaPeringkat(res, kelasAktif, bukaPeringkat));
+    }, function (err) {
+      tutupModal();
+      bukaModal(judul, pesanIsi('Gagal memuat: ' + (err && err.message ? err.message : err)));
+    });
+  }
+  window.sipBukaPapanPeringkat = bukaPeringkat;
+
+  /* ============== 3. TOMBOL DI HEADER (SEMUA PENGGUNA) ============== */
+  function tombolPeringkat(ukuran) {
+    var b = el('button', 'sip-tb-emas', '<span aria-hidden="true">&#127942;</span><span>Peringkat</span>');
+    b.type = 'button';
+    b.title = 'Papan peringkat (nama & kelas)';
+    b.onclick = function () { bukaPeringkat('kelas'); };
+    if (ukuran) b.style.fontSize = '.72rem';
+    return b;
+  }
+
+  function pasangTombolHeader() {
+    var pasangan = [
+      { sel: '#page-admin header', kunci: 'admin' },
+      { sel: '#page-siswa-hub header', kunci: 'siswa' },
+      { sel: '#page-result header', kunci: 'hasil' },
+      { sel: '#page-exam header', kunci: 'ujian' }
+    ];
+    pasangan.forEach(function (p) {
+      var head = document.querySelector(p.sel);
+      if (!head || head.getAttribute('data-sip-peringkat-' + p.kunci) === '1') return;
+      head.setAttribute('data-sip-peringkat-' + p.kunci, '1');
+      head.appendChild(tombolPeringkat(true));
+    });
+  }
+
+  /* ============ 4. PANEL "NILAI SAYA" (TAB NILAI SISWA) ============ */
+  var _sedangMuatNilai = false;
+  function pasangPanelNilai() {
+    var tab = document.getElementById('siswa-tab-nilai');
+    if (!tab || !terlihat(tab)) return;
+
+    var s = sesi();
+    if (!s) return;
+
+    var panel = document.getElementById('sip-nilai-saya');
+    if (!panel) {
+      panel = el('div', 'sip-nilai-saya');
+      panel.id = 'sip-nilai-saya';
+      tab.appendChild(panel);
+    }
+    if (_sedangMuatNilai || panel.getAttribute('data-sip-terisi') === '1') return;
+
+    _sedangMuatNilai = true;
+    panel.innerHTML = '<div class="sip-kosong">Memuat nilai & detail…</div>';
+
+    panggil('getSiswaNilaiRekomendasi', [s.userID, s.token]).then(function (res) {
+      _sedangMuatNilai = false;
+      var items = (res && res.items) || [];
+      panel.innerHTML = '';
+
+      var kepala = el('div', null,
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px">' +
+          '<h2 style="font-weight:900;color:#e6eefc;font-size:1.02rem;margin:0">Nilai Saya &amp; Detail Jawaban</h2>' +
+        '</div>');
+      panel.appendChild(kepala);
+
+      if (!items.length) {
+        panel.appendChild(pesanIsi('Belum ada ujian yang sudah kamu kerjakan.'));
+        panel.setAttribute('data-sip-terisi', '1');
+        return;
+      }
+
+      items.forEach(function (it) {
+        var kartu = el('div', 'sip-nilai-kartu');
+        var kiri = el('div');
+        kiri.style.minWidth = '10rem';
+        kiri.innerHTML =
+          '<div class="sip-nilai-judul">' + esc(it.mapel || 'Ujian') +
+            (it.kelas ? ' · ' + esc(it.kelas) : '') + '</div>' +
+          '<div class="sip-nilai-ket">' + esc(it.tanggal || '-') + ' · ' + esc(it.jam || '-') + '</div>';
+        var kanan = el('div');
+        kanan.style.cssText = 'display:flex;align-items:center;gap:12px';
+        kanan.innerHTML = '<div class="sip-nilai-angka">' +
+          (it.score === null || it.score === undefined || it.score === '' ? '—' : esc(it.score)) + '</div>';
+        var tb = el('button', 'sip-tb-emas', 'Details');
+        tb.type = 'button';
+        tb.onclick = function () { bukaReview(it.responseId || ''); };
+        kanan.appendChild(tb);
+        kartu.appendChild(kiri);
+        kartu.appendChild(kanan);
+        panel.appendChild(kartu);
+      });
+      panel.setAttribute('data-sip-terisi', '1');
+    }, function (err) {
+      _sedangMuatNilai = false;
+      panel.innerHTML = '';
+      panel.appendChild(pesanIsi('Belum bisa memuat nilai: ' + (err && err.message ? err.message : err)));
+    });
+  }
+
+  /* ============ 5. TOMBOL DETAILS DI HALAMAN HASIL UJIAN ============ */
+  function pasangTombolHasil() {
+    var karti = document.querySelector('#result-score-label');
+    var hal = document.getElementById('page-result');
+    if (!hal || !terlihat(hal)) return;
+    if (document.getElementById('sip-tb-detail-hasil')) return;
+    var wadah = (karti && karti.parentElement) ? karti.parentElement : hal.querySelector('main');
+    if (!wadah) return;
+    var b = el('button', 'sip-tb-emas', '&#128269; Details');
+    b.id = 'sip-tb-detail-hasil';
+    b.type = 'button';
+    b.style.marginTop = '12px';
+    b.onclick = function () { bukaReview(''); };   /* '' = jawaban terakhir siswa */
+    wadah.appendChild(b);
+  }
+
+  /* =========================== PEMASANGAN & PENGAWAS =========================== */
+  function pasangSemua() {
+    pasangTombolHeader();
+    pasangPanelNilai();
+    pasangTombolHasil();
+  }
+
+  function mulai() {
+    pasangGaya();
+    pasangSemua();
+    try {
+      if (window.MutationObserver && document.body) {
+        var tunda = null;
+        var pengamat = new MutationObserver(function () {
+          if (tunda) return;
+          tunda = setTimeout(function () { tunda = null; pasangSemua(); }, 350);
+        });
+        /* Perhatikan juga perubahan class (mis. tab siswa dibuka/ditutup) */
+        pengamat.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
+      }
+    } catch (e) {}
+    /* Tab siswa berpindah tanpa mengubah banyak DOM → periksa berkala (ringan) */
+    setInterval(pasangSemua, 2500);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mulai);
+  else mulai();
+  window.addEventListener('load', function () { setTimeout(pasangSemua, 400); });
+  window.SIPINTAR_PAPAN_VERSI = '1.0.0';
+})();
+
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4a5a9e14e116bcd',t:'MTc5MTk3MTI1Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
