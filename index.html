@@ -1,0 +1,193 @@
+<!-- PORTAL VERCEL — PINTU MASUK SIPINTAR
+     Halaman ini adalah "pintu masuk + pemasangan PWA".
+     Aplikasi ada di /app (web/app.html) dan memakai mesin Google Apps Script
+     lewat API (/api/gas). -->
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>SIPINTAR — SMPN 26 Surakarta</title>
+<meta name="theme-color" content="#1b3a6b">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="description" content="SIPINTAR — Sistem Penilaian Terintegrasi SMP Negeri 26 Surakarta. Portal masuk dan pemasangan aplikasi (PWA).">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;min-height:100dvh}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    color:#f8fafc;background:#0b1b33;
+    display:flex;align-items:center;justify-content:center;padding:24px;
+    position:relative;overflow-x:hidden;
+  }
+  .bg-photo{
+    position:fixed;inset:0;width:100%;height:100%;
+    object-fit:cover;object-position:center;z-index:0;pointer-events:none;
+  }
+  .bg-dim{
+    position:fixed;inset:0;z-index:1;pointer-events:none;
+    background:linear-gradient(180deg,rgba(8,20,40,.36),rgba(12,28,55,.50));
+  }
+  .card{
+    position:relative;z-index:2;width:100%;max-width:420px;
+    background:rgba(15,30,58,.78);border:1px solid rgba(255,255,255,.18);
+    border-radius:28px;padding:32px 28px 24px;text-align:center;
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    box-shadow:0 30px 80px rgba(0,0,0,.45);
+  }
+  .logo-img{width:210px;max-width:78%;margin:0 auto 10px;display:block;filter:drop-shadow(0 12px 28px rgba(0,0,0,.45))}
+  h1{font-size:1.4rem;font-weight:800;letter-spacing:.08em}
+  .school{color:#fde68a;font-size:.92rem;font-weight:700;margin-top:6px}
+  .motto{color:#dbeafe;font-size:.78rem;font-style:italic;margin-top:4px}
+  .pill{display:inline-flex;align-items:center;gap:7px;margin:18px auto 4px;font-size:.75rem;font-weight:700;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);padding:7px 14px;border-radius:999px;color:#cbd5e1}
+  .dot{width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 0 4px rgba(52,211,153,.18)}
+  .dot.off{background:#f59e0b}
+  .dot.bad{background:#ef4444;box-shadow:0 0 0 4px rgba(239,68,68,.18)}
+  .btn{width:100%;border:none;cursor:pointer;font:inherit;display:flex;align-items:center;justify-content:center;gap:10px;padding:16px 20px;border-radius:16px;font-weight:800;font-size:1.02rem}
+  .btn:active{transform:scale(.97)}
+  .btn-primary{margin-top:20px;color:#1b3a6b;background:linear-gradient(135deg,#f5d76e,#d4a017);box-shadow:0 12px 28px rgba(212,160,23,.35)}
+  .btn-primary:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+  .btn-ghost{margin-top:12px;color:#e0e7ff;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);font-size:.92rem;font-weight:700}
+  .hidden{display:none !important}
+  .note{margin-top:14px;font-size:.72rem;color:#d7e3f7;line-height:1.5}
+  .foot{margin-top:18px;font-size:.68rem;color:rgba(226,232,240,.85);line-height:1.5}
+  .splash{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;flex-direction:column;background:rgba(8,20,40,.72);color:#c7d2fe;font-weight:700}
+  .splash.on{display:flex}
+  .spin{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.15);border-top-color:#f5d76e;animation:sp 1s linear infinite;margin-bottom:14px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .tech{margin-top:10px;font-size:.66rem;color:rgba(203,213,225,.9);font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.6;word-break:break-word}
+</style>
+</head>
+<body>
+<img class="bg-photo" id="bg-photo" alt="" src="background.png">
+<div class="bg-dim"></div>
+<div id="splash" class="splash"><div class="spin"></div><div>Membuka SIPINTAR…</div></div>
+<main class="card">
+  <img class="logo-img" id="logo-img" src="logo.png" alt="Logo SIPINTAR">
+  <h1>SIPINTAR</h1>
+  <p class="school">SMP Negeri 26 Surakarta</p>
+  <p class="motto">Widya Bhakti Jaya Negara</p>
+  <div class="pill"><span id="dot" class="dot"></span><span id="status-text">Memeriksa koneksi…</span></div>
+  <button id="btn-open" class="btn btn-primary" disabled>Buka Aplikasi</button>
+  <button id="btn-gas" class="btn btn-ghost hidden">Mode Cadangan (Google /exec)</button>
+  <button id="btn-install" class="btn btn-ghost hidden">Install ke Perangkat</button>
+  <p class="note" id="net-note"></p>
+  <p class="note">Halaman ini pintu masuk. Aplikasi (login, bank soal, ujian) berjalan di <b>/app</b> dengan mesin Google Apps Script.</p>
+  <p class="tech" id="tech-line"></p>
+  <p class="foot">v<span id="app-ver">-</span> · © Copyright Inovasi Pembelajaran Version 2<br>Arif Nuur Iswahyudi, S.Pd., Gr · 2026<br>Jl. Joyonegaran No. 02, Surakarta</p>
+</main>
+<script src="config.js"></script>
+<script src="api-actions.js"></script>
+<script src="api-client.js"></script>
+<script>
+(function () {
+  var FALLBACK_BG = 'https://raw.githubusercontent.com/isramiraj1443-ship-it/SIPINTAR-/e8d89242b8d4ac34cf24f741bb325e634e3cb210/background%20%281%29.png';
+  var bg = document.getElementById('bg-photo');
+  bg.addEventListener('error', function () {
+    if (bg.src.indexOf('raw.githubusercontent') < 0) bg.src = FALLBACK_BG;
+  });
+
+  var CFG = window.APP_CONFIG || {};
+  var APP_PATH = String(CFG.APP_PATH || 'app').replace(/^\/+/, '');
+  var btnOpen = document.getElementById('btn-open');
+  var btnGas = document.getElementById('btn-gas');
+  var btnInstall = document.getElementById('btn-install');
+  var dot = document.getElementById('dot');
+  var statusText = document.getElementById('status-text');
+  var techLine = document.getElementById('tech-line');
+
+  document.getElementById('app-ver').textContent = CFG.APP_VERSION || '2.2.3';
+
+  function getGasUrl() { return String(CFG.GAS_WEB_APP_URL || '').trim(); }
+  function gasOk(u) { return /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec/.test(u); }
+  function appUrl() { return APP_PATH ? (APP_PATH + '') : ''; }
+
+  function setStatus(kelas, teks) {
+    dot.className = 'dot' + (kelas ? ' ' + kelas : '');
+    statusText.textContent = teks;
+  }
+
+  function refreshDasar() {
+    var online = navigator.onLine;
+    if (!online) {
+      setStatus('off', 'Offline');
+      btnOpen.disabled = true;
+      document.getElementById('net-note').textContent = 'Butuh koneksi internet.';
+      return false;
+    }
+    return true;
+  }
+
+  /* --- Cek API (proxy Vercel → Google Apps Script) --- */
+  function cekApi() {
+    if (!refreshDasar()) return;
+    setStatus('', 'Memeriksa API…');
+    btnOpen.disabled = true;
+    var mulai = Date.now();
+    window.SIPINTAR_API.health().then(function (h) {
+      var detik = ((Date.now() - mulai) / 1000).toFixed(1) + 's';
+      if (h.ok) {
+        var jalur = h.channel === 'direct' ? 'langsung ke Google' : 'proxy Vercel';
+        setStatus('', 'Terhubung · API aktif');
+        btnOpen.disabled = false;
+        document.getElementById('net-note').textContent =
+          'Mesin SIPINTAR siap (' + jalur + ', ' + detik + ').';
+        techLine.textContent = 'API v' + ((h.info && h.info.api) || CFG.API_VERSION || '-') +
+          ' · jalur ' + h.channel + ' · ' + ((h.info && h.info.aksiTersedia) || '?') + ' aksi' +
+          (h.info && h.info.timezone ? ' · ' + h.info.timezone : '');
+        if (gasOk(getGasUrl())) btnGas.classList.remove('hidden');
+        return;
+      }
+      /* API tidak terjawab → tawarkan mode cadangan bila URL GAS ada */
+      var adaGas = gasOk(getGasUrl());
+      setStatus('bad', adaGas ? 'Mode cadangan tersedia' : 'API belum siap');
+      btnOpen.disabled = false;
+      document.getElementById('net-note').textContent = adaGas
+        ? 'API belum menjawab (' + (h.error || '-') + '). Anda masih bisa masuk lewat mode cadangan Google.'
+        : 'API belum menjawab: ' + (h.error || '-');
+      techLine.textContent = 'API v' + (CFG.API_VERSION || '-') + ' · status: ' + (h.transport ? 'jaringan' : 'server');
+      if (adaGas) btnGas.classList.remove('hidden');
+    });
+  }
+
+  /* --- Tombol: Buka Aplikasi (UI di Vercel, mesin di Google) --- */
+  btnOpen.addEventListener('click', function () {
+    btnOpen.disabled = true;
+    document.getElementById('splash').classList.add('on');
+    window.location.href = appUrl();
+  });
+
+  /* --- Tombol: mode cadangan → halaman /exec milik Google (UI GAS asli) --- */
+  btnGas.addEventListener('click', function () {
+    var url = getGasUrl();
+    if (!gasOk(url)) return;
+    document.getElementById('splash').classList.add('on');
+    setTimeout(function () { window.location.href = url; }, 200);
+  });
+
+  /* --- PWA --- */
+  var deferred = null;
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault(); deferred = e; btnInstall.classList.remove('hidden');
+  });
+  btnInstall.addEventListener('click', function () {
+    if (!deferred) { alert('Gunakan menu browser: Install aplikasi / Tambahkan ke layar utama.'); return; }
+    deferred.prompt();
+  });
+
+  window.addEventListener('online', cekApi);
+  window.addEventListener('offline', function () { refreshDasar(); });
+  cekApi();
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js', { scope: '/' }).catch(function () {});
+    });
+  }
+})();
+</script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4a369882ee76bdf',t:'MTc5MTk0NzY0OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
