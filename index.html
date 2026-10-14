@@ -59,6 +59,9 @@
   .spin{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.15);border-top-color:#f5d76e;animation:sp 1s linear infinite;margin-bottom:14px}
   @keyframes sp{to{transform:rotate(360deg)}}
   .tech{margin-top:10px;font-size:.66rem;color:rgba(203,213,225,.9);font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.6;word-break:break-word}
+  /* --- Pembersih kata (14 Okt): kata "SIPINTAR" tidak ditampilkan pada teks antarmuka
+         maupun judul halaman. Dijalankan oleh skrip pembersih kata di bagian atas kepala
+         dokumen. Ingin memunculkannya lagi? Hapus blok skrip tersebut. ---
   /* --- Aturan tampilan (14 Okt): pilihan menu hanya "BUKA APLIKASI" & "INSTALL ke Perangkat".
          Teks teknis tidak ditampilkan kepada pengguna. Elemen & skripnya TIDAK dihapus —
          cukup hapus baris ini bila ingin memunculkannya kembali. --- */
@@ -69,6 +72,168 @@
     border:1px solid rgba(245,215,110,.45);color:#f8f5e6;text-align:left;font-size:.74rem;line-height:1.65}
   #install-hint b{color:#f5d76e}
 </style>
+
+  <!-- PEMBERSIH KATA ANTARMUKA · sumber: web/hapus-kata.js (versi 1.0.0)
+       Kata "SIPINTAR" tidak ditampilkan pada teks antarmuka & judul halaman.
+       Kode, fungsi, dan berkas aslinya TIDAK diubah — hanya tampilan tulisannya. -->
+  <script id="sipintar-hapus-kata">
+/* =============================================================================
+   BERSIHKAN KATA DARI ANTARMUKA  ·  web/hapus-kata.js   (versi 1.0.0)
+   -----------------------------------------------------------------------------
+   Menghapus kata tertentu dari SELURUH TEKS ANTARMUKA dan JUDUL HALAMAN:
+     · teks yang terlihat (judul kartu, kepala sidebar, header, spanduk, dsb.)
+     · judul tab peramban (document.title)
+     · keterangan gambar (alt), tooltip (title), teks bantu (aria-label),
+       dan keterangan meta (description / og:title)
+
+   Yang TIDAK disentuh: <script>, <style>, komentar, nama berkas, nama fungsi,
+   id/kelas, serta isi kolom isian yang sedang diketik pengguna. Jadi tidak ada
+   kode atau fungsi yang hilang — hanya tulisannya yang tidak ditampilkan.
+
+   Daftar kata diambil dari window.SIPINTAR_HAPUS_KATA (disusun oleh
+   web/INSTRUKSI-TIM.md lewat scripts/build-app.js). Bila tidak ada, dipakai
+   kata bawaan di bawah ini.
+   ============================================================================= */
+(function () {
+  'use strict';
+
+  var KATA = (window.SIPINTAR_HAPUS_KATA && window.SIPINTAR_HAPUS_KATA.length)
+    ? window.SIPINTAR_HAPUS_KATA
+    : ['SIPINTAR'];
+
+  if (!KATA.length) return;
+
+  var LEWATI = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, TEMPLATE: 1, TEXTAREA: 1 };
+  var ATRIBUT = ['title', 'alt', 'placeholder', 'aria-label', 'content'];
+  var sedangJalan = false;
+
+  function pola(kata) {
+    var aman = String(kata).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp('\\s*' + aman + '\\s*', 'gi');
+  }
+
+  var POLA = KATA.map(pola);
+
+  /* Merapikan sisa tanda baca & spasi setelah kata dihapus */
+  function rapikan(t) {
+    return t
+      .replace(/[ \t\u00a0]{2,}/g, ' ')
+      .replace(/^[\s\-–—·|:,;>]+/, '')
+      .replace(/[\s\-–—·|:,;<]+$/, '')
+      .replace(/[ \t\u00a0]{2,}/g, ' ')
+      .trim();
+  }
+
+  function bersihkanTeks(teks) {
+    if (!teks || !/SIPINTAR/i.test(teks)) return teks;
+    var keluar = teks;
+    for (var i = 0; i < POLA.length; i++) keluar = keluar.replace(POLA[i], ' ');
+    var rapi = rapikan(keluar);
+    return rapi === '' ? '' : rapi;
+  }
+
+  /* ---------- 1. Judul tab peramban ---------- */
+  function bersihkanJudul() {
+    try {
+      var baru = bersihkanTeks(document.title);
+      if (baru !== document.title) document.title = baru || 'Sistem Penilaian Terintegrasi';
+    } catch (e) {}
+  }
+
+  /* ---------- 2. Atribut (alt, title, aria-label, meta description) ---------- */
+  function bersihkanAtribut(akar) {
+    var semua = akar.querySelectorAll('*');
+    for (var i = 0; i < semua.length; i++) {
+      var el = semua[i];
+      if (el.tagName === 'META' || !LEWATI[el.tagName]) {
+        for (var a = 0; a < ATRIBUT.length; a++) {
+          var nama = ATRIBUT[a];
+          if (!el.hasAttribute || !el.hasAttribute(nama)) continue;
+          var isi = el.getAttribute(nama);
+          if (!isi || !/SIPINTAR/i.test(isi)) continue;
+          if (nama === 'content' && el.tagName !== 'META') continue;
+          var baru = bersihkanTeks(isi);
+          try { el.setAttribute(nama, baru); } catch (e) {}
+        }
+      }
+    }
+  }
+
+  /* ---------- 3. Teks yang terlihat ---------- */
+  function bersihkanSimpul(akar) {
+    var penelusur = document.createTreeWalker(akar, 4 /* TEXT_NODE */, null);
+    var daftar = [], n;
+    while ((n = penelusur.nextNode())) {
+      var induk = n.parentNode;
+      if (!induk || LEWATI[induk.tagName]) continue;
+      if (!/SIPINTAR/i.test(n.nodeValue || '')) continue;
+      daftar.push(n);
+    }
+    for (var i = 0; i < daftar.length; i++) {
+      var baru = bersihkanTeks(daftar[i].nodeValue);
+      try { daftar[i].nodeValue = baru; } catch (e) {}
+    }
+    /* Judul yang menjadi kosong setelah kata dihapus → tidak ditampilkan
+       (elemennya tetap ada beserta id & fungsinya) */
+    var judul = akar.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    for (var j = 0; j < judul.length; j++) {
+      var el = judul[j];
+      if (!el.textContent || !el.textContent.trim()) {
+        if (!el.getAttribute('data-sip-kosong')) {
+          el.setAttribute('data-sip-kosong', '1');
+          el.style.display = 'none';
+        }
+      }
+    }
+  }
+
+  function terapkan(akar) {
+    if (sedangJalan) return;
+    sedangJalan = true;
+    try {
+      akar = akar || document.body;
+      bersihkanJudul();
+      if (akar && akar.nodeType === 1) {
+        bersihkanSimpul(akar);
+        bersihkanAtribut(akar);
+      }
+    } catch (e) { /* diabaikan — tampilan asli tetap aman */ }
+    sedangJalan = false;
+  }
+
+  /* ---------- 4. Pemasangan ---------- */
+  function pasang() {
+    terapkan(document.body);
+
+    /* Teks yang datang belakangan (mis. nama aplikasi dari menu Konfigurasi)
+       ikut dibersihkan lewat pengamat perubahan halaman. */
+    try {
+      if (window.MutationObserver && document.body) {
+        var pengamat = new MutationObserver(function () { terapkan(document.body); });
+        pengamat.observe(document.body, { childList: true, subtree: true, characterData: true });
+      }
+    } catch (e) {}
+
+    /* Beberapa pemasangan lanjutan untuk teks yang muncul agak lambat */
+    var waktu = [400, 1200, 2500, 5000, 9000];
+    for (var i = 0; i < waktu.length; i++) {
+      (function (t) { setTimeout(function () { terapkan(document.body); }, t); })(waktu[i]);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', pasang);
+  } else {
+    pasang();
+  }
+  window.addEventListener('load', function () { setTimeout(function () { terapkan(document.body); }, 200); });
+
+  /* Dapat dipanggil ulang bila perlu (mis. setelah memuat data baru) */
+  window.sipBersihkanKata = function () { terapkan(document.body); };
+  window.SIPINTAR_HAPUS_KATA_VERSI = '1.0.0';
+})();
+
+  </script>
 </head>
 <body>
 <img class="bg-photo" id="bg-photo" alt="" src="background.png">
@@ -241,13 +406,13 @@
              '<b>Install aplikasi</b> / <b>Tambahkan ke layar utama</b> → tekan <b>Install</b>.';
     }
     return '<b>Cara memasang di komputer:</b> klik ikon <b>Install</b> di ujung kanan kolom alamat ' +
-           '(Chrome/Edge), atau menu <b>⋮</b> → <b>Install SIPINTAR</b>. Bila belum muncul, muat ulang ' +
+           '(Chrome/Edge), atau menu <b>⋮</b> → <b>Install aplikasi</b>. Bila belum muncul, muat ulang ' +
            'halaman ini sekali lagi.';
   }
 
   btnInstall.addEventListener('click', function () {
     if (sudahTerpasang()) {
-      tampilkanPesanInstall('Aplikasi <b>SIPINTAR</b> sudah terpasang di perangkat ini dan siap dibuka dari ikonnya.');
+      tampilkanPesanInstall('Aplikasi sudah terpasang di perangkat ini dan siap dibuka dari ikonnya.');
       return;
     }
     if (deferred) {
@@ -270,7 +435,7 @@
 
   window.addEventListener('appinstalled', function () {
     deferred = null;
-    tampilkanPesanInstall('Terima kasih — <b>SIPINTAR</b> berhasil dipasang di perangkat ini.');
+    tampilkanPesanInstall('Terima kasih — aplikasi berhasil dipasang di perangkat ini.');
   });
 
   window.addEventListener('online', cekApi);
@@ -284,5 +449,5 @@
   }
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4a4bb884d30831e',t:'MTc5MTk2MTQ5Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4a4f49069ffce85',t:'MTc5MTk2MzgyOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
