@@ -1145,13 +1145,16 @@
    TEMA HALAMAN LOGIN SIPINTAR  ·  web/login-theme.css
    -----------------------------------------------------------------------------
    Berkas ini HANYA menyentuh halaman login. Halaman lain (dashboard, ujian,
-   bank soal, dsb.) tidak terpengaruh sama sekali.
+   bank soal, dsb.) tidak terpengaruh.
 
-   Isinya tiga hal atas permintaan pemilik sistem:
-     1. Kartu login dibuat TRANSPARAN (menyatu dengan latar belakang).
-     2. Warna tulisan pada kartu disesuaikan agar tetap terbaca di atas foto.
-     3. Tipografi + animasi untuk tiga baris identitas:
-          SIPINTAR  ·  SISTEM PENILAIAN TERINTEGRASI  ·  SMP NEGERI 26 KOTA SURAKARTA
+   Isinya:
+     1. Kartu login TRANSPARAN (menyatu dengan latar belakang).
+     2. Warna tulisan kartu agar tetap terbaca di atas foto.
+     3. Tipografi dua baris identitas:
+          SISTEM PENILAIAN TERINTEGRASI   (baris besar)
+          SMP NEGERI 26 KOTA SURAKARTA    (baris di bawahnya)
+        keduanya beranimasi "sedang menulis" (dijalankan web/klien-tampilan.js).
+     4. Jam digital besar + hari + tanggal, bernuansa emas.
 
    Cara mengubah: sunting berkas ini, lalu jalankan  →  npm run sipintar:app
    ============================================================================= */
@@ -1168,14 +1171,6 @@
   box-shadow: none !important;
 }
 
-/* Kotak jam: diberi sedikit lapisan gelap transparan supaya angkanya tetap jelas */
-#login-clock-box {
-  background: rgba(15, 23, 42, .58) !important;
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
-  border-color: rgba(148, 163, 184, .35) !important;
-}
-
 /* Tulisan pada form (User ID / Password / Admin) agar terang di atas foto */
 #loginForm label,
 #loginForm .login-label {
@@ -1183,109 +1178,288 @@
   text-shadow: 0 1px 3px rgba(0, 0, 0, .6);
 }
 #loginForm label span { color: #f1f5ff !important; }
-#loginForm input[type="checkbox"] { accent-color: #2563eb; }
 
-/* ==================== 2. TIPOGRAFI + ANIMASI TIGA BARIS ==================== */
+/* ==================== 2. DUA BARIS IDENTITAS (DENGAN ANIMASI) ==================== */
+/*  Baris 1 — SISTEM PENILAIAN TERINTEGRASI : huruf LEBIH BESAR, warna keemasan  */
+#login-subtitle {
+  display: block;
+  margin-top: 10px;
+  font-size: 1.12rem;
+  line-height: 1.35;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: #fff6dc !important;
+  text-shadow:
+    0 0 14px rgba(245, 215, 110, .45),
+    0 2px 8px rgba(0, 0, 0, .75);
+  min-height: 1.5em;
+}
+/*  Baris 2 — SMP NEGERI 26 KOTA SURAKARTA : selalu ≤ baris di atasnya  */
+#login-school {
+  display: block;
+  margin-top: 4px;
+  font-size: 1rem;
+  line-height: 1.3;
+  font-weight: 800;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: #f5d76e !important;
+  text-shadow:
+    0 0 12px rgba(212, 160, 23, .5),
+    0 2px 7px rgba(0, 0, 0, .8);
+  min-height: 1.4em;
+}
 
-/* --- Baris 1 : SIPINTAR --- */
+/* kursor berkedip selama kalimat "sedang ditulis" */
+.sip-sedang-ketik::after {
+  content: '\258C';                 /* █ */
+  display: inline-block;
+  margin-left: 2px;
+  color: #f5d76e;
+  animation: sipKedip .75s steps(1) infinite;
+}
+@keyframes sipKedip { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+
+/* kilau lembut setelah kalimat selesai ditulis (tetap nuansa emas) */
+#login-school { animation: sipEmasDenyut 5s ease-in-out 3.5s infinite; }
+#login-subtitle { animation: sipEmasDenyut 6s ease-in-out 3s infinite; }
+@keyframes sipEmasDenyut {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .88; }
+}
+
+/* Judul lama (bila kelak ditampilkan lagi lewat web/INSTRUKSI-TIM.md) */
 #login-title {
   font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
   font-size: 2.05rem;
   font-weight: 900;
-  line-height: 1.15;
   letter-spacing: .22em;
-  text-indent: .22em;                     /* agar huruf terakhir tetap seimbang */
-  text-align: center;
-  color: #f2f7ff !important;              /* warna aman untuk browser lama */
-  filter:
-    drop-shadow(0 2px 10px rgba(56, 189, 248, .45))
-    drop-shadow(0 1px 2px rgba(0, 0, 0, .55));
-  animation:
-    sipJudulMasuk .95s cubic-bezier(.2, .9, .25, 1) both,
-    sipKilau 7s linear 1.1s infinite;
+  text-indent: .22em;
+  color: #ffe6a3 !important;
+  text-shadow: 0 0 18px rgba(245, 215, 110, .5), 0 2px 8px rgba(0, 0, 0, .7);
 }
 
-/* --- Baris 2 : SISTEM PENILAIAN TERINTEGRASI --- */
-#login-subtitle {
-  margin-top: 8px;
-  font-size: .74rem;
-  font-weight: 700;
+/* ===================== 3. JAM DIGITAL + HARI + TANGGAL ===================== */
+#sip-clock-full {
+  margin-top: 12px;
+  padding: 12px 22px 10px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(8, 18, 38, .72), rgba(8, 18, 38, .58));
+  border: 1px solid rgba(245, 215, 110, .55);
+  box-shadow:
+    0 0 0 1px rgba(245, 215, 110, .12),
+    0 10px 30px rgba(0, 0, 0, .45),
+    inset 0 0 22px rgba(212, 160, 23, .12);
+}
+#sip-clock-time {
+  font-family: ui-monospace, 'Consolas', 'Menlo', monospace;
+  font-size: 2.15rem;
+  font-weight: 800;
+  letter-spacing: .12em;
+  color: #ffd970;
+  text-shadow:
+    0 0 14px rgba(245, 215, 110, .65),
+    0 0 34px rgba(212, 160, 23, .35);
+  animation: sipJamGlow 3.2s ease-in-out infinite;
+}
+@keyframes sipJamGlow {
+  0%, 100% { text-shadow: 0 0 12px rgba(245, 215, 110, .5), 0 0 26px rgba(212, 160, 23, .28); }
+  50%      { text-shadow: 0 0 20px rgba(255, 226, 138, .85), 0 0 44px rgba(212, 160, 23, .45); }
+}
+#sip-clock-day {
+  margin-top: 2px;
+  font-size: .95rem;
+  font-weight: 800;
   letter-spacing: .17em;
   text-transform: uppercase;
-  color: #eaf2ff !important;
-  text-shadow: 0 2px 9px rgba(0, 0, 0, .7);
-  animation:
-    sipBarisMasuk .85s cubic-bezier(.2, .9, .25, 1) .2s both,
-    sipDenyut 4.5s ease-in-out 1.3s infinite;
+  color: #fff6dc;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, .7);
 }
-
-/* --- Baris 3 : SMP NEGERI 26 KOTA SURAKARTA --- */
-#login-school {
-  margin-top: 5px;
-  font-size: .8rem;
-  font-weight: 800;
-  letter-spacing: .11em;
+#sip-clock-date {
+  font-size: .84rem;
+  font-weight: 700;
+  letter-spacing: .1em;
   text-transform: uppercase;
-  color: #fde68a !important;              /* warna aman untuk browser lama */
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .6));
-  animation:
-    sipBarisMasuk .85s cubic-bezier(.2, .9, .25, 1) .38s both,
-    sipKilau 6s linear 1.7s infinite;
+  color: #f5d76e;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, .75);
+}
+#sip-clock-full::after {
+  content: '';
+  display: block;
+  width: 62%;
+  height: 1px;
+  margin: 6px auto 0;
+  background: linear-gradient(90deg, transparent, rgba(245, 215, 110, .85), transparent);
 }
 
-/* --- Efek teks gradien berkilau (hanya bila browser mendukung) ---
-       Bila tidak didukung, warna aman di atas yang dipakai → tulisan TIDAK
-       akan pernah hilang, termasuk pada HP/WebView lama. --- */
-@supports ((-webkit-background-clip: text) or (background-clip: text)) {
-  #login-title {
-    background-image: linear-gradient(100deg,
-        #bfdbfe 0%, #ffffff 20%, #fde68a 42%, #ffffff 64%, #bfdbfe 100%);
-    background-size: 280% 100%;
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent !important;
-  }
-  #login-school {
-    background-image: linear-gradient(100deg, #fde68a, #fffbeb, #f5d76e, #fffbeb, #fde68a);
-    background-size: 250% 100%;
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent !important;
-  }
+/* ==================== 4. BUTIRAN EMAS PADA LATAR HALAMAN ==================== */
+#sip-emas-kanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;                        /* di atas lapisan gelap, di bawah kartu login */
 }
 
-/* --- Gerak --- */
-@keyframes sipJudulMasuk {
-  0%   { opacity: 0; transform: translateY(16px) scale(.93); letter-spacing: .55em; }
-  100% { opacity: 1; transform: translateY(0)    scale(1);   letter-spacing: .22em; }
-}
-@keyframes sipBarisMasuk {
-  0%   { opacity: 0; transform: translateY(11px); letter-spacing: .40em; }
-  100% { opacity: 1; transform: translateY(0);    letter-spacing: .17em; }
-}
-@keyframes sipKilau {
-  0%   { background-position: 0% 50%; }
-  100% { background-position: 280% 50%; }
-}
-@keyframes sipDenyut {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: .85; }
+/* Simbol matematika melayang → kini bernuansa emas */
+.sp-math-float span {
+  color: rgba(245, 215, 110, .22) !important;
+  text-shadow: 0 0 18px rgba(245, 215, 110, .35);
 }
 
-/* --- Menghormati setelan "kurangi gerak" pada perangkat pengguna --- */
+/* ======================== PENGAMAN & PENYESUAIAN LAYAR ======================== */
 @media (prefers-reduced-motion: reduce) {
-  #login-title, #login-subtitle, #login-school {
-    animation: none !important;
-    letter-spacing: .18em;
-  }
+  #login-subtitle, #login-school, #sip-clock-time, #login-title { animation: none !important; }
+  .sip-sedang-ketik::after { animation: none !important; }
+}
+@media (max-width: 420px) {
+  #login-subtitle { font-size: 1rem;    letter-spacing: .06em; }
+  #login-school   { font-size: .9rem;   letter-spacing: .07em; }
+  #sip-clock-time { font-size: 1.75rem; letter-spacing: .08em; }
+  #sip-clock-full { padding: 10px 16px 8px; }
+  #login-title    { font-size: 1.7rem;  letter-spacing: .18em; }
+}
+  </style>
+
+  <!-- TEMA EMAS · sumber: web/theme-emas.css (dibangun otomatis) -->
+  <style id="sipintar-tema-emas">
+/* =============================================================================
+   TEMA EMAS SIPINTAR  ·  web/theme-emas.css
+   -----------------------------------------------------------------------------
+   Elemen warna emas untuk SELURUH fitur + gaya tombol minimize menu.
+   Hanya menyentuh tampilan (warna, garis, sorotan) — tidak ada fungsi yang diubah.
+   Sumber tetap: sunting berkas ini → npm run sipintar:app → unggah app.html
+   ============================================================================= */
+
+:root {
+  --emas-1: #f5d76e;   /* emas terang */
+  --emas-2: #d4a017;   /* emas tua   */
+  --emas-3: #fff3c4;   /* emas pucat */
 }
 
-/* --- Layar kecil: huruf sedikit mengecil agar tidak terpotong --- */
-@media (max-width: 400px) {
-  #login-title   { font-size: 1.7rem;  letter-spacing: .18em; }
-  #login-subtitle{ font-size: .68rem;  letter-spacing: .13em; }
-  #login-school  { font-size: .72rem;  letter-spacing: .09em; }
+/* ----------------------------- TOMBOL MINIMIZE MENU ----------------------------- */
+.sip-nav-min-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(212, 160, 23, .55);
+  background: linear-gradient(135deg, rgba(245, 215, 110, .22), rgba(212, 160, 23, .12));
+  color: var(--emas-1);
+  cursor: pointer;
+  transition: transform .18s ease, background .18s ease, box-shadow .18s ease;
 }
+.sip-nav-min-btn:hover {
+  background: linear-gradient(135deg, rgba(245, 215, 110, .4), rgba(212, 160, 23, .22));
+  box-shadow: 0 0 0 3px rgba(245, 215, 110, .18);
+}
+.sip-nav-min-btn:active { transform: scale(.94); }
+.sip-nav-min-btn i { font-size: 15px; }
+/* pada header berlatar terang (panel admin) tombol dibuat lebih kontras */
+#page-admin header .sip-nav-min-btn {
+  background: linear-gradient(135deg, #f5d76e, #e8b93c);
+  border-color: #d4a017;
+  color: #4a3200;
+  box-shadow: 0 4px 12px rgba(212, 160, 23, .35);
+}
+
+/* -------------------------- GARIS & SOROTAN EMAS UMUM -------------------------- */
+#page-admin header,
+#page-siswa-hub header,
+.exam-header {
+  border-bottom: 2px solid rgba(245, 215, 110, .55) !important;
+}
+#admin-sidebar { border-right: 1px solid rgba(245, 215, 110, .18); }
+#siswa-side-nav { border-right: 1px solid rgba(245, 215, 110, .16); }
+
+/* menu yang sedang aktif → garis emas */
+#admin-sidebar .sidebar-item.active {
+  border-left: 3px solid var(--emas-1);
+  background: linear-gradient(90deg, rgba(245, 215, 110, .14), transparent 70%) !important;
+}
+#admin-sidebar .sidebar-item.active i,
+#admin-sidebar .sidebar-item.active .sidebar-text { color: var(--emas-1) !important; }
+.siswa-nav-btn.active {
+  border-left: 3px solid var(--emas-1);
+  background: linear-gradient(90deg, rgba(245, 215, 110, .14), transparent 70%) !important;
+}
+.siswa-nav-btn.active i, .siswa-nav-btn.active .siswa-nav-label { color: var(--emas-1) !important; }
+
+/* judul modul / bagian menu */
+.menu-mod-head .mod-ico, .menu-mod-title .mod-ico { color: var(--emas-1) !important; }
+
+/* tabel & kartu: garis atas emas tipis */
+#page-admin table thead tr,
+#page-admin .card, #page-admin .sip-card { border-top-color: rgba(245, 215, 110, .55) !important; }
+#page-admin table thead th {
+  background-image: linear-gradient(180deg, rgba(245, 215, 110, .16), rgba(245, 215, 110, .04));
+}
+
+/* tombol utama & sorotan fokus (seluruh aplikasi) */
+#page-admin button.bg-blue-700,
+#page-admin button.bg-blue-600,
+#btnLogin {
+  background-image: linear-gradient(135deg, #f5d76e, #e8b93c) !important;
+  color: #3d2b00 !important;
+  font-weight: 800 !important;
+  border: 1px solid #d4a017 !important;
+  box-shadow: 0 8px 20px rgba(212, 160, 23, .35) !important;
+}
+#page-admin button.bg-blue-700:hover,
+#page-admin button.bg-blue-600:hover,
+#btnLogin:hover {
+  filter: brightness(1.06);
+  box-shadow: 0 10px 26px rgba(212, 160, 23, .45) !important;
+}
+input:focus, select:focus, textarea:focus {
+  outline-color: var(--emas-1) !important;
+  border-color: var(--emas-1) !important;
+  box-shadow: 0 0 0 3px rgba(245, 215, 110, .25) !important;
+}
+#loginForm input[type="checkbox"] { accent-color: var(--emas-2); }
+
+/* gulir (scrollbar) bernuansa emas */
+#admin-sidebar nav::-webkit-scrollbar-thumb,
+#admin-content::-webkit-scrollbar-thumb,
+.sip-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--emas-1), var(--emas-2));
+  border-radius: 8px;
+}
+
+/* badge / lencana & lencana status */
+#page-admin .rounded-full.bg-emerald-500,
+#page-siswa-hub .rounded-full.bg-emerald-400 { box-shadow: 0 0 0 2px rgba(245, 215, 110, .35); }
+
+/* kerangka foto profil bernuansa emas */
+.sip-pf-frame { border-color: rgba(245, 215, 110, .7) !important; }
+
+/* ------- saat sidebar admin diminimalkan (kelas .collapsed bawaan) ------- */
+#admin-sidebar.collapsed { border-right: 2px solid rgba(245, 215, 110, .35); }
+#admin-sidebar.collapsed .menu-mod-head { border-left: 3px solid transparent; }
+#admin-sidebar.collapsed .sidebar-item.active { border-left-width: 3px; }
+
+/* ------- saat menu siswa diminimalkan (kelas .siswa-nav-min bawaan) ------- */
+#siswa-side-nav.siswa-nav-min { border-right: 2px solid rgba(245, 215, 110, .35); }
+#siswa-side-nav.siswa-nav-min .siswa-menu-mod-head { justify-content: center; }
+#siswa-side-nav.siswa-nav-min .siswa-menu-mod-head i { color: var(--emas-1); }
+  </style>
+
+  <!-- INSTRUKSI TAMPILAN · sumber: web/INSTRUKSI-TIM.md (dibangun otomatis) -->
+  <style id="sipintar-instruksi-tim">
+#login-title{display:none !important}
+#login-clock-box{display:none !important}
+#login-tz-label{display:none !important}
+#sipintar-ui-build{display:none !important}
+#siswa-nav-min-btn{display:none !important}
   </style>
 </head>
 <body class="overflow-x-hidden text-slate-800">
@@ -1330,6 +1504,14 @@
             <div id="login-date-display" class="text-xs text-slate-300 font-medium"></div>
             <div id="login-tz-label" class="text-[10px] text-slate-400 font-mono"></div>
             <div id="sipintar-ui-build" class="text-[9px] text-slate-400 mt-0.5 tracking-wide">UI 2.0.3</div>
+          </div>
+
+          <!-- Jam digital + hari + tanggal (menggantikan baris WIB & UI;
+               jam lama tetap berdetak tersembunyi, tidak ada yang dihapus) -->
+          <div id="sip-clock-full" role="timer" aria-label="Jam dan tanggal">
+            <div id="sip-clock-time">--:--:--</div>
+            <div id="sip-clock-day">&mdash;</div>
+            <div id="sip-clock-date">&mdash;</div>
           </div>
 <script>
 (function(){
@@ -1411,7 +1593,8 @@
 
     <div id="page-siswa-hub" class="hidden min-h-screen bg-[#d9e2ec] flex flex-col">
       <header class="bg-[#1b3a6b] text-white px-4 py-3 flex items-center justify-between shadow-md sticky top-0 z-30">
-        <div class="flex items-center gap-3 min-w-0">
+        <button type="button" class="sip-nav-min-btn" onclick="sipMinimalkanMenuSiswa()" title="Minimize / tampilkan menu" aria-label="Minimize menu"><i class="fas fa-angles-left" id="sip-nav-min-ico-siswa"></i></button>
+          <div class="flex items-center gap-3 min-w-0">
           <img class="sp-owl-slot w-10 h-10 rounded-lg object-contain bg-white/10 shrink-0" alt="Logo SIPINTAR">
           <div class="min-w-0">
             <p class="text-[10px] uppercase tracking-[0.2em] text-blue-200 font-bold">Exam Browser</p>
@@ -1697,6 +1880,7 @@
               <i class="fas fa-indent text-sm" id="collapse-icon"></i>
             </button>
 
+            <button type="button" class="sip-nav-min-btn" onclick="sipMinimalkanMenuAdmin()" title="Minimize / tampilkan menu" aria-label="Minimize menu"><i class="fas fa-angles-left" id="sip-nav-min-ico-admin"></i></button>
             <h2 class="text-xl font-bold text-slate-800 tracking-tight hidden sm:block" id="admin-header-title">Dashboard Overview</h2>
           </div>
 
@@ -21019,5 +21203,276 @@ function sipSisipTandaGambar_() {
   }
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4a4896f0a1809c2',t:'MTc5MTk1OTQ0MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+  <!-- SKRIP TAMPILAN · sumber: web/klien-tampilan.js (dibangun otomatis) -->
+  <script id="sipintar-klien-tampilan">
+/* =============================================================================
+   SKRIP TAMPILAN SIPINTAR  ·  web/klien-tampilan.js
+   -----------------------------------------------------------------------------
+   Semua bersifat MENAMBAH tampilan; tidak ada fungsi asli aplikasi yang diubah
+   atau dihapus. Berisi:
+     1. Jam digital besar + hari + tanggal (bawah jam, sesuai permintaan)
+     2. Animasi "sedang menulis" untuk SISTEM PENILAIAN TERINTEGRASI dan
+        SMP NEGERI 26 KOTA SURAKARTA
+     3. Tombol minimize menu pada header (semua peran) + mengingat pilihannya
+     4. Butiran emas berkilau pada latar halaman login (elemen warna emas)
+
+   Bila berkas ini gagal dimuat, aplikasi tetap berjalan normal seperti sebelumnya:
+   tulisan judul tetap tampil utuh (tidak dikosongkan) dan jam lama tetap berdetak.
+   ============================================================================= */
+(function () {
+  'use strict';
+
+  var HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  var BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+               'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  var KUNCI_NAV_ADMIN = 'sipintar-admin-nav-min';
+  var KUNCI_NAV_SISWA = 'sipintar-siswa-nav-min';
+
+  function p2(n) { n = String(n); return n.length < 2 ? '0' + n : n; }
+  function ada(el) { return !!(el && el.nodeType === 1); }
+  function baca(kunci) { try { return localStorage.getItem(kunci); } catch (e) { return null; } }
+  function tulis(kunci, nilai) { try { localStorage.setItem(kunci, nilai); } catch (e) {} }
+  function kurangiGerak() {
+    try { return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+    catch (e) { return false; }
+  }
+
+  /* ============================ 1. JAM & TANGGAL ============================ */
+  function jamHariTanggal() {
+    var d = new Date();
+    var jam = document.getElementById('sip-clock-time');
+    var hari = document.getElementById('sip-clock-day');
+    var tgl = document.getElementById('sip-clock-date');
+    if (ada(jam)) jam.textContent = p2(d.getHours()) + ':' + p2(d.getMinutes()) + ':' + p2(d.getSeconds());
+    if (ada(hari)) hari.textContent = HARI[d.getDay()];
+    if (ada(tgl)) tgl.textContent = d.getDate() + ' ' + BULAN[d.getMonth()] + ' ' + d.getFullYear();
+  }
+  function jalankanJam() {
+    if (!document.getElementById('sip-clock-time') &&
+        !document.getElementById('sip-clock-day') &&
+        !document.getElementById('sip-clock-date')) return;
+    jamHariTanggal();
+    if (window._sipJamInterval) clearInterval(window._sipJamInterval);
+    window._sipJamInterval = setInterval(jamHariTanggal, 1000);
+  }
+
+  /* ======================= 2. ANIMASI MENULIS (KETIK) ======================= */
+  var ANTREAN_KETIK = ['login-subtitle', 'login-school'];
+  var NAMBAH_KECEPATAN = 55;          /* milidetik per huruf */
+
+  function bersihkanIntervalKetik() {
+    if (window._sipKetikInterval) { clearInterval(window._sipKetikInterval); window._sipKetikInterval = null; }
+  }
+
+  function ketikSemua() {
+    var tugas = [];
+    for (var i = 0; i < ANTREAN_KETIK.length; i++) {
+      var el = document.getElementById(ANTREAN_KETIK[i]);
+      if (ada(el)) tugas.push(el);
+    }
+    if (!tugas.length) return;
+
+    /* Simpan kalimat aslinya masing-masing elemen */
+    for (var k = 0; k < tugas.length; k++) {
+      if (!tugas[k].getAttribute('data-teks-asli')) {
+        tugas[k].setAttribute('data-teks-asli', (tugas[k].textContent || '').trim());
+      }
+    }
+
+    /* Bila pengguna minta tampilan minim gerak → tampilkan utuh tanpa animasi */
+    if (kurangiGerak()) {
+      for (var r = 0; r < tugas.length; r++) tugas[r].textContent = tugas[r].getAttribute('data-teks-asli');
+      return;
+    }
+
+    bersihkanIntervalKetik();
+    for (var s = 0; s < tugas.length; s++) {
+      tugas[s].textContent = '';
+      tugas[s].classList.add('sip-sedang-ketik');
+    }
+
+    var idx = 0, pos = 0;
+    function langkah() {
+      if (idx >= tugas.length) {
+        for (var z = 0; z < tugas.length; z++) tugas[z].classList.remove('sip-sedang-ketik');
+        bersihkanIntervalKetik();
+        return;
+      }
+      var el = tugas[idx];
+      var teks = el.getAttribute('data-teks-asli') || '';
+      pos++;
+      el.textContent = teks.slice(0, pos);
+      if (pos >= teks.length) {
+        el.classList.remove('sip-sedang-ketik');
+        idx++; pos = 0;
+        /* jeda singkat sebelum baris berikutnya mulai ditulis */
+        bersihkanIntervalKetik();
+        window._sipKetikInterval = setTimeout(langkah, 520);
+        return;
+      }
+    }
+    window._sipKetikInterval = setInterval(langkah, NAMBAH_KECEPATAN);
+  }
+
+  /* Perangkat lain (mis. jam lama) menulis isi #login-subtitle setelah dimuat;
+     animasi diulang sesaat setelahnya supaya kalimatnya tidak hilang. */
+  window.sipKetikUlang = function () {
+    setTimeout(ketikSemua, 60);
+  };
+
+  /* ==================== 3. TOMBOL MINIMIZE MENU (HEADER) ==================== */
+  function ikonNav(min) { return min ? 'fas fa-angles-right' : 'fas fa-angles-left'; }
+
+  function setNavAdmin(min, simpan) {
+    var sb = document.getElementById('admin-sidebar');
+    if (!ada(sb)) return;
+    sb.classList.toggle('collapsed', !!min);
+    var ico = document.getElementById('sip-nav-min-ico-admin');
+    if (ada(ico)) ico.className = ikonNav(min);
+    if (simpan !== false) tulis(KUNCI_NAV_ADMIN, min ? '1' : '0');
+  }
+  function setNavSiswa(min, simpan) {
+    var nav = document.getElementById('siswa-side-nav');
+    if (!ada(nav)) return;
+    nav.classList.toggle('siswa-nav-min', !!min);
+    var ico = document.getElementById('sip-nav-min-ico-siswa');
+    if (ada(ico)) ico.className = ikonNav(min);
+    var lbl = document.getElementById('sip-nav-min-lbl-siswa');
+    if (ada(lbl)) lbl.style.display = min ? 'none' : '';
+    if (simpan !== false) tulis(KUNCI_NAV_SISWA, min ? '1' : '0');
+  }
+
+  window.sipMinimalkanMenuAdmin = function () {
+    var sb = document.getElementById('admin-sidebar');
+    setNavAdmin(!(sb && sb.classList.contains('collapsed')), true);
+  };
+  window.sipMinimalkanMenuSiswa = function () {
+    var nav = document.getElementById('siswa-side-nav');
+    if (!ada(nav)) return;
+    /* memakai fungsi bawaan aplikasi bila tersedia, agar perilakunya sama persis */
+    if (typeof window.toggleSiswaNavMin === 'function' && !document.getElementById('sip-nav-min-ico-siswa')) {
+      window.toggleSiswaNavMin();
+    } else {
+      setNavSiswa(!nav.classList.contains('siswa-nav-min'), true);
+    }
+    var on = nav.classList.contains('siswa-nav-min');
+    var ico = document.getElementById('sip-nav-min-ico-siswa');
+    if (ada(ico)) ico.className = ikonNav(on);
+    var lbl = document.getElementById('sip-nav-min-lbl-siswa');
+    if (ada(lbl)) lbl.style.display = on ? 'none' : '';
+    tulis(KUNCI_NAV_SISWA, on ? '1' : '0');
+  };
+
+  function pulihkanNav() {
+    if (baca(KUNCI_NAV_ADMIN) === '1') setNavAdmin(true, false);
+    if (baca(KUNCI_NAV_SISWA) === '1') setNavSiswa(true, false);
+  }
+
+  /* Tombol ciut bawaan aplikasi (ikon "indent" di header admin) tetap ada dan tetap
+     berfungsi. Bagian ini hanya MENYAMAKAN tampilan ikon & mengingat pilihannya,
+     supaya kedua tombol tidak saling bertentangan. Tidak ada fungsi yang diubah. */
+  function sinkronkanTombolLama() {
+    var icoBawaan = document.getElementById('collapse-icon');
+    if (!ada(icoBawaan)) return;
+    var btn = icoBawaan.parentNode;
+    while (btn && btn.nodeType === 1 && btn.tagName !== 'BUTTON') btn = btn.parentNode;
+    if (!ada(btn) || btn.getAttribute('data-sip-sinkron') === '1') return;
+    btn.setAttribute('data-sip-sinkron', '1');
+    btn.addEventListener('click', function () {
+      setTimeout(function () {
+        var sb = document.getElementById('admin-sidebar');
+        var min = !!(sb && sb.classList.contains('collapsed'));
+        var ico = document.getElementById('sip-nav-min-ico-admin');
+        if (ada(ico)) ico.className = ikonNav(min);
+        tulis(KUNCI_NAV_ADMIN, min ? '1' : '0');
+      }, 0);
+    });
+  }
+
+  /* ====================== 4. BUTIRAN EMAS (LATAR LOGIN) ====================== */
+  function butiranEmas() {
+    var panggung = document.getElementById('page-login');
+    if (!panggung || kurangiGerak()) return;
+    if (document.getElementById('sip-emas-kanvas')) return;      /* sudah ada */
+    if (!window.requestAnimationFrame) return;
+
+    var cv = document.createElement('canvas');
+    cv.id = 'sip-emas-kanvas';
+    cv.setAttribute('aria-hidden', 'true');
+    panggung.insertBefore(cv, panggung.firstChild);
+
+    var ctx = cv.getContext('2d');
+    if (!ctx) return;
+    var butir = [], W = 0, H = 0, kelip = -1;
+
+    function ukuran() {
+      W = cv.width = panggung.clientWidth || window.innerWidth;
+      H = cv.height = panggung.clientHeight || window.innerHeight;
+    }
+    function buatButir() {
+      var n = Math.max(14, Math.min(34, Math.round(W / 34)));
+      butir = [];
+      for (var i = 0; i < n; i++) {
+        butir.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          r: 0.8 + Math.random() * 2.1,
+          s: 0.12 + Math.random() * 0.42,
+          a: 0.18 + Math.random() * 0.5,
+          f: Math.random() * Math.PI * 2
+        });
+      }
+    }
+    function gambar() {
+      if (!document.body.contains(cv)) return;                    /* halaman sudah berganti */
+      ctx.clearRect(0, 0, W, H);
+      for (var i = 0; i < butir.length; i++) {
+        var b = butir[i];
+        b.y -= b.s; b.f += 0.02;
+        if (b.y < -6) { b.y = H + 6; b.x = Math.random() * W; }
+        var kilau = -0.35;
+        if (kelip !== -1) kilau = Math.abs(Math.sin(kelip - b.x * 0.02));
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+        var alfa = b.a * (0.55 + (kilau > 0 ? kilau * 0.6 : -0.18));
+        ctx.fillStyle = 'rgba(245, 215, 110, ' + alfa.toFixed(3) + ')';
+        ctx.shadowColor = 'rgba(245, 215, 110, .75)';
+        ctx.shadowBlur = 6;
+        ctx.fill();
+      }
+      kelip += 0.035;
+      if (kelip > 40) kelip = -1;                                 /* setelah satu sapuan, redup lembut */
+      window._sipEmasRAF = window.requestAnimationFrame(gambar);
+    }
+    ukuran(); buatButir();
+    window.addEventListener('resize', function () { ukuran(); buatButir(); });
+    window._sipEmasRAF = window.requestAnimationFrame(gambar);
+
+    /* sesekali munculkan lagi sapuan kilau */
+    setInterval(function () { if (kelip === -1) kelip = 0; }, 9000);
+  }
+
+  /* ============================== PEMASANGAN ============================== */
+  function pasangSemua() {
+    jalankanJam();
+    ketikSemua();
+    pulihkanNav();
+    sinkronkanTombolLama();
+    butiranEmas();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', pasangSemua);
+  } else {
+    pasangSemua();
+  }
+
+  /* pemasangan ulang saat halaman login dibuka kembali (tanpa mengganggu
+     halaman lain) — hanya jam/animasi yang dipasang ulang, aman untuk diulang */
+  window.addEventListener('load', function () { setTimeout(pasangSemua, 300); });
+})();
+
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4a4bc591fec831e',t:'MTc5MTk2MTUyNw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
