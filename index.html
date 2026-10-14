@@ -71,7 +71,8 @@
   <p class="school">SMP Negeri 26 Surakarta</p>
   <p class="motto">Widya Bhakti Jaya Negara</p>
   <div class="pill"><span id="dot" class="dot"></span><span id="status-text">Memeriksa koneksi…</span></div>
-  <button id="btn-open" class="btn btn-primary" disabled>Buka Aplikasi</button>
+  <p class="note" id="status-retry" style="margin-top:6px"><a href="#" id="link-retry" style="color:#fde68a;font-weight:700">Uji ulang koneksi</a></p>
+  <button id="btn-open" class="btn btn-primary">Buka Aplikasi</button>
   <button id="btn-gas" class="btn btn-ghost hidden">Mode Cadangan (Google /exec)</button>
   <button id="btn-install" class="btn btn-ghost hidden">Install ke Perangkat</button>
   <p class="note" id="net-note"></p>
@@ -121,37 +122,62 @@
     return true;
   }
 
-  /* --- Cek API (proxy Vercel → Google Apps Script) --- */
+  /* --- Cek API (proxy Vercel → Google Apps Script) ---
+     Cepat (≤ 9 detik), menampilkan PENYEBAB bila gagal, dan TIDAK pernah
+     mengunci tombol "Buka Aplikasi". */
+  var waktuCek = null;
   function cekApi() {
     if (!refreshDasar()) return;
+
+    btnOpen.disabled = false;                 /* selalu bisa ditekan */
     setStatus('', 'Memeriksa API…');
-    btnOpen.disabled = true;
+
+    var detik = 0;
+    if (waktuCek) clearInterval(waktuCek);
+    waktuCek = setInterval(function () {
+      detik++;
+      if (detik < 10) setStatus('', 'Memeriksa API… (' + detik + 's)');
+    }, 1000);
+
     var mulai = Date.now();
     window.SIPINTAR_API.health().then(function (h) {
-      var detik = ((Date.now() - mulai) / 1000).toFixed(1) + 's';
+      clearInterval(waktuCek);
+      var catatWaktu = ((Date.now() - mulai) / 1000).toFixed(1) + 's';
+      var tech = 'API v' + (CFG.API_VERSION || '-') + ' · ' + catatWaktu;
+
       if (h.ok) {
         var jalur = h.channel === 'direct' ? 'langsung ke Google' : 'proxy Vercel';
         setStatus('', 'Terhubung · API aktif');
-        btnOpen.disabled = false;
         document.getElementById('net-note').textContent =
-          'Mesin SIPINTAR siap (' + jalur + ', ' + detik + ').';
-        techLine.textContent = 'API v' + ((h.info && h.info.api) || CFG.API_VERSION || '-') +
-          ' · jalur ' + h.channel + ' · ' + ((h.info && h.info.aksiTersedia) || '?') + ' aksi' +
+          'Mesin SIPINTAR siap (' + jalur + ', ' + catatWaktu + ').';
+        techLine.textContent = tech + ' · jalur ' + h.channel + ' · ' +
+          ((h.info && h.info.aksiTersedia) || '?') + ' aksi' +
           (h.info && h.info.timezone ? ' · ' + h.info.timezone : '');
-        if (gasOk(getGasUrl())) btnGas.classList.remove('hidden');
+        btnGas.classList.toggle('hidden', !gasOk(getGasUrl()));
         return;
       }
-      /* API tidak terjawab → tawarkan mode cadangan bila URL GAS ada */
+
+      /* GAGAL: tampilkan penyebab + tetap izinkan masuk */
       var adaGas = gasOk(getGasUrl());
-      setStatus('bad', adaGas ? 'Mode cadangan tersedia' : 'API belum siap');
-      btnOpen.disabled = false;
-      document.getElementById('net-note').textContent = adaGas
-        ? 'API belum menjawab (' + (h.error || '-') + '). Anda masih bisa masuk lewat mode cadangan Google.'
-        : 'API belum menjawab: ' + (h.error || '-');
-      techLine.textContent = 'API v' + (CFG.API_VERSION || '-') + ' · status: ' + (h.transport ? 'jaringan' : 'server');
+      setStatus('bad', 'API belum terjangkau');
+      document.getElementById('net-note').textContent =
+        'Penyebab — ' + (h.error || 'tidak diketahui') + '. ' +
+        (adaGas ? 'Anda tetap bisa menekan "Buka Aplikasi" atau memakai mode cadangan Google.'
+                : 'Tekan "Buka Aplikasi" untuk mencoba; bila gagal, hubungi admin.');
+      techLine.textContent = tech + ' · periksa /api/gas?health=1 pada alamat ini';
       if (adaGas) btnGas.classList.remove('hidden');
+    }, function (err) {
+      clearInterval(waktuCek);
+      setStatus('bad', 'API belum terjangkau');
+      document.getElementById('net-note').textContent = 'Penyebab — ' + err.message;
     });
   }
+
+  document.getElementById('link-retry').addEventListener('click', function (e) {
+    e.preventDefault();
+    window.SIPINTAR_API.resetChannel();
+    cekApi();
+  });
 
   /* --- Tombol: Buka Aplikasi (UI di Vercel, mesin di Google) --- */
   btnOpen.addEventListener('click', function () {
@@ -189,5 +215,5 @@
   }
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4a369882ee76bdf',t:'MTc5MTk0NzY0OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
