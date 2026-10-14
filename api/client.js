@@ -433,28 +433,69 @@
 
   /* ======================= publik ======================= */
 
-  function health() {
+  /** Ringkas pesan galat supaya enak dibaca di layar. */
+  function ringkasGalat(msg) {
+    var m = String(msg || '');
+    if (m === 'timeout/abort' || /tidak merespons dalam/i.test(m)) return 'timeout';
+    if (/HTTP 4\d\d|HTTP 5\d\d/.test(m)) return m.match(/HTTP \d+/)[0];
+    if (/not valid JSON|bukan JSON|Server mengembalikan HTML/i.test(m)) return 'jawaban bukan JSON';
+    if (/Failed to fetch|NetworkError|Load failed|Network request failed/i.test(m)) return 'jaringan/CORS';
+    if (/doPost/i.test(m)) return 'deploy GAS belum diperbarui';
+    return m.length > 60 ? m.slice(0, 57) + '…' : m;
+  }
+
+  /** Uji SATU saluran (tanpa mengubah saluran aktif). */
+  function ujiSaluran(channel, ms) {
     var t0 = Date.now();
-    return sipRequest('apiInfo', [], { timeout: 20000, cid: uid() }).then(function (h) {
-      return { ok: true, channel: h.channel, ms: Date.now() - t0, info: h.data };
-    }, function (err) {
-      return { ok: false, ms: Date.now() - t0, error: err.message, transport: !!err.transport };
+    return kirim(channel, 'apiInfo', [], { timeout: ms, cid: uid() }).then(function (r) {
+      return { ok: true, channel: channel, ms: Date.now() - t0, info: r.data };
+    }, function (e) {
+      return {
+        ok: false, channel: channel, ms: Date.now() - t0,
+        error: (e && e.message) || String(e),
+        ringkas: ringkasGalat(e && e.message),
+        transport: !!e.__transport, status: (e && e.status) || 0
+      };
     });
   }
 
-  /** Cek kedua saluran (dipakai portal untuk memilih jalur terbaik). */
-  function probe() {
-    return health().then(function (h1) {
-      if (h1.ok) { simpanSaluran(h1.channel); return h1; }
-      if (!hasDirect()) return h1;
-      return kirim('direct', 'apiInfo', [], { timeout: 20000, cid: uid() }).then(function (r) {
-        simpanSaluran('direct');
-        return { ok: true, channel: 'direct', ms: 0, info: r.data, catatan: 'proxy gagal, memakai jalur langsung' };
-      }, function (e2) {
-        return { ok: false, error: h1.error + ' | ' + e2.message, transport: true };
-      });
+  /**
+   * health() — uji KEDUA saluran SEKALIGUS (paralel) dengan batas waktu pendek.
+   * Dipakai portal supaya pengunjung tidak menunggu lama dan tahu penyebabnya.
+   */
+  function health() {
+    var ms = Number(CFG.API_HEALTH_TIMEOUT_MS) || 9000;
+    var tugas = [ujiSaluran('proxy', ms)];
+    if (hasDirect()) tugas.push(ujiSaluran('direct', ms));
+
+    return Promise.all(tugas).then(function (hasil) {
+      var menang = null, i;
+      for (i = 0; i < hasil.length; i++) if (hasil[i].ok && hasil[i].channel === 'proxy') menang = hasil[i];
+      if (!menang) for (i = 0; i < hasil.length; i++) if (hasil[i].ok) menang = hasil[i];
+
+      if (menang) {
+        if (MEM.channel !== menang.channel) simpanSaluran(menang.channel);
+        menang.semua = hasil;
+        return menang;
+      }
+
+      var bagian = [];
+      for (i = 0; i < hasil.length; i++) {
+        bagian.push((hasil[i].channel === 'proxy' ? 'proxy Vercel' : 'langsung ke Google') + ': ' + hasil[i].ringkas);
+      }
+      var ms_ = 0;
+      for (i = 0; i < hasil.length; i++) ms_ = Math.max(ms_, hasil[i].ms);
+      return {
+        ok: false, ms: ms_,
+        error: bagian.join(' · '),
+        transport: true,
+        semua: hasil
+      };
     });
   }
+
+  /** Nama lama dipertahankan: probe = health (kompatibilitas). */
+  function probe() { return health(); }
 
   function warmup() {
     if (CFG.API_WARMUP === false) return Promise.resolve(null);
