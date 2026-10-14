@@ -1187,7 +1187,7 @@
   font-size: 1.12rem;
   line-height: 1.35;
   font-weight: 800;
-  letter-spacing: .1em;
+  letter-spacing: .085em;
   text-transform: uppercase;
   color: #fff6dc !important;
   text-shadow:
@@ -1202,7 +1202,7 @@
   font-size: 1rem;
   line-height: 1.3;
   font-weight: 800;
-  letter-spacing: .11em;
+  letter-spacing: .09em;
   text-transform: uppercase;
   color: #f5d76e !important;
   text-shadow:
@@ -1271,20 +1271,29 @@
   0%, 100% { text-shadow: 0 0 12px rgba(245, 215, 110, .5), 0 0 26px rgba(212, 160, 23, .28); }
   50%      { text-shadow: 0 0 20px rgba(255, 226, 138, .85), 0 0 44px rgba(212, 160, 23, .45); }
 }
-#sip-clock-day {
-  margin-top: 2px;
-  font-size: .95rem;
+/* --- Hari, tanggal, bulan & tahun dalam SATU baris di bawah jam digital --- */
+#sip-clock-meta {
+  margin-top: 5px;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: .45em;
+  white-space: nowrap;
+  font-size: clamp(.82rem, 3.4vw, 1rem);   /* ukuran menyesuaikan lebar layar */
   font-weight: 800;
-  letter-spacing: .17em;
+  letter-spacing: .09em;
   text-transform: uppercase;
+  line-height: 1.35;
+}
+#sip-clock-day {
+  font-size: 1em;
   color: #fff6dc;
   text-shadow: 0 2px 6px rgba(0, 0, 0, .7);
 }
+#sip-clock-day::after { content: ','; }          /* pemisah hari & tanggal */
 #sip-clock-date {
-  font-size: .84rem;
-  font-weight: 700;
-  letter-spacing: .1em;
-  text-transform: uppercase;
+  font-size: 1em;
   color: #f5d76e;
   text-shadow: 0 2px 6px rgba(0, 0, 0, .75);
 }
@@ -1319,10 +1328,11 @@
   .sip-sedang-ketik::after { animation: none !important; }
 }
 @media (max-width: 420px) {
-  #login-subtitle { font-size: 1rem;    letter-spacing: .06em; }
-  #login-school   { font-size: .9rem;   letter-spacing: .07em; }
+  #login-subtitle { font-size: 1rem;    letter-spacing: .05em; }
+  #login-school   { font-size: .9rem;   letter-spacing: .06em; }
   #sip-clock-time { font-size: 1.75rem; letter-spacing: .08em; }
-  #sip-clock-full { padding: 10px 16px 8px; }
+  #sip-clock-meta { font-size: .8rem;   letter-spacing: .06em; gap: .38em; }
+  #sip-clock-full { padding: 10px 14px 8px; }
   #login-title    { font-size: 1.7rem;  letter-spacing: .18em; }
 }
   </style>
@@ -1453,6 +1463,169 @@ input:focus, select:focus, textarea:focus {
 #siswa-side-nav.siswa-nav-min .siswa-menu-mod-head i { color: var(--emas-1); }
   </style>
 
+  <!-- PEMBERSIH KATA ANTARMUKA · sumber: web/hapus-kata.js (dibangun otomatis)
+       Kata ["SIPINTAR"] tidak ditampilkan pada teks antarmuka & judul halaman.
+       Kode, fungsi, dan berkas aslinya TIDAK diubah — hanya tampilan tulisannya. -->
+  <script>window.SIPINTAR_HAPUS_KATA = ["SIPINTAR"];</script>
+  <script id="sipintar-hapus-kata">
+/* =============================================================================
+   BERSIHKAN KATA DARI ANTARMUKA  ·  web/hapus-kata.js   (versi 1.0.0)
+   -----------------------------------------------------------------------------
+   Menghapus kata tertentu dari SELURUH TEKS ANTARMUKA dan JUDUL HALAMAN:
+     · teks yang terlihat (judul kartu, kepala sidebar, header, spanduk, dsb.)
+     · judul tab peramban (document.title)
+     · keterangan gambar (alt), tooltip (title), teks bantu (aria-label),
+       dan keterangan meta (description / og:title)
+
+   Yang TIDAK disentuh: <script>, <style>, komentar, nama berkas, nama fungsi,
+   id/kelas, serta isi kolom isian yang sedang diketik pengguna. Jadi tidak ada
+   kode atau fungsi yang hilang — hanya tulisannya yang tidak ditampilkan.
+
+   Daftar kata diambil dari window.SIPINTAR_HAPUS_KATA (disusun oleh
+   web/INSTRUKSI-TIM.md lewat scripts/build-app.js). Bila tidak ada, dipakai
+   kata bawaan di bawah ini.
+   ============================================================================= */
+(function () {
+  'use strict';
+
+  var KATA = (window.SIPINTAR_HAPUS_KATA && window.SIPINTAR_HAPUS_KATA.length)
+    ? window.SIPINTAR_HAPUS_KATA
+    : ['SIPINTAR'];
+
+  if (!KATA.length) return;
+
+  var LEWATI = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, TEMPLATE: 1, TEXTAREA: 1 };
+  var ATRIBUT = ['title', 'alt', 'placeholder', 'aria-label', 'content'];
+  var sedangJalan = false;
+
+  function pola(kata) {
+    var aman = String(kata).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp('\\s*' + aman + '\\s*', 'gi');
+  }
+
+  var POLA = KATA.map(pola);
+
+  /* Merapikan sisa tanda baca & spasi setelah kata dihapus */
+  function rapikan(t) {
+    return t
+      .replace(/[ \t\u00a0]{2,}/g, ' ')
+      .replace(/^[\s\-–—·|:,;>]+/, '')
+      .replace(/[\s\-–—·|:,;<]+$/, '')
+      .replace(/[ \t\u00a0]{2,}/g, ' ')
+      .trim();
+  }
+
+  function bersihkanTeks(teks) {
+    if (!teks || !/SIPINTAR/i.test(teks)) return teks;
+    var keluar = teks;
+    for (var i = 0; i < POLA.length; i++) keluar = keluar.replace(POLA[i], ' ');
+    var rapi = rapikan(keluar);
+    return rapi === '' ? '' : rapi;
+  }
+
+  /* ---------- 1. Judul tab peramban ---------- */
+  function bersihkanJudul() {
+    try {
+      var baru = bersihkanTeks(document.title);
+      if (baru !== document.title) document.title = baru || 'Sistem Penilaian Terintegrasi';
+    } catch (e) {}
+  }
+
+  /* ---------- 2. Atribut (alt, title, aria-label, meta description) ---------- */
+  function bersihkanAtribut(akar) {
+    var semua = akar.querySelectorAll('*');
+    for (var i = 0; i < semua.length; i++) {
+      var el = semua[i];
+      if (el.tagName === 'META' || !LEWATI[el.tagName]) {
+        for (var a = 0; a < ATRIBUT.length; a++) {
+          var nama = ATRIBUT[a];
+          if (!el.hasAttribute || !el.hasAttribute(nama)) continue;
+          var isi = el.getAttribute(nama);
+          if (!isi || !/SIPINTAR/i.test(isi)) continue;
+          if (nama === 'content' && el.tagName !== 'META') continue;
+          var baru = bersihkanTeks(isi);
+          try { el.setAttribute(nama, baru); } catch (e) {}
+        }
+      }
+    }
+  }
+
+  /* ---------- 3. Teks yang terlihat ---------- */
+  function bersihkanSimpul(akar) {
+    var penelusur = document.createTreeWalker(akar, 4 /* TEXT_NODE */, null);
+    var daftar = [], n;
+    while ((n = penelusur.nextNode())) {
+      var induk = n.parentNode;
+      if (!induk || LEWATI[induk.tagName]) continue;
+      if (!/SIPINTAR/i.test(n.nodeValue || '')) continue;
+      daftar.push(n);
+    }
+    for (var i = 0; i < daftar.length; i++) {
+      var baru = bersihkanTeks(daftar[i].nodeValue);
+      try { daftar[i].nodeValue = baru; } catch (e) {}
+    }
+    /* Judul yang menjadi kosong setelah kata dihapus → tidak ditampilkan
+       (elemennya tetap ada beserta id & fungsinya) */
+    var judul = akar.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    for (var j = 0; j < judul.length; j++) {
+      var el = judul[j];
+      if (!el.textContent || !el.textContent.trim()) {
+        if (!el.getAttribute('data-sip-kosong')) {
+          el.setAttribute('data-sip-kosong', '1');
+          el.style.display = 'none';
+        }
+      }
+    }
+  }
+
+  function terapkan(akar) {
+    if (sedangJalan) return;
+    sedangJalan = true;
+    try {
+      akar = akar || document.body;
+      bersihkanJudul();
+      if (akar && akar.nodeType === 1) {
+        bersihkanSimpul(akar);
+        bersihkanAtribut(akar);
+      }
+    } catch (e) { /* diabaikan — tampilan asli tetap aman */ }
+    sedangJalan = false;
+  }
+
+  /* ---------- 4. Pemasangan ---------- */
+  function pasang() {
+    terapkan(document.body);
+
+    /* Teks yang datang belakangan (mis. nama aplikasi dari menu Konfigurasi)
+       ikut dibersihkan lewat pengamat perubahan halaman. */
+    try {
+      if (window.MutationObserver && document.body) {
+        var pengamat = new MutationObserver(function () { terapkan(document.body); });
+        pengamat.observe(document.body, { childList: true, subtree: true, characterData: true });
+      }
+    } catch (e) {}
+
+    /* Beberapa pemasangan lanjutan untuk teks yang muncul agak lambat */
+    var waktu = [400, 1200, 2500, 5000, 9000];
+    for (var i = 0; i < waktu.length; i++) {
+      (function (t) { setTimeout(function () { terapkan(document.body); }, t); })(waktu[i]);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', pasang);
+  } else {
+    pasang();
+  }
+  window.addEventListener('load', function () { setTimeout(function () { terapkan(document.body); }, 200); });
+
+  /* Dapat dipanggil ulang bila perlu (mis. setelah memuat data baru) */
+  window.sipBersihkanKata = function () { terapkan(document.body); };
+  window.SIPINTAR_HAPUS_KATA_VERSI = '1.0.0';
+})();
+
+  </script>
+
   <!-- INSTRUKSI TAMPILAN · sumber: web/INSTRUKSI-TIM.md (dibangun otomatis) -->
   <style id="sipintar-instruksi-tim">
 #login-title{display:none !important}
@@ -1510,8 +1683,10 @@ input:focus, select:focus, textarea:focus {
                jam lama tetap berdetak tersembunyi, tidak ada yang dihapus) -->
           <div id="sip-clock-full" role="timer" aria-label="Jam dan tanggal">
             <div id="sip-clock-time">--:--:--</div>
-            <div id="sip-clock-day">&mdash;</div>
-            <div id="sip-clock-date">&mdash;</div>
+            <div id="sip-clock-meta">
+              <span id="sip-clock-day">&mdash;</span>
+              <span id="sip-clock-date">&mdash;</span>
+            </div>
           </div>
 <script>
 (function(){
@@ -21211,9 +21386,9 @@ function sipSisipTandaGambar_() {
    -----------------------------------------------------------------------------
    Semua bersifat MENAMBAH tampilan; tidak ada fungsi asli aplikasi yang diubah
    atau dihapus. Berisi:
-     1. Jam digital besar + hari + tanggal (bawah jam, sesuai permintaan)
-     2. Animasi "sedang menulis" untuk SISTEM PENILAIAN TERINTEGRASI dan
-        SMP NEGERI 26 KOTA SURAKARTA
+     1. Jam digital besar + SATU baris hari & tanggal (di bawah jam)
+     2. Animasi "sedang menulis" yang halus — tingginya dipesan lebih dulu
+        sehingga tulisan tidak pernah terpotong atau menggeser tata letak
      3. Tombol minimize menu pada header (semua peran) + mengingat pilihannya
      4. Butiran emas berkilau pada latar halaman login (elemen warna emas)
 
@@ -21229,6 +21404,12 @@ function sipSisipTandaGambar_() {
   var KUNCI_NAV_ADMIN = 'sipintar-admin-nav-min';
   var KUNCI_NAV_SISWA = 'sipintar-siswa-nav-min';
 
+  /* --- Kecepatan menulis (tidak terlalu cepat, dibuat berirama seperti menulis) --- */
+  var MILIS_HURUF = 82;          /* kecepatan dasar per huruf */
+  var JEDA_KATA = 130;           /* jeda kecil setiap melewati batas kata */
+  var JEDA_ANTAR_BARIS = 720;    /* jeda sebelum baris berikutnya mulai ditulis */
+  var JEDA_AWAL = 450;           /* jeda sebelum animasi mulai */
+
   function p2(n) { n = String(n); return n.length < 2 ? '0' + n : n; }
   function ada(el) { return !!(el && el.nodeType === 1); }
   function baca(kunci) { try { return localStorage.getItem(kunci); } catch (e) { return null; } }
@@ -21238,7 +21419,7 @@ function sipSisipTandaGambar_() {
     catch (e) { return false; }
   }
 
-  /* ============================ 1. JAM & TANGGAL ============================ */
+  /* ================= 1. JAM DIGITAL + SATU BARIS HARI & TANGGAL ================= */
   function jamHariTanggal() {
     var d = new Date();
     var jam = document.getElementById('sip-clock-time');
@@ -21259,64 +21440,134 @@ function sipSisipTandaGambar_() {
 
   /* ======================= 2. ANIMASI MENULIS (KETIK) ======================= */
   var ANTREAN_KETIK = ['login-subtitle', 'login-school'];
-  var NAMBAH_KECEPATAN = 55;          /* milidetik per huruf */
 
-  function bersihkanIntervalKetik() {
+  function bersihkanTimerKetik() {
+    if (window._sipKetikTimer) { clearTimeout(window._sipKetikTimer); window._sipKetikTimer = null; }
     if (window._sipKetikInterval) { clearInterval(window._sipKetikInterval); window._sipKetikInterval = null; }
+  }
+
+  /* Menyediakan tinggi sesuai TEKS PENUH lebih dulu.
+     Dengan begitu, selama kalimat sedang "ditulis" tata letak tidak bergerak dan
+     tulisan tidak pernah terpotong (penyebab utama tampilan tampak cacat). */
+  function siapkanTinggi(el, teks) {
+    try {
+      var lebar = el.clientWidth || 0;
+      var klon = el.cloneNode(false);
+      klon.removeAttribute('id');
+      klon.className = String(el.className || '').replace('sip-sedang-ketik', '').trim();
+      klon.style.position = 'absolute';
+      klon.style.visibility = 'hidden';      /* tak terlihat, tapi tidak menggeser apa pun */
+      klon.style.pointerEvents = 'none';
+      klon.style.zIndex = '-1';
+      klon.style.top = '0';
+      klon.style.left = '0';
+      klon.style.margin = '0';
+      klon.style.minHeight = '0';
+      klon.style.height = 'auto';
+      if (lebar) klon.style.width = lebar + 'px';
+      klon.textContent = teks;
+      el.parentNode.appendChild(klon);
+      var tinggi = klon.offsetHeight;
+      el.parentNode.removeChild(klon);
+      el.setAttribute('data-sip-tinggi', String(tinggi || 0));
+      if (tinggi > 0) el.style.minHeight = tinggi + 'px';
+    } catch (e) { /* ukuran mengikuti isi — tetap aman */ }
+  }
+
+  function teksPenuh(el) {
+    if (!el.getAttribute('data-teks-asli')) {
+      el.setAttribute('data-teks-asli', (el.textContent || '').trim());
+    }
+    return el.getAttribute('data-teks-asli') || '';
+  }
+
+  /* Bila kalimat diubah dari luar (mis. app-boot.js memakai isi menu Konfigurasi),
+     kalimat baru itu dipakai sebagai bahan animasi — bukan kalimat lama. */
+  function segarkanTeksAsli(el) {
+    var posTulis = parseInt(el.getAttribute('data-sip-tulis') || '0', 10) || 0;
+    var sekarang = (el.textContent || '').trim();
+    var asli = el.getAttribute('data-teks-asli') || '';
+    if (!asli) { el.setAttribute('data-teks-asli', sekarang); return; }
+
+    var sudahDiketik = asli.slice(0, posTulis);
+    if (sekarang !== sudahDiketik) {
+      /* ada perubahan dari luar → jadikan kalimat baru sebagai teks penuh */
+      if (sekarang) el.setAttribute('data-teks-asli', sekarang);
+      el.setAttribute('data-sip-tulis', '0');
+    }
   }
 
   function ketikSemua() {
     var tugas = [];
     for (var i = 0; i < ANTREAN_KETIK.length; i++) {
       var el = document.getElementById(ANTREAN_KETIK[i]);
-      if (ada(el)) tugas.push(el);
+      if (!ada(el)) continue;
+      if (!el.classList.contains('sip-sedang-ketik')) segarkanTeksAsli(el);
+      teksPenuh(el);
+      tugas.push(el);
     }
     if (!tugas.length) return;
 
-    /* Simpan kalimat aslinya masing-masing elemen */
-    for (var k = 0; k < tugas.length; k++) {
-      if (!tugas[k].getAttribute('data-teks-asli')) {
-        tugas[k].setAttribute('data-teks-asli', (tugas[k].textContent || '').trim());
-      }
-    }
-
-    /* Bila pengguna minta tampilan minim gerak → tampilkan utuh tanpa animasi */
+    /* Tampilan minim gerak → langsung tampil utuh, tanpa animasi */
     if (kurangiGerak()) {
-      for (var r = 0; r < tugas.length; r++) tugas[r].textContent = tugas[r].getAttribute('data-teks-asli');
+      bersihkanTimerKetik();
+      for (var r = 0; r < tugas.length; r++) {
+        tugas[r].textContent = teksPenuh(tugas[r]);
+        tugas[r].classList.remove('sip-sedang-ketik');
+        tugas[r].removeAttribute('data-sip-tulis');
+      }
+      window._sipAnimasiSelesai = true;
       return;
     }
 
-    bersihkanIntervalKetik();
+    bersihkanTimerKetik();
+    window._sipAnimasiSelesai = false;
+
     for (var s = 0; s < tugas.length; s++) {
+      siapkanTinggi(tugas[s], teksPenuh(tugas[s]));   /* ruang dipesan dulu */
       tugas[s].textContent = '';
+      tugas[s].setAttribute('data-sip-tulis', '0');
       tugas[s].classList.add('sip-sedang-ketik');
     }
 
     var idx = 0, pos = 0;
-    function langkah() {
-      if (idx >= tugas.length) {
-        for (var z = 0; z < tugas.length; z++) tugas[z].classList.remove('sip-sedang-ketik');
-        bersihkanIntervalKetik();
-        return;
+
+    function selesai() {
+      for (var z = 0; z < tugas.length; z++) {
+        tugas[z].textContent = teksPenuh(tugas[z]);
+        tugas[z].classList.remove('sip-sedang-ketik');
+        tugas[z].removeAttribute('data-sip-tulis');
       }
+      bersihkanTimerKetik();
+      window._sipAnimasiSelesai = true;
+    }
+
+    function langkah() {
+      if (idx >= tugas.length) { selesai(); return; }
       var el = tugas[idx];
-      var teks = el.getAttribute('data-teks-asli') || '';
+      var teks = teksPenuh(el);
       pos++;
       el.textContent = teks.slice(0, pos);
+      el.setAttribute('data-sip-tulis', String(pos));
+
       if (pos >= teks.length) {
         el.classList.remove('sip-sedang-ketik');
         idx++; pos = 0;
-        /* jeda singkat sebelum baris berikutnya mulai ditulis */
-        bersihkanIntervalKetik();
-        window._sipKetikInterval = setTimeout(langkah, 520);
+        window._sipKetikTimer = setTimeout(langkah, JEDA_ANTAR_BARIS);
         return;
       }
+
+      /* Irama menulis: sedikit lebih lambat sesudah spasi, kadang cepat kadang santai */
+      var jeda = MILIS_HURUF + Math.round((Math.random() - 0.4) * 32);
+      if (teks.charAt(pos - 1) === ' ' || teks.charAt(pos) === ' ') jeda += JEDA_KATA;
+      if (jeda < 48) jeda = 48;
+      window._sipKetikTimer = setTimeout(langkah, jeda);
     }
-    window._sipKetikInterval = setInterval(langkah, NAMBAH_KECEPATAN);
+
+    window._sipKetikTimer = setTimeout(langkah, JEDA_AWAL);
   }
 
-  /* Perangkat lain (mis. jam lama) menulis isi #login-subtitle setelah dimuat;
-     animasi diulang sesaat setelahnya supaya kalimatnya tidak hilang. */
+  /* Dipakai bila halaman login dibuka kembali / kalimatnya diubah dari luar */
   window.sipKetikUlang = function () {
     setTimeout(ketikSemua, 60);
   };
@@ -21350,7 +21601,6 @@ function sipSisipTandaGambar_() {
   window.sipMinimalkanMenuSiswa = function () {
     var nav = document.getElementById('siswa-side-nav');
     if (!ada(nav)) return;
-    /* memakai fungsi bawaan aplikasi bila tersedia, agar perilakunya sama persis */
     if (typeof window.toggleSiswaNavMin === 'function' && !document.getElementById('sip-nav-min-ico-siswa')) {
       window.toggleSiswaNavMin();
     } else {
@@ -21394,7 +21644,7 @@ function sipSisipTandaGambar_() {
   function butiranEmas() {
     var panggung = document.getElementById('page-login');
     if (!panggung || kurangiGerak()) return;
-    if (document.getElementById('sip-emas-kanvas')) return;      /* sudah ada */
+    if (document.getElementById('sip-emas-kanvas')) return;
     if (!window.requestAnimationFrame) return;
 
     var cv = document.createElement('canvas');
@@ -21425,7 +21675,7 @@ function sipSisipTandaGambar_() {
       }
     }
     function gambar() {
-      if (!document.body.contains(cv)) return;                    /* halaman sudah berganti */
+      if (!document.body.contains(cv)) return;
       ctx.clearRect(0, 0, W, H);
       for (var i = 0; i < butir.length; i++) {
         var b = butir[i];
@@ -21442,14 +21692,13 @@ function sipSisipTandaGambar_() {
         ctx.fill();
       }
       kelip += 0.035;
-      if (kelip > 40) kelip = -1;                                 /* setelah satu sapuan, redup lembut */
+      if (kelip > 40) kelip = -1;
       window._sipEmasRAF = window.requestAnimationFrame(gambar);
     }
+
     ukuran(); buatButir();
     window.addEventListener('resize', function () { ukuran(); buatButir(); });
     window._sipEmasRAF = window.requestAnimationFrame(gambar);
-
-    /* sesekali munculkan lagi sapuan kilau */
     setInterval(function () { if (kelip === -1) kelip = 0; }, 9000);
   }
 
@@ -21468,11 +21717,11 @@ function sipSisipTandaGambar_() {
     pasangSemua();
   }
 
-  /* pemasangan ulang saat halaman login dibuka kembali (tanpa mengganggu
-     halaman lain) — hanya jam/animasi yang dipasang ulang, aman untuk diulang */
+  /* Pemasangan ulang sesaat setelah semua sumber dimuat (jam & kalimat dari menu
+     Konfigurasi baru siap) — aman diulang, tidak mengganggu halaman lain. */
   window.addEventListener('load', function () { setTimeout(pasangSemua, 300); });
 })();
 
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4a4bc591fec831e',t:'MTc5MTk2MTUyNw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4a4f3f07909ce85',t:'MTc5MTk2MzgwNA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
