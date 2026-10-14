@@ -106,8 +106,102 @@
     document.body.appendChild(b);
   }
 
-  /* ---------------------------------------------------------------- 3. JALAN */
+  /* ------------------------------------ 3. PEMERIKSAAN BERKAS INTI (diagnosa)
+     Bila web/api-client.js belum ada di Vercel, aplikasi lama akan menampilkan
+     pesan "Login hanya di URL Google /exec" yang membingungkan. Bagian ini
+     memeriksa lebih dulu, mencoba memuat ulang, lalu menjelaskan berkas mana
+     yang kurang — jadi tidak perlu menebak-nebak. */
+  var BERKAS_INTI = ['config.js', 'api-actions.js', 'api-client.js', 'app-boot.js'];
+
+  function adaGoogleRun() {
+    try { return !!(window.google && window.google.script && window.google.script.run); } catch (e) { return false; }
+  }
+
+  function alamatAbsolut(nama) {
+    try { return new URL(nama, location.href).href; } catch (e) { return nama; }
+  }
+
+  function periksaBerkas() {
+    var hasil = {};
+    var tugas = BERKAS_INTI.map(function (nama) {
+      return fetch(nama, { cache: 'no-store' }).then(function (r) {
+        hasil[nama] = r.ok ? 'ok' : ('HTTP ' + r.status);
+      }, function () {
+        hasil[nama] = 'tidak terjangkau';
+      });
+    });
+    return Promise.all(tugas).then(function () { return hasil; });
+  }
+
+  /** Coba muat ulang berkas API (kadang gagal sesaat karena jaringan). */
+  function muatUlangApi() {
+    return new Promise(function (selesai) {
+      var sisa = 2;
+      function turun() { if (--sisa === 0) setTimeout(selesai, 700); }
+      ['api-actions.js', 'api-client.js'].forEach(function (nama) {
+        var el = document.createElement('script');
+        el.src = nama + '?ulang=' + Date.now();
+        el.async = false;
+        el.onload = turun;
+        el.onerror = turun;
+        document.head.appendChild(el);
+      });
+    });
+  }
+
+  function spandukBerkas(hasil) {
+    if (document.getElementById('sip-berkas-banner')) return;
+    var daftar = BERKAS_INTI.map(function (nama) {
+      var st = hasil[nama] || '?';
+      var tanda = st === 'ok' ? '✓' : '✗';
+      return tanda + ' ' + nama + ' (' + st + ')';
+    }).join('  •  ');
+
+    var b = document.createElement('div');
+    b.id = 'sip-berkas-banner';
+    b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:100000;background:#7f1d1d;color:#fff;' +
+      'font:600 13px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:12px 16px;' +
+      'box-shadow:0 6px 24px rgba(0,0,0,.4)';
+    b.innerHTML =
+      '<div style="max-width:900px;margin:0 auto">' +
+      '<b>Berkas aplikasi belum lengkap di server.</b> ' +
+      'Akibatnya tombol login berhenti di pesan “Login hanya di URL Google /exec”.' +
+      '<div style="margin-top:6px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:#fecaca">' +
+      daftar + '</div>' +
+      '<div style="margin-top:6px;font-size:12px;color:#fee2e2">' +
+      'Yang harus ada di GitHub (isi mengikuti letak): ' +
+      '<code>web/config.js</code> · <code>web/api-actions.js</code> · ' +
+      '<code>web/api-client.js</code> · <code>web/app-boot.js</code>. ' +
+      'Periksa langsung: <a id="sip-berkas-link" style="color:#fde68a" target="_blank" rel="noopener"></a>' +
+      '</div>' +
+      '<div style="margin-top:8px"><button id="sip-berkas-ulang" style="border:0;border-radius:8px;' +
+      'padding:6px 12px;font-weight:800;cursor:pointer;background:#fde68a;color:#7c2d12">Muat ulang halaman</button></div>' +
+      '</div>';
+
+    document.body.appendChild(b);
+    var link = document.getElementById('sip-berkas-link');
+    if (link) { link.href = alamatAbsolut('api-client.js'); link.textContent = alamatAbsolut('api-client.js'); }
+    var btn = document.getElementById('sip-berkas-ulang');
+    if (btn) btn.onclick = function () { location.reload(); };
+  }
+
+  function jagaAplikasi() {
+    if (adaGoogleRun()) return;                       /* normal: tidak ada gangguan */
+    muatUlangApi().then(function () {
+      if (adaGoogleRun()) return;                     /* berhasil dipulihkan */
+      periksaBerkas().then(function (hasil) {
+        if (!adaGoogleRun()) spandukBerkas(hasil);
+      });
+    });
+  }
+
+  /* ---------------------------------------------------------------- 4. JALAN */
   siap(function () {
+    /* Diagnosa berkas inti — berjalan sendiri, tidak mengganggu apa pun */
+    if (location.protocol === 'http:' || location.protocol === 'https:') {
+      setTimeout(jagaAplikasi, 900);
+    }
+
     setTimeout(function () {
       if (!API || typeof API.request !== 'function') return;
       API.request('getAppConfig', [], { timeout: 20000, cid: 'boot' }).then(function (hasil) {
