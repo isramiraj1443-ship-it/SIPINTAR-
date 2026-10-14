@@ -22275,5 +22275,877 @@ function sipSisipTandaGambar_() {
 })();
 
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4a5a9e14e116bcd',t:'MTc5MTk3MTI1Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+  <!-- LONCENG NOTIFIKASI · sumber: web/lonceng.js -->
+  <script id="sipintar-lonceng">
+/* =============================================================================
+   LONCENG NOTIFIKASI  ·  web/lonceng.js   (versi 1.0.0)
+   -----------------------------------------------------------------------------
+   Membuat ikon lonceng yang sudah ada BENAR-BENAR BERFUNGSI:
+     • menampilkan jumlah notifikasi belum dibaca pada lencana merah;
+     • diklik → membuka daftar notifikasi (ujian baru, nilai keluar, pengumuman);
+     • menandai "sudah dibaca" per pengguna (tersimpan di perangkat).
+
+   Sumber notifikasi dihitung di server (aksi getNotifikasiSaya) dari data yang
+   sudah ada — tidak perlu sheet baru. Semua bersifat MENAMBAH.
+   ============================================================================= */
+(function () {
+  'use strict';
+
+  var KUNCI_DIBACA = 'sipintar-notif-dibaca';
+  var sudahMuat = false;
+  var dataTerakhir = null;
+
+  function sesi() {
+    var cu = window.currentUser;
+    if (cu && cu.userID && cu.token) return cu;
+    return null;
+  }
+  function panggil(aksi, args) {
+    return new Promise(function (selesai, gagal) {
+      var r = window.google && window.google.script && window.google.script.run;
+      if (!r) { gagal(new Error('Mesin API belum siap.')); return; }
+      try {
+        var c = r.withSuccessHandler(selesai).withFailureHandler(gagal);
+        c[aksi].apply(c, args || []);
+      } catch (e) { gagal(e); }
+    });
+  }
+  function dibacaSet() {
+    var s = sesi();
+    var kunci = KUNCI_DIBACA + ':' + (s ? s.userID : 'tamu');
+    try { return JSON.parse(localStorage.getItem(kunci) || '[]'); } catch (e) { return []; }
+  }
+  function tandaiDibaca(kunci2) {
+    var s = sesi();
+    var kunci = KUNCI_DIBACA + ':' + (s ? s.userID : 'tamu');
+    var arr = dibacaSet();
+    if (arr.indexOf(kunci2) < 0) arr.push(kunci2);
+    if (arr.length > 300) arr = arr.slice(-300);
+    try { localStorage.setItem(kunci, JSON.stringify(arr)); } catch (e) {}
+  }
+  function esc(t) {
+    return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  /* --------------------------------------------------------------- tampilan */
+  function pasangGaya() {
+    if (document.getElementById('sip-lonceng-gaya')) return;
+    var s = document.createElement('style');
+    s.id = 'sip-lonceng-gaya';
+    s.innerHTML = ''
+      + '.sip-lonceng-wrap{position:relative}'
+      + '.sip-lonceng-lencana{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;'
+      + 'border-radius:999px;background:#ef4444;color:#fff;font-size:11px;font-weight:900;'
+      + 'display:flex;align-items:center;justify-content:center;padding:0 5px;border:2px solid #fff;'
+      + 'box-shadow:0 2px 6px rgba(0,0,0,.25)}'
+      + '.sip-lonceng-panel{position:absolute;right:0;top:calc(100% + 10px);width:min(94vw,364px);'
+      + 'max-height:70vh;overflow:auto;z-index:9999;border-radius:16px;'
+      + 'background:linear-gradient(180deg,#0f1b33,#0b1428);border:1px solid rgba(245,215,110,.45);'
+      + 'box-shadow:0 22px 50px rgba(0,0,0,.5);color:#e6eefc;text-align:left}'
+      + '.sip-lonceng-panel .kepala{display:flex;align-items:center;justify-content:space-between;'
+      + 'padding:11px 14px;border-bottom:1px solid rgba(245,215,110,.28);font-weight:900;'
+      + 'font-size:.82rem;letter-spacing:.05em;color:#f5d76e}'
+      + '.sip-lonceng-item{padding:11px 14px;border-bottom:1px solid rgba(148,163,184,.16);'
+      + 'display:flex;gap:10px;align-items:flex-start}'
+      + '.sip-lonceng-item:last-child{border-bottom:0}'
+      + '.sip-lonceng-item.baru{background:rgba(245,215,110,.09)}'
+      + '.sip-lonceng-ikon{flex:0 0 30px;height:30px;border-radius:9px;display:flex;align-items:center;'
+      + 'justify-content:center;background:rgba(245,215,110,.16);color:#f5d76e;font-size:14px}'
+      + '.sip-lonceng-judul{font-size:.8rem;font-weight:800;color:#f8fafc}'
+      + '.sip-lonceng-pesan{font-size:.74rem;color:#cbd5e1;margin-top:2px;line-height:1.5}'
+      + '.sip-lonceng-waktu{font-size:.66rem;color:#94a3b8;margin-top:3px}'
+      + '.sip-lonceng-kosong{padding:18px 14px;font-size:.78rem;color:#94a3b8;text-align:center}'
+      + '.sip-lonceng-kaki{padding:9px 14px;font-size:.68rem;color:#94a3b8;'
+      + 'border-top:1px solid rgba(148,163,184,.2);text-align:center}'
+      + '.sip-lonceng-panel button.baca{margin-top:0;background:transparent;border:1px solid '
+      + 'rgba(245,215,110,.45);color:#f5d76e;border-radius:9px;padding:3px 9px;font-size:.68rem;'
+      + 'font-weight:800;cursor:pointer}';
+    document.head.appendChild(s);
+  }
+
+  function pastikanLencana(tombol) {
+    var induk = tombol.parentElement;
+    if (induk && !induk.classList.contains('sip-lonceng-wrap')) induk.classList.add('sip-lonceng-wrap');
+    var lencana = tombol.querySelector('.sip-lonceng-lencana');
+    if (!lencana) {
+      lencana = document.createElement('span');
+      lencana.className = 'sip-lonceng-lencana';
+      lencana.style.display = 'none';
+      tombol.appendChild(lencana);
+    }
+    return lencana;
+  }
+
+  function isiPanel(h) {
+    var panel = document.getElementById('sip-lonceng-panel');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'sip-lonceng-panel';
+      panel.className = 'sip-lonceng-panel';
+      h.appendChild(panel);
+    }
+    var arr = (dataTerakhir && dataTerakhir.data) || [];
+    var dibaca = dibacaSet();
+    var baru = arr.filter(function (n) { return dibaca.indexOf(n.kunci) < 0; }).length;
+
+    var html = '<div class="kepala"><span>&#128276; Notifikasi</span>' +
+      (baru ? '<button type="button" class="baca" id="sip-notif-tandai">Tandai semua dibaca</button>' : '') +
+      '</div>';
+    if (!arr.length) {
+      html += '<div class="sip-lonceng-kosong">Belum ada notifikasi.<br>' +
+        '<span style="font-size:.7rem">Notifikasi muncul bila ada jadwal ujian baru, nilai yang ' +
+        'sudah keluar, atau pengumuman dari admin.</span></div>';
+    } else {
+      html += arr.map(function (n) {
+        var belum = dibaca.indexOf(n.kunci) < 0;
+        var ikon = n.jenis === 'nilai' ? '&#127942;' : (n.jenis === 'pengumuman' ? '&#128227;' : '&#128197;');
+        return '<div class="sip-lonceng-item' + (belum ? ' baru' : '') + '">' +
+          '<div class="sip-lonceng-ikon">' + ikon + '</div>' +
+          '<div><div class="sip-lonceng-judul">' + esc(n.judul) + '</div>' +
+          '<div class="sip-lonceng-pesan">' + esc(n.pesan) + '</div>' +
+          '<div class="sip-lonceng-waktu">' + esc(String(n.waktu || '').slice(0, 16).replace('T', ' ')) +
+          (belum ? ' · <b style="color:#f5d76e">baru</b>' : '') + '</div></div></div>';
+      }).join('');
+    }
+    html += '<div class="sip-lonceng-kaki">Data dihitung dari jadwal ujian, nilai, dan pengumuman.</div>';
+    panel.innerHTML = html;
+    var tb = document.getElementById('sip-notif-tandai');
+    if (tb) tb.onclick = function () {
+      arr.forEach(function (n) { tandaiDibaca(n.kunci); });
+      isiPanel(h);
+      perbaruiLencana();
+    };
+  }
+
+  function tutupPanel() {
+    var p = document.getElementById('sip-lonceng-panel');
+    if (p) p.remove();
+  }
+
+  function perbaruiLencana() {
+    var tombol = document.querySelectorAll('.sip-lonceng-tombol');
+    var arr = (dataTerakhir && dataTerakhir.data) || [];
+    var dibaca = dibacaSet();
+    var baru = arr.filter(function (n) { return dibaca.indexOf(n.kunci) < 0; }).length;
+    for (var i = 0; i < tombol.length; i++) {
+      var l = pastikanLencana(tombol[i]);
+      l.textContent = baru > 99 ? '99+' : String(baru);
+      l.style.display = baru ? 'flex' : 'none';
+    }
+  }
+
+  function muat() {
+    var s = sesi();
+    if (!s) return;
+    panggil('getNotifikasiSaya', [s.userID, s.token]).then(function (res) {
+      if (res && res.success) { dataTerakhir = res; perbaruiLencana(); }
+      var p = document.getElementById('sip-lonceng-panel');
+      if (p) {
+        var head = p.parentElement;
+        isiPanel(head);
+      }
+    }, function () { /* diamkan bila gagal — aplikasi tetap jalan */ });
+  }
+
+  /* ----------------------------------------------------------- pemasangan */
+  function pasang() {
+    pasangGaya();
+    var tombol = document.querySelectorAll('#page-admin header button, #page-siswa-hub header button, ' +
+      '#page-result header button, .exam-header button');
+    var ada = false;
+    for (var i = 0; i < tombol.length; i++) {
+      var t = tombol[i];
+      if (t.classList.contains('sip-tb-emas')) continue;              /* tombol Peringkat */
+      if (!t.querySelector || !t.querySelector('i.fa-bell')) continue; /* hanya ikon lonceng */
+      if (t.getAttribute('data-sip-lonceng') === '1') { ada = true; continue; }
+      t.setAttribute('data-sip-lonceng', '1');
+      t.classList.add('sip-lonceng-tombol');
+      t.type = 'button';
+      t.title = 'Notifikasi';
+      t.onclick = function (e) {
+        e.preventDefault();
+        var sudahAda = document.getElementById('sip-lonceng-panel');
+        tutupPanel();
+        if (sudahAda) return;
+        muat();
+        isiPanel(this.parentElement);
+      };
+      pastikanLencana(t);
+      ada = true;
+    }
+    if (ada && !sudahMuat) {
+      sudahMuat = true;
+      muat();
+      /* Perbarui berkala (10 menit) supaya lonceng tetap segar */
+      setInterval(muat, 600000);
+      document.addEventListener('click', function (ev) {
+        var p = document.getElementById('sip-lonceng-panel');
+        if (!p) return;
+        if (!p.contains(ev.target) && !(ev.target.closest && ev.target.closest('.sip-lonceng-tombol'))) tutupPanel();
+      });
+    }
+  }
+
+  function mulai() {
+    pasang();
+    try {
+      if (window.MutationObserver && document.body) {
+        var tunda = null;
+        new MutationObserver(function () {
+          if (tunda) return;
+          tunda = setTimeout(function () { tunda = null; pasang(); }, 400);
+        }).observe(document.body, { childList: true, subtree: true });
+      }
+    } catch (e) {}
+    setInterval(pasang, 3000);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mulai);
+  else mulai();
+  window.addEventListener('load', function () { setTimeout(function () { pasang(); muat(); }, 600); });
+  window.sipMuatNotifikasi = muat;
+  window.SIPINTAR_LONCENG_VERSI = '1.0.0';
+})();
+
+  </script>
+
+  <!-- UNGGAH GAMBAR SOAL · sumber: web/unggah-gambar.js -->
+  <script id="sipintar-unggah-gambar">
+/* =============================================================================
+   UNGGAH GAMBAR SOAL  ·  web/unggah-gambar.js   (versi 1.0.0)
+   -----------------------------------------------------------------------------
+   Menambahkan tombol "Unggah dari perangkat" pada editor soal (Bank Soal),
+   sehingga Admin/Guru dapat mengunggah gambar soal LANGSUNG dari aplikasi.
+   Gambar otomatis disimpan ke folder Drive "SIPINTAR-Gambar Soal"
+   (dibuat aplikasi bila belum ada) — tidak perlu mengunggahnya sendiri ke Drive.
+
+   Sifat: MURNI TAMBAHAN. Kolom gambar yang sudah ada tetap dipakai apa adanya
+   (bisa juga masih menempel tautan Drive seperti sebelumnya).
+
+   Batas: 5 MB per gambar (gambar besar diperkecil otomatis di perangkat).
+   ============================================================================= */
+(function () {
+  'use strict';
+
+  var MAKS_MB = 5;
+  var MAKS_SISI = 1600;           /* sisi terpanjang gambar setelah diperkecil */
+  var sedangUnggah = false;
+
+  function sesi() {
+    var cu = window.currentUser;
+    if (cu && cu.userID && cu.token) return cu;
+    return null;
+  }
+  function panggil(aksi, args) {
+    return new Promise(function (selesai, gagal) {
+      var r = window.google && window.google.script && window.google.script.run;
+      if (!r) { gagal(new Error('Mesin API belum siap.')); return; }
+      try {
+        var c = r.withSuccessHandler(selesai).withFailureHandler(gagal);
+        c[aksi].apply(c, args || []);
+      } catch (e) { gagal(e); }
+    });
+  }
+  function beritahu(judul, pesan, jenis) {
+    if (window.Swal && typeof window.Swal.fire === 'function') {
+      window.Swal.fire(judul, pesan, jenis || 'info');
+    } else {
+      alert(judul + '\n' + pesan);
+    }
+  }
+
+  /* ------------------------------------------------------------ perkecil gambar */
+  function perkecil(file) {
+    return new Promise(function (selesai, gagal) {
+      var pembaca = new FileReader();
+      pembaca.onerror = function () { gagal(new Error('Berkas tidak bisa dibaca.')); };
+      pembaca.onload = function () {
+        var img = new Image();
+        img.onerror = function () { gagal(new Error('Berkas ini bukan gambar yang dikenali.')); };
+        img.onload = function () {
+          var w = img.width, h = img.height;
+          var skala = Math.min(1, MAKS_SISI / Math.max(w, h));
+          if (skala >= 1 && file.size <= MAKS_MB * 1024 * 1024) {
+            selesai({ dataUrl: pembaca.result, tipe: file.type || 'image/png' });
+            return;
+          }
+          var kanvas = document.createElement('canvas');
+          kanvas.width = Math.max(1, Math.round(w * skala));
+          kanvas.height = Math.max(1, Math.round(h * skala));
+          var ctx = kanvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, kanvas.width, kanvas.height);
+          var tipe = /png/i.test(file.type) ? 'image/png' : 'image/jpeg';
+          var dataUrl = '';
+          try { dataUrl = kanvas.toDataURL(tipe, 0.9); } catch (e) { dataUrl = ''; }
+          if (!dataUrl) { selesai({ dataUrl: pembaca.result, tipe: file.type || 'image/png' }); return; }
+          selesai({ dataUrl: dataUrl, tipe: tipe });
+        };
+        img.src = pembaca.result;
+      };
+      pembaca.readAsDataURL(file);
+    });
+  }
+
+  /* --------------------------------------------------------------- pemasangan */
+  function isiKolomGambar(url, ukuran) {
+    var kolom = document.getElementById('input-image-ac');
+    if (!kolom) return;
+    kolom.value = url;
+    try { kolom.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {}
+    var sel = document.getElementById('input-image-size');
+    if (sel && ukuran) { try { sel.value = ukuran; } catch (e2) {} }
+  }
+
+  function unggah(file, tombol) {
+    if (sedangUnggah) return;
+    var s = sesi();
+    if (!s) { beritahu('Sesi tidak ditemukan', 'Silakan login ulang lalu coba lagi.', 'warning'); return; }
+    if (!file) return;
+    if (String(file.type || '').indexOf('image/') !== 0) {
+      beritahu('Bukan gambar', 'Pilih berkas gambar (PNG / JPG / WebP).', 'warning');
+      return;
+    }
+    if (file.size > MAKS_MB * 1024 * 1024 * 1.6) {      /* masih boleh, akan diperkecil */
+      beritahu('Gambar terlalu besar',
+        'Ukuran aslinya ' + (file.size / 1048576).toFixed(1) + ' MB. Maksimal ' + MAKS_MB +
+        ' MB setelah diperkecil otomatis. Coba perkecil dulu.', 'warning');
+      return;
+    }
+
+    sedangUnggah = true;
+    var teksAsli = tombol ? tombol.innerHTML : '';
+    if (tombol) { tombol.disabled = true; tombol.innerHTML = '&#8987; Mengunggah…'; }
+
+    perkecil(file).then(function (hasil) {
+      return panggil('uploadGambarSoal', [hasil.dataUrl, file.name, hasil.tipe, s.userID, s.token]);
+    }).then(function (res) {
+      sedangUnggah = false;
+      if (tombol) { tombol.disabled = false; tombol.innerHTML = teksAsli; }
+      if (!res || !res.success) {
+        beritahu('Gagal mengunggah', (res && res.message) || 'Tidak diketahui.', 'error');
+        return;
+      }
+      isiKolomGambar(res.url1000, 'w1000');
+      beritahu('Berhasil',
+        'Gambar tersimpan di folder "' + (res.folder || 'SIPINTAR-Gambar Soal') +
+        '" (' + (res.ukuranKB || '?') + ' KB). Tautan sudah diisi otomatis — tekan Simpan Soal.',
+        'success');
+    }).catch(function (err) {
+      sedangUnggah = false;
+      if (tombol) { tombol.disabled = false; tombol.innerHTML = teksAsli; }
+      beritahu('Gagal mengunggah', (err && err.message) || String(err), 'error');
+    });
+  }
+
+  function pasangTombol() {
+    var kolom = document.getElementById('input-image-ac');
+    if (!kolom) return;
+    if (document.getElementById('sip-tb-unggah-gambar')) return;
+    var wadah = kolom.parentElement || kolom;
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.id = 'sip-tb-unggah-gambar';
+    b.className = 'sip-tb-emas';
+    b.style.marginTop = '8px';
+    b.innerHTML = '&#128247; Unggah dari perangkat';
+    b.title = 'Gambar disimpan otomatis ke folder Drive SIPINTAR-Gambar Soal (maks 5 MB)';
+
+    var berkas = document.createElement('input');
+    berkas.type = 'file';
+    berkas.accept = 'image/*';
+    berkas.id = 'sip-berkas-gambar';
+    berkas.style.display = 'none';
+    berkas.onchange = function () {
+      var f = berkas.files && berkas.files[0];
+      unggah(f, b);
+      berkas.value = '';
+    };
+
+    b.onclick = function () { berkas.click(); };
+    wadah.appendChild(b);
+    wadah.appendChild(berkas);
+
+    var ket = document.createElement('div');
+    ket.className = 'text-[10px] text-slate-400 mt-1';
+    ket.textContent = 'Otomatis ke folder Drive "SIPINTAR-Gambar Soal" · maks 5 MB (diperkecil otomatis).';
+    wadah.appendChild(ket);
+  }
+
+  function mulai() {
+    pasangTombol();
+    try {
+      if (window.MutationObserver && document.body) {
+        var tunda = null;
+        new MutationObserver(function () {
+          if (tunda) return;
+          tunda = setTimeout(function () { tunda = null; pasangTombol(); }, 400);
+        }).observe(document.body, { childList: true, subtree: true });
+      }
+    } catch (e) {}
+    setInterval(pasangTombol, 3000);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mulai);
+  else mulai();
+  window.sipUnggahGambarSoal = unggah;
+  window.SIPINTAR_UNGGAH_VERSI = '1.0.0';
+})();
+
+  </script>
+
+  <!-- GERBANG TATA CARA PENGERJAAN · sumber: web/gerbang-jenis.js -->
+  <script id="sipintar-gerbang-jenis">
+/* =============================================================================
+   GERBANG TATA CARA PENGERJAAN  ·  web/gerbang-jenis.js   (versi 1.0.0)
+   -----------------------------------------------------------------------------
+   Alur baru sesuai permintaan pemilik sistem:
+
+     [Tata cara PILIHAN GANDA & PG KOMPLEKS] → Lanjutkan/Mulai
+        → mengerjakan soal PG (sesuai jumlah soal) → Lanjutkan
+     [Tata cara MENJODOHKAN]                 → Lanjutkan/Mulai
+        → mengerjakan soal menjodohkan          → Lanjutkan
+     [Tata cara BENAR/SALAH]                 → Lanjutkan/Mulai
+        → mengerjakan soal benar/salah          → Lanjutkan
+     [Tata cara URAIAN]                      → Lanjutkan/Mulai
+        → mengerjakan soal uraian               → Selesai / Kumpulkan
+
+   Tata cara WAJIB muncul sebelum soal jenis bersangkutan dimulai (sekali per
+   jenis, per sesi ujian). Sifat: MURNI TAMBAHAN — mesin ujian asli (fungsi
+   renderQuestion dll.) tidak diubah, hanya dibungkus untuk menampilkan gerbang.
+   ============================================================================= */
+(function () {
+  'use strict';
+
+  var URUT = ['PG', 'PG_KOMPLEKS', 'JODOH', 'BS', 'Esai'];
+  var LABEL = {
+    PG: 'Pilihan Ganda',
+    PG_KOMPLEKS: 'Pilihan Ganda Kompleks',
+    JODOH: 'Menjodohkan',
+    BS: 'Benar / Salah',
+    Esai: 'Uraian'
+  };
+  var IKON = { PG: '&#128204;', PG_KOMPLEKS: '&#9989;', JODOH: '&#128279;', BS: '&#9878;', Esai: '&#9997;' };
+  var CARA = {
+    PG: [
+      'Baca soal dengan teliti, termasuk gambar bila ada.',
+      'Pilih <b>satu</b> jawaban yang paling benar dengan menekan bulatannya.',
+      'Jawaban bisa diganti sebelum ditekan <b>Lanjutkan</b>.'
+    ],
+    PG_KOMPLEKS: [
+      'Jawaban benar bisa <b>lebih dari satu</b>.',
+      'Pilih <b>semua</b> pilihan yang menurutmu benar.',
+      'Nilai diberikan sesuai banyaknya pilihan yang benar.'
+    ],
+    JODOH: [
+      'Pasangkan setiap pernyataan dengan pasangan yang tepat.',
+      'Tekan pilihan pada kolom kanan untuk setiap baris.',
+      'Semua baris harus dipasangkan sebelum ditekan <b>Lanjutkan</b>.'
+    ],
+    BS: [
+      'Tentukan setiap pernyataan <b>Benar</b> atau <b>Salah</b>.',
+      'Semua pernyataan harus dijawab.',
+      'Nilai dihitung per pernyataan yang benar.'
+    ],
+    Esai: [
+      'Tulis jawabanmu pada kotak yang tersedia.',
+      '<b>Periksa kembali</b> tulisan sebelum dikumpulkan.',
+      'Jawaban uraian dapat dinilai/dikoreksi oleh guru.'
+    ]
+  };
+
+  var gerbangSelesai = {};      /* { examKey|jenis: true } */
+  var examAktif = '';
+
+  function terlihat(node) {
+    if (!node) return false;
+    var p = node;
+    while (p && p.nodeType === 1) {
+      if (p.classList && p.classList.contains('hidden')) return false;
+      p = p.parentElement;
+    }
+    return true;
+  }
+  function soalSekarang() {
+    try {
+      if (typeof questions === 'undefined' || !questions) return null;
+      var i = (typeof currentQIndex === 'number') ? currentQIndex : 0;
+      return questions[i] || null;
+    } catch (e) { return null; }
+  }
+  function kunciUjian() {
+    try {
+      var cx = window.currentExam;
+      if (cx && (cx.id || cx.examID)) return String(cx.id || cx.examID);
+      if (typeof currentExam !== 'undefined' && currentExam) {
+        return String(currentExam.id || currentExam.examID || currentExam.subject || 'ujian');
+      }
+    } catch (e) {}
+    return 'ujian';
+  }
+  function daftarJenis() {
+    try {
+      if (typeof questions === 'undefined' || !questions || !questions.length) return [];
+      var ada = {};
+      questions.forEach(function (q) { if (q && q.type) ada[q.type] = true; });
+      return URUT.filter(function (t) { return ada[t]; });
+    } catch (e) { return []; }
+  }
+  function jumlahJenis(t) {
+    try { return (questions || []).filter(function (q) { return q && q.type === t; }).length; }
+    catch (e) { return 0; }
+  }
+  function jenisKe(n) {
+    var d = daftarJenis();
+    var idx = d.indexOf(n);
+    return idx >= 0 ? idx + 1 : 0;
+  }
+
+  /* ------------------------------------------------------------------ gerbang */
+  function pasangGaya() {
+    if (document.getElementById('sip-gerbang-gaya')) return;
+    var s = document.createElement('style');
+    s.id = 'sip-gerbang-gaya';
+    s.innerHTML = ''
+      + '.sip-gerbang{position:absolute;inset:0;z-index:60;display:flex;align-items:center;'
+      + 'justify-content:center;padding:14px;border-radius:16px;'
+      + 'background:linear-gradient(180deg,rgba(8,18,38,.94),rgba(8,18,38,.9));'
+      + 'backdrop-filter:blur(3px);color:#e6eefc}'
+      + '.sip-gerbang-kartu{width:100%;max-width:560px;max-height:88%;overflow:auto;'
+      + 'border-radius:16px;padding:18px;background:linear-gradient(180deg,#101d38,#0b1428);'
+      + 'border:1px solid rgba(245,215,110,.5);box-shadow:0 22px 55px rgba(0,0,0,.55)}'
+      + '.sip-gerbang h3{margin:0 0 4px;font-size:1.06rem;font-weight:900;color:#f5d76e}'
+      + '.sip-gerbang .ikon-langkah{font-size:1.6rem;line-height:1}'
+      + '.sip-gerbang .tahap{font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:#94a3b8}'
+      + '.sip-gerbang .rasio{display:inline-block;margin-top:6px;font-size:.7rem;font-weight:800;'
+      + 'padding:3px 9px;border-radius:999px;background:rgba(245,215,110,.16);'
+      + 'border:1px solid rgba(245,215,110,.45);color:#f5d76e}'
+      + '.sip-gerbang ol{margin:12px 0 0;padding-left:20px;font-size:.84rem;line-height:1.65;color:#dbeafe}'
+      + '.sip-gerbang ol li{margin-bottom:5px}'
+      + '.sip-gerbang .alur{margin-top:14px;font-size:.72rem;color:#94a3b8;line-height:1.6;'
+      + 'border-top:1px dashed rgba(148,163,184,.35);padding-top:10px}'
+      + '.sip-gerbang .tombol{margin-top:16px;width:100%;padding:14px;border-radius:14px;border:0;'
+      + 'font-size:1rem;font-weight:900;cursor:pointer;color:#3d2b00;'
+      + 'background:linear-gradient(135deg,#f5d76e,#d4a017);box-shadow:0 12px 26px rgba(212,160,23,.35)}'
+      + '.sip-gerbang .tombol:active{transform:scale(.98)}'
+      + '@media (orientation: landscape) and (max-height: 560px){'
+      + '.sip-gerbang{align-items:flex-start}.sip-gerbang-kartu{max-height:96%}'
+      + '.sip-gerbang ol{margin-top:8px;font-size:.8rem}}';
+    document.head.appendChild(s);
+  }
+
+  function bukaGerbang(jenis) {
+    var kotak = document.getElementById('question-container');
+    if (!kotak) return;
+    var lama = document.getElementById('sip-gerbang');
+    if (lama) lama.remove();
+
+    var jenisAda = daftarJenis();
+    var banyak = jumlahJenis(jenis);
+    var ke = jenisKe(jenis);
+    var berikut = jenisAda[berikutnyaKe(jenisAda, jenis)];
+    var langkah = CARA[jenis] || ['Ikuti petunjuk yang tampil pada layar.'];
+
+    var g = document.createElement('div');
+    g.className = 'sip-gerbang';
+    g.id = 'sip-gerbang';
+    g.innerHTML =
+      '<div class="sip-gerbang-kartu">' +
+        '<div class="ikon-langkah">' + (IKON[jenis] || '&#128221;') + '</div>' +
+        '<div class="tahap" style="margin-top:6px">Tata cara pengerjaan &middot; bagian ' + ke +
+          ' dari ' + jenisAda.length + '</div>' +
+        '<h3>' + LABEL[jenis] + '</h3>' +
+        '<span class="rasio">' + banyak + ' soal</span>' +
+        '<ol>' + langkah.map(function (t) { return '<li>' + t + '</li>'; }).join('') + '</ol>' +
+        '<div class="alur">Alur ujian: ' + jenisAda.map(function (t) {
+            return '<b style="color:' + (t === jenis ? '#f5d76e' : '#cbd5e1') + '">' + LABEL[t] + '</b>';
+          }).join(' &rarr; ') +
+          ' &rarr; <b style="color:#f5d76e">Kumpulkan</b>' +
+          (berikut ? '<br>Setelah bagian ini: <b>' + LABEL[berikut] + '</b>' : '') +
+        '</div>' +
+        '<button type="button" class="tombol" id="sip-gerbang-mulai">' +
+          (ke === 1 ? 'Mulai Mengerjakan' : 'Lanjutkan &amp; Mulai') + ' &rarr;</button>' +
+      '</div>';
+
+    var induk = kotak.parentElement || kotak;
+    try { induk.style.position = induk.style.position || 'relative'; } catch (e) {}
+    induk.appendChild(g);
+
+    var tb = g.querySelector('#sip-gerbang-mulai');
+    if (tb) {
+      tb.focus();
+      tb.onclick = function () {
+        gerbangSelesai[examAktif + '|' + jenis] = true;
+        g.remove();
+      };
+    }
+  }
+  function berikutnyaKe(jenisAda, jenis) {
+    for (var i = 0; i < jenisAda.length - 1; i++) if (jenisAda[i] === jenis) return i + 1;
+    return -1;
+  }
+
+  function periksa() {
+    if (!terlihat(document.getElementById('page-exam'))) return;
+    if (!terlihat(document.getElementById('question-container'))) return;
+
+    var kunci = kunciUjian();
+    if (kunci !== examAktif) {         /* ujian berbeda → gerbang dipasang ulang */
+      examAktif = kunci;
+      gerbangSelesai = {};
+      var lama = document.getElementById('sip-gerbang');
+      if (lama) lama.remove();
+    }
+
+    var q = soalSekarang();
+    if (!q || !q.type) return;
+    var jenis = q.type;
+    if (gerbangSelesai[examAktif + '|' + jenis]) return;
+    bukaGerbang(jenis);
+  }
+
+  /* ----------------------------------------------------------------- pemasangan */
+  function mulai() {
+    pasangGaya();
+
+    /* Bungkus fungsi mesin ujian (aslinya tetap dijalankan apa adanya) */
+    try {
+      if (typeof window.renderQuestion === 'function' && !window.renderQuestion.__sipDibungkus) {
+        var asli = window.renderQuestion;
+        var bungkus = function () {
+          var out = asli.apply(this, arguments);
+          try { periksa(); } catch (e) {}
+          return out;
+        };
+        bungkus.__sipDibungkus = true;
+        window.renderQuestion = bungkus;
+      }
+    } catch (e) {}
+
+    /* Periksa berkala: menangkap saat ujian dibuka tanpa renderQuestion */
+    setInterval(function () { try { periksa(); } catch (e) {} }, 1200);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mulai);
+  else mulai();
+  window.addEventListener('load', function () { setTimeout(mulai, 800); });
+  window.sipPeriksaGerbangJenis = periksa;
+  window.SIPINTAR_GERBANG_VERSI = '1.0.0';
+})();
+
+  </script>
+
+  <!-- POIN PER PERTANYAAN (BANK SOAL) · sumber: web/bank-soal-poin.js -->
+  <script id="sipintar-bank-soal-poin">
+/* =============================================================================
+   POIN PER PERTANYAAN (BANK SOAL)  ·  web/bank-soal-poin.js   (versi 1.0.0)
+   -----------------------------------------------------------------------------
+   Perubahan alur pembuatan bank soal MENJODOHKAN & BENAR/SALAH:
+
+     • Dipilih SEKALI saja pada daftar "Tipe Soal" (Menjodohkan / Benar-Salah),
+       lalu seluruh pertanyaan ditambahkan di bawahnya — sudah begitu sejak awal.
+     • Setiap pertanyaan (pasangan / pernyataan) kini punya NILAI/POIN sendiri.
+     • Nilai soal = JUMLAH poin seluruh pertanyaan yang diisi
+       (bukan mengikuti nomor soal / banyaknya soal).
+
+   Cara kerja: menambahkan kolom "Poin" pada baris pasangan & pernyataan
+   (termasuk baris yang sudah ada), lalu mengisi otomatis kolom
+   "Bobot Nilai (Poin)" pada formulir dengan jumlah semuanya.
+
+   Sifat: MURNI TAMBAHAN — fungsi editor asli (addPairInput, addBsRowInput,
+   penyimpanan soal) tidak diubah, hanya dilengkapi kolom baru.
+   ============================================================================= */
+(function () {
+  'use strict';
+
+  var KUNCI_POIN_JODOH = 'sip-poin-pair';
+  var KUNCI_POIN_BS = 'sip-poin-bs';
+
+  function poinInput(nilai) {
+    var d = document.createElement('div');
+    d.className = 'col-span-2';
+    d.innerHTML =
+      '<label class="text-[10px] text-amber-600 font-bold uppercase ml-1 mb-1 block">Poin</label>' +
+      '<input type="number" min="0" step="1" value="' + (nilai == null ? 1 : nilai) + '" ' +
+      'class="w-full border border-amber-300 p-2 rounded text-sm text-center focus:ring-1 ' +
+      'focus:ring-amber-500 outline-none bg-amber-50">';
+    return d;
+  }
+
+  function pasangPoin(baris, kelasPoin) {
+    if (!baris || baris.getAttribute('data-sip-poin') === '1') return;
+    /* Baris pasangan memakai grid 12 kolom: 5 + 3 + 3 + 1.
+       Baris benar/salah memakai 12 kolom: 8 + 3 + 1.
+       Agar tetap rapi, lebar kolom-kolom lain disesuaikan sedikit. */
+    var kiri = baris.querySelector('.pair-left');
+    if (kiri) {
+      var kolomKiri = kiri.closest('div');
+      var kolomTengah = baris.querySelector('.pair-middle') && baris.querySelector('.pair-middle').closest('div');
+      var kolomKanan = baris.querySelector('.pair-right') && baris.querySelector('.pair-right').closest('div');
+      var kolomHapus = baris.querySelector('button') && baris.querySelector('button').closest('div');
+      if (kolomKiri) kolomKiri.className = kolomKiri.className.replace(/col-span-\d+/, 'col-span-4');
+      if (kolomTengah) kolomTengah.className = kolomTengah.className.replace(/col-span-\d+/, 'col-span-3');
+      if (kolomKanan) kolomKanan.className = kolomKanan.className.replace(/col-span-\d+/, 'col-span-3');
+      if (kolomHapus) kolomHapus.className = kolomHapus.className.replace(/col-span-\d+/, 'col-span-1');
+      var p = poinInput(1);
+      p.querySelector('input').classList.add(kelasPoin);
+      p.querySelector('input').oninput = hitungTotal;
+      baris.insertBefore(p, kolomHapus || null);
+      baris.setAttribute('data-sip-poin', '1');
+      hitungTotal();
+      return;
+    }
+
+    var teks = baris.querySelector('.bs-text');
+    if (teks) {
+      var kTeks = teks.closest('div');
+      var kKey = baris.querySelector('.bs-key') && baris.querySelector('.bs-key').closest('div');
+      var kHapus = baris.querySelector('button') && baris.querySelector('button').closest('div');
+      if (kTeks) kTeks.className = kTeks.className.replace(/col-span-\d+/, 'col-span-6');
+      if (kKey) kKey.className = kKey.className.replace(/col-span-\d+/, 'col-span-3');
+      var p2 = poinInput(1);
+      p2.querySelector('input').classList.add(kelasPoin);
+      p2.querySelector('input').oninput = hitungTotal;
+      baris.insertBefore(p2, kHapus || null);
+      baris.setAttribute('data-sip-poin', '1');
+      hitungTotal();
+    }
+  }
+
+  /* ------------------------------------------------ jumlah poin → bobot nilai */
+  function hitungTotal() {
+    var jenis = ambilJenis();
+    if (jenis !== 'JODOH' && jenis !== 'BS') {
+      bersihkanPetunjuk();
+      return 0;
+    }
+    var kelasPoin = jenis === 'JODOH' ? KUNCI_POIN_JODOH : KUNCI_POIN_BS;
+    var daftar = document.querySelectorAll('.' + kelasPoin);
+    var total = 0, terisi = 0;
+    for (var i = 0; i < daftar.length; i++) {
+      var baris = daftar[i].closest('.pair-row, .bs-row');
+      var punyaIsi = baris && (
+        (jenis === 'JODOH' && baris.querySelector('.pair-left') && baris.querySelector('.pair-left').value.trim() !== '') ||
+        (jenis === 'BS' && baris.querySelector('.bs-text') && baris.querySelector('.bs-text').value.trim() !== '')
+      );
+      if (!punyaIsi) continue;
+      terisi++;
+      var v = parseFloat(String(daftar[i].value).replace(',', '.'));
+      total += (isNaN(v) ? 0 : v);
+    }
+    var kolomBobot = document.getElementById('input-point');
+    if (kolomBobot) {
+      kolomBobot.value = String(Math.round(total * 100) / 100);
+      kolomBobot.readOnly = true;
+      kolomBobot.style.background = '#fffbeb';
+    }
+    tampilkanPetunjuk(terisi, total);
+    return total;
+  }
+
+  function ambilJenis() {
+    var sel = document.getElementById('q-type-select');
+    return sel ? String(sel.value || '') : '';
+  }
+
+  function tampilkanPetunjuk(terisi, total) {
+    var kotak = document.getElementById('sip-poin-petunjuk');
+    if (!kotak) {
+      var kolomBobot = document.getElementById('input-point');
+      if (!kolomBobot) return;
+      kotak = document.createElement('div');
+      kotak.id = 'sip-poin-petunjuk';
+      kotak.className = 'text-[10px] text-amber-700 mt-1 leading-relaxed';
+      var wadah = kolomBobot.parentElement || kolomBobot;
+      wadah.appendChild(kotak);
+    }
+    kotak.innerHTML = 'Nilai soal = jumlah poin pertanyaan yang diisi: <b>' + terisi +
+      ' pertanyaan &times; poin = ' + total + ' poin</b>. Kolom Bobot Nilai terisi otomatis.';
+  }
+
+  function bersihkanPetunjuk() {
+    var kotak = document.getElementById('sip-poin-petunjuk');
+    if (kotak) kotak.remove();
+    var kolomBobot = document.getElementById('input-point');
+    if (kolomBobot) { kolomBobot.readOnly = false; kolomBobot.style.background = ''; }
+  }
+
+  /* ------------------------------------------------------------- pemasangan */
+  function bungkusFungsi() {
+    if (typeof window.addPairInput === 'function' && !window.addPairInput.__sipPoin) {
+      var asli = window.addPairInput;
+      var b = function () {
+        var out = asli.apply(this, arguments);
+        try {
+          var wadah = document.getElementById('pairs-container');
+          var baris = wadah && wadah.lastElementChild;
+          if (baris) pasangPoin(baris, KUNCI_POIN_JODOH);
+        } catch (e) {}
+        return out;
+      };
+      b.__sipPoin = true;
+      window.addPairInput = b;
+    }
+    if (typeof window.addBsRowInput === 'function' && !window.addBsRowInput.__sipPoin) {
+      var asli2 = window.addBsRowInput;
+      var b2 = function () {
+        var out = asli2.apply(this, arguments);
+        try {
+          var wadah2 = document.getElementById('bs-container');
+          var baris2 = wadah2 && wadah2.lastElementChild;
+          if (baris2) pasangPoin(baris2, KUNCI_POIN_BS);
+        } catch (e) {}
+        return out;
+      };
+      b2.__sipPoin = true;
+      window.addBsRowInput = b2;
+    }
+  }
+
+  function rapikanSemua() {
+    var jenis = ambilJenis();
+    var kelasPoin = jenis === 'JODOH' ? KUNCI_POIN_JODOH : KUNCI_POIN_BS;
+    var keluarga = jenis === 'JODOH' ? '.pair-row' : '.bs-row';
+    if (jenis !== 'JODOH' && jenis !== 'BS') {
+      bersihkanPetunjuk();
+      return;
+    }
+    var baris = document.querySelectorAll(keluarga);
+    for (var i = 0; i < baris.length; i++) pasangPoin(baris[i], kelasPoin);
+    hitungTotal();
+  }
+
+  function mulai() {
+    bungkusFungsi();
+    rapikanSemua();
+
+    var sel = document.getElementById('q-type-select');
+    if (sel && sel.getAttribute('data-sip-poin-awas') !== '1') {
+      sel.setAttribute('data-sip-poin-awas', '1');
+      sel.addEventListener('change', function () {
+        setTimeout(function () { rapikanSemua(); }, 120);
+      });
+    }
+
+    try {
+      if (window.MutationObserver && document.body) {
+        var tunda = null;
+        new MutationObserver(function () {
+          if (tunda) return;
+          tunda = setTimeout(function () { tunda = null; bungkusFungsi(); rapikanSemua(); }, 500);
+        }).observe(document.body, { childList: true, subtree: true });
+      }
+    } catch (e) {}
+    setInterval(function () { bungkusFungsi(); rapikanSemua(); }, 3000);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mulai);
+  else mulai();
+  window.sipHitungPoinSoal = hitungTotal;
+  window.SIPINTAR_POIN_VERSI = '1.0.0';
+})();
+
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4a5d9030d9fff86',t:'MTc5MTk3MzE4Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
