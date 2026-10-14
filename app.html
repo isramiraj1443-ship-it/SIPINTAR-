@@ -1138,6 +1138,155 @@
   /* --- MICRO-INTERACTIONS: lift halus untuk kartu & tombol utama --- */
   #page-admin .dash-card { transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease; }
 </style>
+
+  <!-- TEMA HALAMAN LOGIN · sumber: web/login-theme.css (dibangun otomatis) -->
+  <style id="sipintar-login-theme">
+/* =============================================================================
+   TEMA HALAMAN LOGIN SIPINTAR  ·  web/login-theme.css
+   -----------------------------------------------------------------------------
+   Berkas ini HANYA menyentuh halaman login. Halaman lain (dashboard, ujian,
+   bank soal, dsb.) tidak terpengaruh sama sekali.
+
+   Isinya tiga hal atas permintaan pemilik sistem:
+     1. Kartu login dibuat TRANSPARAN (menyatu dengan latar belakang).
+     2. Warna tulisan pada kartu disesuaikan agar tetap terbaca di atas foto.
+     3. Tipografi + animasi untuk tiga baris identitas:
+          SIPINTAR  ·  SISTEM PENILAIAN TERINTEGRASI  ·  SMP NEGERI 26 KOTA SURAKARTA
+
+   Cara mengubah: sunting berkas ini, lalu jalankan  →  npm run sipintar:app
+   ============================================================================= */
+
+/* ============================ 1. KARTU TRANSPARAN ============================ */
+#login-card,
+#page-login > .glass {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Kotak jam: diberi sedikit lapisan gelap transparan supaya angkanya tetap jelas */
+#login-clock-box {
+  background: rgba(15, 23, 42, .58) !important;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  border-color: rgba(148, 163, 184, .35) !important;
+}
+
+/* Tulisan pada form (User ID / Password / Admin) agar terang di atas foto */
+#loginForm label,
+#loginForm .login-label {
+  color: #e6eefc !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .6);
+}
+#loginForm label span { color: #f1f5ff !important; }
+#loginForm input[type="checkbox"] { accent-color: #2563eb; }
+
+/* ==================== 2. TIPOGRAFI + ANIMASI TIGA BARIS ==================== */
+
+/* --- Baris 1 : SIPINTAR --- */
+#login-title {
+  font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 2.05rem;
+  font-weight: 900;
+  line-height: 1.15;
+  letter-spacing: .22em;
+  text-indent: .22em;                     /* agar huruf terakhir tetap seimbang */
+  text-align: center;
+  color: #f2f7ff !important;              /* warna aman untuk browser lama */
+  filter:
+    drop-shadow(0 2px 10px rgba(56, 189, 248, .45))
+    drop-shadow(0 1px 2px rgba(0, 0, 0, .55));
+  animation:
+    sipJudulMasuk .95s cubic-bezier(.2, .9, .25, 1) both,
+    sipKilau 7s linear 1.1s infinite;
+}
+
+/* --- Baris 2 : SISTEM PENILAIAN TERINTEGRASI --- */
+#login-subtitle {
+  margin-top: 8px;
+  font-size: .74rem;
+  font-weight: 700;
+  letter-spacing: .17em;
+  text-transform: uppercase;
+  color: #eaf2ff !important;
+  text-shadow: 0 2px 9px rgba(0, 0, 0, .7);
+  animation:
+    sipBarisMasuk .85s cubic-bezier(.2, .9, .25, 1) .2s both,
+    sipDenyut 4.5s ease-in-out 1.3s infinite;
+}
+
+/* --- Baris 3 : SMP NEGERI 26 KOTA SURAKARTA --- */
+#login-school {
+  margin-top: 5px;
+  font-size: .8rem;
+  font-weight: 800;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: #fde68a !important;              /* warna aman untuk browser lama */
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .6));
+  animation:
+    sipBarisMasuk .85s cubic-bezier(.2, .9, .25, 1) .38s both,
+    sipKilau 6s linear 1.7s infinite;
+}
+
+/* --- Efek teks gradien berkilau (hanya bila browser mendukung) ---
+       Bila tidak didukung, warna aman di atas yang dipakai → tulisan TIDAK
+       akan pernah hilang, termasuk pada HP/WebView lama. --- */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  #login-title {
+    background-image: linear-gradient(100deg,
+        #bfdbfe 0%, #ffffff 20%, #fde68a 42%, #ffffff 64%, #bfdbfe 100%);
+    background-size: 280% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent !important;
+  }
+  #login-school {
+    background-image: linear-gradient(100deg, #fde68a, #fffbeb, #f5d76e, #fffbeb, #fde68a);
+    background-size: 250% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent !important;
+  }
+}
+
+/* --- Gerak --- */
+@keyframes sipJudulMasuk {
+  0%   { opacity: 0; transform: translateY(16px) scale(.93); letter-spacing: .55em; }
+  100% { opacity: 1; transform: translateY(0)    scale(1);   letter-spacing: .22em; }
+}
+@keyframes sipBarisMasuk {
+  0%   { opacity: 0; transform: translateY(11px); letter-spacing: .40em; }
+  100% { opacity: 1; transform: translateY(0);    letter-spacing: .17em; }
+}
+@keyframes sipKilau {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 280% 50%; }
+}
+@keyframes sipDenyut {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .85; }
+}
+
+/* --- Menghormati setelan "kurangi gerak" pada perangkat pengguna --- */
+@media (prefers-reduced-motion: reduce) {
+  #login-title, #login-subtitle, #login-school {
+    animation: none !important;
+    letter-spacing: .18em;
+  }
+}
+
+/* --- Layar kecil: huruf sedikit mengecil agar tidak terpotong --- */
+@media (max-width: 400px) {
+  #login-title   { font-size: 1.7rem;  letter-spacing: .18em; }
+  #login-subtitle{ font-size: .68rem;  letter-spacing: .13em; }
+  #login-school  { font-size: .72rem;  letter-spacing: .09em; }
+}
+  </style>
 </head>
 <body class="overflow-x-hidden text-slate-800">
 
@@ -1173,6 +1322,7 @@
 
           <h1 id="login-title" class="text-2xl font-bold text-slate-800 tracking-tight">SIPINTAR</h1>
           <p id="login-subtitle" class="text-sm text-slate-600 mt-1 font-medium">Sistem Penilaian Terintegrasi</p>
+          <p id="login-school">SMP Negeri 26 Kota Surakarta</p>
 
           <!-- Jam Real-time Login -->
           <div id="login-clock-box" class="mt-2 py-2 px-4 rounded-xl bg-slate-800/70 inline-flex flex-col items-center gap-0.5 shadow-inner border border-slate-700/50">
@@ -20869,5 +21019,5 @@ function sipSisipTandaGambar_() {
   }
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4a3684bcfeef93a',t:'MTc5MTk0NzU5OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4a4896f0a1809c2',t:'MTc5MTk1OTQ0MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
