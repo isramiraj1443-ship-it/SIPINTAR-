@@ -7,7 +7,7 @@ window.APP_CONFIG = {
   /* --- Alamat mesin SIPINTAR (Google Apps Script / code.gs) -----------------
      Bentuk: https://script.google.com/macros/s/XXXX/exec
      Tidak berubah saat Anda memilih "Deploy → New version". */
-  GAS_WEB_APP_URL: "https://script.google.com/macros/s/AKfycbzWMKpiFErd1P1b5WXv1S_s-T-UMZJBJRnEHITRgS_32Xrjc7wvdE1o3DJIJN78cTw2DA/exec",
+  GAS_WEB_APP_URL: "https://script.google.com/macros/s/AKfycbxTsPGRhenyTUO6WFQonDWj0p7tyu9B3NDJukFnuSI-hrn9PJooPFyaW9OATkRfmbetjg/exec",
 
   /* --- Identitas ----------------------------------------------------------- */
   APP_NAME: "SIPINTAR",
