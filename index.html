@@ -59,6 +59,15 @@
   .spin{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.15);border-top-color:#f5d76e;animation:sp 1s linear infinite;margin-bottom:14px}
   @keyframes sp{to{transform:rotate(360deg)}}
   .tech{margin-top:10px;font-size:.66rem;color:rgba(203,213,225,.9);font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.6;word-break:break-word}
+  /* --- Aturan tampilan (14 Okt): pilihan menu hanya "BUKA APLIKASI" & "INSTALL ke Perangkat".
+         Teks teknis tidak ditampilkan kepada pengguna. Elemen & skripnya TIDAK dihapus —
+         cukup hapus baris ini bila ingin memunculkannya kembali. --- */
+  #tech-line,#portal-note,#net-note{display:none !important}
+  #status-retry{display:none !important}
+  #btn-gas{display:none !important}
+  #install-hint{margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(245,215,110,.12);
+    border:1px solid rgba(245,215,110,.45);color:#f8f5e6;text-align:left;font-size:.74rem;line-height:1.65}
+  #install-hint b{color:#f5d76e}
 </style>
 </head>
 <body>
@@ -74,9 +83,10 @@
   <p class="note" id="status-retry" style="margin-top:6px"><a href="#" id="link-retry" style="color:#fde68a;font-weight:700">Uji ulang koneksi</a></p>
   <button id="btn-open" class="btn btn-primary">Buka Aplikasi</button>
   <button id="btn-gas" class="btn btn-ghost hidden">Mode Cadangan (Google /exec)</button>
-  <button id="btn-install" class="btn btn-ghost hidden">Install ke Perangkat</button>
+  <button id="btn-install" class="btn btn-ghost">Install ke Perangkat</button>
+  <p class="note" id="install-hint" hidden></p>
   <p class="note" id="net-note"></p>
-  <p class="note">Halaman ini pintu masuk. Aplikasi (login, bank soal, ujian) berjalan di <b>/app</b> dengan mesin Google Apps Script.</p>
+  <p class="note" id="portal-note">Halaman ini pintu masuk. Aplikasi (login, bank soal, ujian) berjalan di <b>/app</b> dengan mesin Google Apps Script.</p>
   <p class="tech" id="tech-line"></p>
   <p class="foot">v<span id="app-ver">-</span> · © Copyright Inovasi Pembelajaran Version 2<br>Arif Nuur Iswahyudi, S.Pd., Gr · 2026<br>Jl. Joyonegaran No. 02, Surakarta</p>
 </main>
@@ -148,6 +158,7 @@
       if (h.ok) {
         var jalur = h.channel === 'direct' ? 'langsung ke Google' : 'proxy Vercel';
         setStatus('', 'Terhubung · API aktif');
+        statusText.title = 'Mesin SIPINTAR siap (' + jalur + ', ' + catatWaktu + ').';
         document.getElementById('net-note').textContent =
           'Mesin SIPINTAR siap (' + jalur + ', ' + catatWaktu + ').';
         techLine.textContent = tech + ' · jalur ' + h.channel + ' · ' +
@@ -160,15 +171,16 @@
       /* GAGAL: tampilkan penyebab + tetap izinkan masuk */
       var adaGas = gasOk(getGasUrl());
       setStatus('bad', 'API belum terjangkau');
+      statusText.title = 'Penyebab — ' + (h.error || 'tidak diketahui') + '.';
       document.getElementById('net-note').textContent =
         'Penyebab — ' + (h.error || 'tidak diketahui') + '. ' +
-        (adaGas ? 'Anda tetap bisa menekan "Buka Aplikasi" atau memakai mode cadangan Google.'
-                : 'Tekan "Buka Aplikasi" untuk mencoba; bila gagal, hubungi admin.');
+        'Anda tetap bisa menekan "Buka Aplikasi" untuk mencoba; bila gagal, hubungi admin.';
       techLine.textContent = tech + ' · periksa /api/gas?health=1 pada alamat ini';
       if (adaGas) btnGas.classList.remove('hidden');
     }, function (err) {
       clearInterval(waktuCek);
       setStatus('bad', 'API belum terjangkau');
+      statusText.title = 'Penyebab — ' + err.message;
       document.getElementById('net-note').textContent = 'Penyebab — ' + err.message;
     });
   }
@@ -194,14 +206,71 @@
     setTimeout(function () { window.location.href = url; }, 200);
   });
 
-  /* --- PWA --- */
+  /* --- PWA: INSTALL ke Perangkat selalu tampil sebagai pilihan menu --- */
   var deferred = null;
+  var pesanInstall = document.getElementById('install-hint');
+
   window.addEventListener('beforeinstallprompt', function (e) {
     e.preventDefault(); deferred = e; btnInstall.classList.remove('hidden');
   });
+
+  function sudahTerpasang() {
+    try {
+      if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return true;
+      if (navigator.standalone === true) return true;
+    } catch (e) {}
+    return false;
+  }
+
+  function tampilkanPesanInstall(html) {
+    if (!pesanInstall) { alert(html.replace(/<[^>]+>/g, '')); return; }
+    pesanInstall.innerHTML = html;
+    pesanInstall.hidden = false;
+  }
+
+  function panduanInstall() {
+    var ua = navigator.userAgent || '';
+    var ios = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var android = /Android/i.test(ua);
+    if (ios) {
+      return '<b>Cara memasang di iPhone/iPad:</b> buka menu <b>Bagikan</b> (kotak dengan panah ke atas) ' +
+             '→ pilih <b>Tambahkan ke Layar Utama</b> → tekan <b>Tambah</b>.';
+    }
+    if (android) {
+      return '<b>Cara memasang di Android:</b> buka menu <b>⋮</b> di kanan atas browser → pilih ' +
+             '<b>Install aplikasi</b> / <b>Tambahkan ke layar utama</b> → tekan <b>Install</b>.';
+    }
+    return '<b>Cara memasang di komputer:</b> klik ikon <b>Install</b> di ujung kanan kolom alamat ' +
+           '(Chrome/Edge), atau menu <b>⋮</b> → <b>Install SIPINTAR</b>. Bila belum muncul, muat ulang ' +
+           'halaman ini sekali lagi.';
+  }
+
   btnInstall.addEventListener('click', function () {
-    if (!deferred) { alert('Gunakan menu browser: Install aplikasi / Tambahkan ke layar utama.'); return; }
-    deferred.prompt();
+    if (sudahTerpasang()) {
+      tampilkanPesanInstall('Aplikasi <b>SIPINTAR</b> sudah terpasang di perangkat ini dan siap dibuka dari ikonnya.');
+      return;
+    }
+    if (deferred) {
+      try {
+        deferred.prompt();
+        if (pesanInstall) pesanInstall.hidden = true;
+        deferred.userChoice && deferred.userChoice.then(function (r) {
+          if (r && r.outcome === 'dismissed') {
+            tampilkanPesanInstall('Pemasangan dibatalkan. Tekan <b>INSTALL ke Perangkat</b> lagi kapan saja.');
+          }
+          deferred = null;
+        });
+      } catch (e) {
+        tampilkanPesanInstall(panduanInstall());
+      }
+      return;
+    }
+    tampilkanPesanInstall(panduanInstall());
+  });
+
+  window.addEventListener('appinstalled', function () {
+    deferred = null;
+    tampilkanPesanInstall('Terima kasih — <b>SIPINTAR</b> berhasil dipasang di perangkat ini.');
   });
 
   window.addEventListener('online', cekApi);
@@ -215,5 +284,5 @@
   }
 })();
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4a4bb884d30831e',t:'MTc5MTk2MTQ5Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
