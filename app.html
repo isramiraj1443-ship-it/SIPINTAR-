@@ -23147,5 +23147,557 @@ function sipSisipTandaGambar_() {
 })();
 
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4a5d9030d9fff86',t:'MTc5MTk3MzE4Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+  <!-- UNGGAH PADA MENU FOLDER GAMBAR · sumber: web/folder-gambar-unggah.js -->
+  <script id="sipintar-folder-unggah">
+/* =============================================================================
+   UNGGAH DI MENU FOLDER GAMBAR · versi 1.0.0 · 15 Oktober 2026
+   Tambahan saja: Generator Link, tabel, pencarian, dan API gambar lama tetap utuh.
+   Penyimpanan: Drive SIPINTAR-Gambar Soal/yyyy-MM + sheet Gambar yang sudah ada.
+   ============================================================================= */
+(function () {
+  'use strict';
+  var MAKS_BYTE = 5 * 1024 * 1024;
+  var MAKS_SISI = 1600;
+  var sedangUnggah = false;
+
+  function sesi() {
+    var s = window.currentUser;
+    return s && s.userID && s.token && /^(Admin|Guru)$/i.test(s.role || '') ? s : null;
+  }
+  function panggil(args) {
+    return new Promise(function (selesai, gagal) {
+      try {
+        var r = window.google && window.google.script && window.google.script.run;
+        if (!r) throw new Error('Mesin API belum siap. Muat ulang halaman.');
+        var c = r.withSuccessHandler(selesai).withFailureHandler(gagal);
+        c.uploadGambarFolder.apply(c, args);
+      } catch (e) { gagal(e); }
+    });
+  }
+  function elemen(tag, kelas, teks) {
+    var n = document.createElement(tag);
+    if (kelas) n.className = kelas;
+    if (teks != null) n.textContent = teks;
+    return n;
+  }
+  function gaya() {
+    if (document.getElementById('sip-folder-unggah-gaya')) return;
+    var s = elemen('style');
+    s.id = 'sip-folder-unggah-gaya';
+    s.textContent =
+      '.sip-folder-unggah{padding:22px;border-radius:18px;border:1px solid rgba(212,160,23,.4);' +
+      'background:linear-gradient(135deg,#0f1b33,#172442);color:#e2e8f0;margin-bottom:18px}' +
+      '.sip-folder-unggah h3{font-size:1rem;font-weight:900;color:#f5d76e;margin:0 0 5px}' +
+      '.sip-folder-unggah p{font-size:.78rem;line-height:1.6;margin:4px 0 14px;color:#cbd5e1}' +
+      '.sip-folder-baris{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:15px;margin-top:14px}' +
+      '.sip-folder-unggah label{font-size:.73rem;font-weight:700;display:block;margin-bottom:6px}' +
+      '.sip-folder-unggah input{box-sizing:border-box;width:100%;min-width:0;border:1px solid #64748b;' +
+      'border-radius:10px;background:#0b1428;color:#f8fafc;padding:10px;font:inherit;font-size:.78rem}' +
+      '.sip-folder-unggah input:focus{outline:2px solid #f5d76e;outline-offset:2px}' +
+      '.sip-folder-unggah input[readonly]{color:#b6c5dc}' +
+      '.sip-folder-unggah button{padding:10px 16px;border-radius:10px;border:1px solid #f5d76e;' +
+      'background:linear-gradient(135deg,#f5d76e,#d4a017);color:#332300;font-size:.78rem;font-weight:900;cursor:pointer}' +
+      '.sip-folder-unggah button:disabled{opacity:.5;cursor:wait}' +
+      '.sip-folder-unggah .sip-folder-aksi{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px}' +
+      '.sip-folder-status{font-size:.77rem;line-height:1.6;overflow-wrap:anywhere;margin:12px 0 0}' +
+      '.sip-folder-status[data-jenis="error"]{color:#fda4af}' +
+      '.sip-folder-status[data-jenis="success"]{color:#a7f3d0}' +
+      '.sip-folder-pratinjau{max-width:100%;max-height:180px;object-fit:contain;border-radius:12px;margin-top:12px}' +
+      '.sip-folder-hasil{margin-top:14px;padding-top:14px;border-top:1px solid #475569}' +
+      '.sip-folder-hasil a{display:inline-block;font-size:.76rem;color:#f5d76e;text-decoration:underline;margin:12px 12px 0 0}' +
+      '.sip-folder-unggah [hidden]{display:none!important}' +
+      '@media(max-width:620px){.sip-folder-baris{grid-template-columns:minmax(0,1fr)}.sip-folder-unggah{padding:16px}}';
+    document.head.appendChild(s);
+  }
+  function status(panel, teks, jenis) {
+    var n = panel.querySelector('[data-status]');
+    n.textContent = teks;
+    n.setAttribute('data-jenis', jenis || 'info');
+  }
+  function tombol(panel) {
+    var b = panel.querySelector('button[type="submit"]');
+    b.disabled = sedangUnggah || !panel.__gambar || panel.__membaca || panel.__perluPulih;
+    var label = sedangUnggah ? 'Mengunggah ke Drive…' : 'Unggah & simpan ke Drive';
+    if (b.textContent !== label) b.textContent = label;
+    panel.querySelector('input[type="file"]').disabled = sedangUnggah;
+  }
+
+  /* Decode di perangkat, jaga rasio & transparansi, bukan sekadar mengganti ekstensi. */
+  function siapkan(file) {
+    return new Promise(function (selesai, gagal) {
+      if (!/^(image\/png|image\/jpeg|image\/webp)$/i.test(file.type || '')) {
+        gagal(new Error('Pilih gambar PNG/JPG/WebP. SVG, dokumen, dan berkas lain tidak diterima.')); return;
+      }
+      if (!file.size || file.size > MAKS_BYTE) {
+        gagal(new Error('Ukuran berkas harus lebih dari 0 dan maksimal 5 MB.')); return;
+      }
+      var rd = new FileReader();
+      rd.onerror = function () { gagal(new Error('Berkas tidak bisa dibaca. Pilih ulang gambar.')); };
+      rd.onload = function () {
+        var img = new Image();
+        img.onerror = function () { gagal(new Error('Isi berkas tidak bisa dibaca sebagai gambar.')); };
+        img.onload = function () {
+          try {
+            var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+            if (!w || !h) throw new Error('Gambar tidak memiliki ukuran yang valid.');
+            var rasio = Math.min(1, MAKS_SISI / Math.max(w, h));
+            var data = String(rd.result);
+            if (rasio < 1) {
+              var c = document.createElement('canvas');
+              c.width = Math.max(1, Math.round(w * rasio));
+              c.height = Math.max(1, Math.round(h * rasio));
+              var ctx = c.getContext('2d');
+              if (!ctx) throw new Error('Peramban tidak bisa menyiapkan gambar. Coba browser lain.');
+              ctx.drawImage(img, 0, 0, c.width, c.height);
+              data = c.toDataURL(file.type, .88);
+            }
+            var m = data.match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+=*)$/i);
+            if (!m) throw new Error('Gambar gagal disiapkan. Pilih ulang gambar.');
+            var pad = /==$/.test(m[2]) ? 2 : (/=$/.test(m[2]) ? 1 : 0);
+            var bytes = m[2].length / 4 * 3 - pad;
+            if (bytes > MAKS_BYTE) throw new Error('Gambar setelah diproses masih melebihi 5 MB. Perkecil dulu.');
+            selesai({ dataUrl: data, tipe: m[1], nama: file.name || 'gambar', ukuran: bytes,
+              lebar: Math.round(w * rasio), tinggi: Math.round(h * rasio) });
+          } catch (e) { gagal(e); }
+        };
+        img.src = String(rd.result);
+      };
+      rd.readAsDataURL(file);
+    });
+  }
+
+  function hasil(panel, res) {
+    var kotak = panel.querySelector('[data-hasil]');
+    var url = panel.querySelector('[data-link]');
+    var folder = panel.querySelector('[data-folder]');
+    url.value = res.url1000 || '';
+    if (/^https:\/\/drive\.google\.com\/drive\/folders\//.test(res.folderUrl || '')) {
+      folder.href = res.folderUrl;
+      folder.hidden = false;
+    } else folder.hidden = true;
+    kotak.hidden = !res.url1000 && folder.hidden;
+  }
+  function kirim(panel, e) {
+    e.preventDefault();
+    var s = sesi(), g = panel.__gambar;
+    if (!s) { status(panel, 'Sesi Admin/Guru tidak ditemukan. Silakan login ulang.', 'error'); return; }
+    if (!g || sedangUnggah || panel.__perluPulih) return;
+    sedangUnggah = true;
+    tombol(panel);
+    status(panel, 'Mengunggah… tunggu sampai berkas tersimpan di Drive.');
+    var nama = panel.querySelector('[data-nama]').value.trim() || g.nama;
+    panggil([g.dataUrl, nama, g.tipe, s.userID, s.token]).then(function (res) {
+      sedangUnggah = false;
+      if (!res || !res.success) {
+        if (res && res.tersimpanDiDrive) {
+          panel.__perluPulih = true;
+          hasil(panel, res);       /* jangan mengunggah ulang: berkas sudah ada */
+        }
+        status(panel, res && res.message || 'Unggahan ditolak. Periksa sesi dan izin Drive.', 'error');
+        tombol(panel); return;
+      }
+      hasil(panel, res);
+      panel.__gambar = null;
+      panel.querySelector('input[type="file"]').value = '';
+      panel.querySelector('[data-nama]').value = '';
+      var tujuanLayar = String(res.folder || '').replace(/^SIPINTAR-/i, '');
+      status(panel, (res.message || 'Gambar tersimpan.') + ' Tujuan: ' + tujuanLayar +
+        ' · ' + res.ukuranKB + ' KB.', res.aksesPublik === false ? 'error' : 'success');
+      tombol(panel);
+      /* API getSavedImages lama membaca baris baru ini; tidak mengganti cache milik aplikasi. */
+      if (panel.isConnected && document.getElementById('img-table-container') &&
+          typeof window.loadImageTable === 'function') {
+        window.loadImageTable();
+      }
+    }, function (err) {
+      sedangUnggah = false;
+      status(panel, 'Belum ada konfirmasi penyimpanan: ' + (err && err.message || err) +
+        '. Periksa Riwayat/Drive sebelum mencoba lagi agar tidak menggandakan gambar.', 'error');
+      tombol(panel);
+    });
+  }
+
+  function pasang() {
+    if (!sesi()) return;
+    var inputLama = document.getElementById('input-folder-url');
+    if (!inputLama) return;
+    var kartuLama = inputLama.closest('.dash-card');
+    if (!kartuLama || !kartuLama.parentNode) return;
+    var sudah = document.getElementById('sip-folder-unggah');
+    if (sudah) { tombol(sudah); return; }
+    var panel = elemen('form', 'sip-folder-unggah');
+    panel.id = 'sip-folder-unggah';
+    panel.innerHTML =
+      '<h3>Unggah gambar dari perangkat</h3>' +
+      '<p>PNG/JPG/WebP · maksimal 5 MB per berkas. Gambar besar diperkecil hingga sisi terpanjang 1600 piksel. ' +
+      'Unggahan otomatis masuk ke Riwayat Gambar dan pencarian gambar Bank Soal.</p>' +
+      '<label for="sip-folder-tujuan">Folder Drive tujuan (otomatis)</label>' +
+      '<input id="sip-folder-tujuan" type="text" value="Folder gambar soal / tahun-bulan (otomatis)" readonly>' +
+      '<div class="sip-folder-baris"><div><label for="sip-folder-berkas">Berkas gambar</label>' +
+      '<input id="sip-folder-berkas" type="file" accept="image/png,image/jpeg,image/webp" required></div>' +
+      '<div><label for="sip-folder-nama">Nama gambar (opsional)</label>' +
+      '<input id="sip-folder-nama" data-nama type="text" maxlength="80" placeholder="Kosong = nama berkas asli"></div></div>' +
+      '<img class="sip-folder-pratinjau" data-preview alt="Pratinjau gambar yang dipilih" hidden>' +
+      '<div class="sip-folder-aksi"><button type="submit" disabled>Unggah &amp; simpan ke Drive</button></div>' +
+      '<div class="sip-folder-status" data-status role="status" aria-live="polite">Pilih gambar terlebih dahulu.</div>' +
+      '<div class="sip-folder-hasil" data-hasil hidden><label for="sip-folder-link">Tautan gambar tersimpan</label>' +
+      '<input id="sip-folder-link" data-link type="text" readonly>' +
+      '<a data-folder target="_blank" rel="noopener noreferrer" hidden>Buka folder di Google Drive ↗</a>' +
+      '<button type="button" data-salin>Salin tautan gambar</button></div>';
+    /* Nama folder sebenarnya tetap sesuai pilihan pemilik; label UI tanpa merek. */
+    panel.querySelector('#sip-folder-tujuan').value = 'Gambar Soal / yyyy-MM (dibuat otomatis)';
+    kartuLama.insertAdjacentElement('afterend', panel);
+    panel.addEventListener('submit', function (e) { kirim(panel, e); });
+    var berkas = panel.querySelector('input[type="file"]');
+    berkas.addEventListener('change', function () {
+      var file = berkas.files && berkas.files[0];
+      var giliran = (panel.__giliran || 0) + 1;
+      panel.__giliran = giliran;
+      panel.__gambar = null; panel.__perluPulih = false;
+      panel.querySelector('[data-hasil]').hidden = true;
+      panel.querySelector('[data-preview]').hidden = true;
+      panel.__membaca = !!file;
+      tombol(panel);
+      if (!file) { status(panel, 'Pilih gambar terlebih dahulu.'); return; }
+      status(panel, 'Memeriksa dan menyiapkan gambar…');
+      siapkan(file).then(function (g) {
+        if (panel.__giliran !== giliran) return;
+        panel.__membaca = false; panel.__gambar = g;
+        var img = panel.querySelector('[data-preview]');
+        img.src = g.dataUrl; img.hidden = false;
+        status(panel, g.nama + ' · ' + g.lebar + ' × ' + g.tinggi + ' piksel · ' +
+          (g.ukuran / 1024).toFixed(1) + ' KB. Siap diunggah.');
+        tombol(panel);
+      }, function (err) {
+        if (panel.__giliran !== giliran) return;
+        panel.__membaca = false;
+        status(panel, err.message || String(err), 'error');
+        tombol(panel);
+      });
+    });
+    panel.querySelector('[data-salin]').onclick = function () {
+      var url = panel.querySelector('[data-link]');
+      if (!url.value) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url.value).then(function () {
+          status(panel, 'Tautan gambar berhasil disalin.', 'success');
+        }, function () { url.focus(); url.select(); status(panel, 'Tautan dipilih. Tekan Ctrl+C atau Salin.'); });
+      } else { url.focus(); url.select(); status(panel, 'Tautan dipilih. Tekan Ctrl+C atau Salin.'); }
+    };
+    tombol(panel);
+  }
+  function mulai() {
+    gaya();
+    /* Bungkus, bukan ganti/hapus fungsi lama. */
+    if (typeof window.renderImageFolder === 'function' && !window.renderImageFolder.__sipUnggahFolder) {
+      var asli = window.renderImageFolder;
+      var fn = function () { var r = asli.apply(this, arguments); pasang(); return r; };
+      fn.__sipUnggahFolder = true;
+      window.renderImageFolder = fn;
+    }
+    pasang();
+    if (window.MutationObserver) {
+      var menunggu = false;
+      new MutationObserver(function () {
+        if (menunggu) return;
+        menunggu = true;
+        setTimeout(function () { menunggu = false; pasang(); }, 150);
+      }).observe(document.body, { childList: true, subtree: true });
+    }
+  }
+  window.sipPasangUnggahFolder = pasang;
+  window.SIPINTAR_FOLDER_UNGGAH_VERSI = '1.0.0';
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mulai);
+  else mulai();
+})();
+
+  </script>
+
+  <!-- MITIGASI TANGKAPAN LAYAR SISWA · sumber: web/perlindungan-layar.js -->
+  <script id="sipintar-lindung-layar">
+/* =============================================================================
+   PERLINDUNGAN LAYAR SISWA · versi 1.0.0 · 15 Oktober 2026
+   Tambahan mitigasi, BUKAN pemblokir screenshot sistem/kamera eksternal.
+   Cakupan pilihan pengguna: soal, hasil akhir, tab Hasil & Nilai, detail jawaban.
+   Dashboard/leaderboard dari dashboard, halaman lain, Admin/Guru tetap normal.
+   Peringatan saja: tidak memanggil logViolation, submitExam, atau logout.
+   ============================================================================= */
+(function () {
+  'use strict';
+  var aktif = '';
+  var identitas = '';
+  var kehilanganFokus = false;
+  var sedangCetak = false;
+  var tutupSampai = 0;
+  var tenggangTangkapan = 0;
+  var tundaPulih = null;
+  var teksAir = '';
+
+  function sesiSiswa() {
+    var s = window.currentUser;
+    return s && s.userID && s.token && /^siswa$/i.test(s.role || '') ? s : null;
+  }
+  function terlihat(n) {
+    if (!n || !n.isConnected) return false;
+    for (var p = n; p && p.nodeType === 1; p = p.parentElement) {
+      if (p.hidden || p.classList.contains('hidden') || p.getAttribute('aria-hidden') === 'true') return false;
+      if (p.style.display === 'none' || p.style.visibility === 'hidden') return false;
+      try {
+        /* Dalam mode cetak, CSS perlindungan sengaja menyembunyikan leluhur halaman.
+           Itu BUKAN perpindahan menu. Jangan memakai hasil CSS cetak untuk
+           menonaktifkan perlindungan (akan menimbulkan loop / bocor cetak). */
+        var cetak = sedangCetak || window.matchMedia && window.matchMedia('print').matches;
+        if (!cetak) {
+          var css = window.getComputedStyle(p);
+          if (css.display === 'none' || css.visibility === 'hidden') return false;
+        }
+      } catch (e) {}
+    }
+    return true;
+  }
+  function konteks() {
+    if (!sesiSiswa()) return '';
+    if (terlihat(document.getElementById('page-exam'))) return 'ujian';
+    if (terlihat(document.getElementById('page-result'))) return 'hasil';
+    if (terlihat(document.getElementById('siswa-tab-nilai'))) return 'nilai';
+    var modal = document.getElementById('sip-modal');
+    var judul = modal && modal.querySelector('h3');
+    if (terlihat(modal) && judul && /^Detail Jawaban/i.test(judul.textContent.trim())) return 'detail';
+    return '';
+  }
+  function atribut(nama, nilai) {
+    if (document.body.getAttribute(nama) !== nilai) document.body.setAttribute(nama, nilai);
+  }
+  function gayaDanLapisan() {
+    if (document.getElementById('sip-lindung-gaya')) return;
+    var css = document.createElement('style');
+    css.id = 'sip-lindung-gaya';
+    css.textContent =
+      '#sip-lindung-air,#sip-lindung-tutup,#sip-lindung-info,#sip-lindung-cetak{display:none}' +
+      'body[data-sip-lindung="1"] #sip-lindung-air{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));' +
+      'grid-template-rows:repeat(4,minmax(0,1fr));position:fixed;inset:0;overflow:hidden;z-index:2147483000;' +
+      'pointer-events:none!important;user-select:none!important;-webkit-user-select:none!important}' +
+      '#sip-lindung-air span{align-self:center;justify-self:center;transform:rotate(-23deg);' +
+      'font:600 12px/1.7 system-ui,sans-serif;text-align:center;color:rgba(110,125,145,.21);' +
+      'text-shadow:0 1px rgba(255,255,255,.12);white-space:pre-line;overflow-wrap:anywhere;padding:4px;max-width:95%}' +
+      'body[data-sip-lindung="1"] #sip-lindung-info{display:block;position:fixed;bottom:5px;left:50%;' +
+      'transform:translateX(-50%);z-index:2147483001;pointer-events:none;max-width:95vw;white-space:nowrap;' +
+      'font:600 10px/1.5 system-ui,sans-serif;background:rgba(15,23,42,.8);color:#e2e8f0;padding:3px 9px;border-radius:99px}' +
+      'body[data-sip-lindung="1"][data-sip-lindung-tutup="1"] #sip-lindung-tutup{display:flex;' +
+      'position:fixed;inset:0;z-index:2147483100;align-items:center;justify-content:center;padding:22px;' +
+      'background:#071122!important;opacity:1!important;color:#e2e8f0;text-align:center}' +
+      '#sip-lindung-tutup>div{max-width:470px;padding:30px;border-radius:20px;border:1px solid #9c7b25;background:#101d35}' +
+      '#sip-lindung-tutup h2{font:900 22px/1.3 system-ui,sans-serif;color:#f5d76e;margin:0 0 14px}' +
+      '#sip-lindung-tutup p{font:400 14px/1.7 system-ui,sans-serif;margin:10px 0}' +
+      '#sip-lindung-tutup small{display:block;font:400 11px/1.6 system-ui,sans-serif;color:#aebed4;margin-top:14px}' +
+      '#sip-lindung-tutup button{border:1px solid #f5d76e;background:#f5d76e;color:#332300;font:800 14px system-ui,sans-serif;' +
+      'padding:12px 20px;border-radius:11px;margin-top:18px;cursor:pointer}' +
+      'body[data-sip-lindung="1"] #page-exam,body[data-sip-lindung="1"] #page-result,' +
+      'body[data-sip-lindung="1"] #siswa-tab-nilai,body[data-sip-lindung="1"] #sip-modal{' +
+      'user-select:none!important;-webkit-user-select:none!important}' +
+      'body[data-sip-lindung="1"] input,body[data-sip-lindung="1"] textarea,' +
+      'body[data-sip-lindung="1"] [contenteditable="true"]{user-select:text!important;-webkit-user-select:text!important}' +
+      'body[data-sip-lindung="1"] #page-exam img,body[data-sip-lindung="1"] #page-result img,' +
+      'body[data-sip-lindung="1"] #siswa-tab-nilai img{-webkit-user-drag:none}' +
+      '@media(max-width:600px){body[data-sip-lindung="1"] #sip-lindung-air{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(6,minmax(0,1fr))}' +
+      '#sip-lindung-air span{font-size:10px}}' +
+      '@media print{body[data-sip-lindung="1"]>*{display:none!important}' +
+      'body[data-sip-lindung="1"]>#sip-lindung-cetak{display:block!important;position:static!important;' +
+      'color:#111!important;background:white!important;font:16px/1.6 sans-serif!important;padding:35px!important}}';
+    document.head.appendChild(css);
+
+    var air = document.createElement('div');
+    air.id = 'sip-lindung-air';
+    air.setAttribute('aria-hidden', 'true');
+    for (var i = 0; i < 12; i++) air.appendChild(document.createElement('span'));
+    document.body.appendChild(air);
+    var info = document.createElement('div');
+    info.id = 'sip-lindung-info';
+    info.textContent = 'Tampilan pribadi · watermark identitas aktif';
+    document.body.appendChild(info);
+    var tutup = document.createElement('div');
+    tutup.id = 'sip-lindung-tutup';
+    tutup.setAttribute('role', 'status');
+    tutup.setAttribute('aria-live', 'polite');
+    tutup.innerHTML = '<div><h2>Tampilan pribadi disembunyikan sementara</h2>' +
+      '<p id="sip-lindung-pesan"></p><p>Ini hanya peringatan. Jawaban dan nilai tetap tersimpan; ' +
+      'tidak ada diskualifikasi dari perlindungan tangkapan layar ini.</p>' +
+      '<button type="button" id="sip-lindung-lanjut">Lanjutkan melihat</button>' +
+      '<small>Website tidak dapat menjamin pemblokiran screenshot sistem atau foto dari kamera lain. ' +
+      'Jangan menyebarkan soal maupun jawaban pribadi.</small></div>';
+    document.body.appendChild(tutup);
+    document.getElementById('sip-lindung-lanjut').onclick = function () {
+      if (document.hidden || sedangCetak) return;
+      kehilanganFokus = false;
+      tutupSampai = 0;
+      pulihkan();
+    };
+    var cetak = document.createElement('div');
+    cetak.id = 'sip-lindung-cetak';
+    cetak.textContent = 'Tampilan soal, hasil, dan jawaban pribadi tidak disertakan dalam cetakan. Kembali ke aplikasi untuk melihatnya.';
+    document.body.appendChild(cetak);
+  }
+  function watermark() {
+    var s = sesiSiswa();
+    if (!s || !aktif) return;
+    var tanggal;
+    try {
+      tanggal = new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short',
+        year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date()) + ' WIB';
+    } catch (e) { tanggal = new Date().toLocaleString(); }
+    var nama = String(s.name || s.nama || s.username || 'Siswa').slice(0, 90);
+    var kelas = String(s.kelas || s.className || s.class || s.kelasSiswa || '-').slice(0, 30);
+    var teks = nama + ' · ' + kelas + '\n' + tanggal;
+    if (teks === teksAir) return;
+    teksAir = teks;
+    document.querySelectorAll('#sip-lindung-air span').forEach(function (n) { n.textContent = teks; });
+  }
+  function periksa() {
+    if (typeof document === 'undefined' || !document || !document.body) return '';
+    var baru = konteks();
+    var s = sesiSiswa();
+    var siapa = s ? String(s.userID) : '';
+    if (baru !== aktif || siapa !== identitas) {
+      aktif = baru; identitas = siapa;
+      tutupSampai = 0; tenggangTangkapan = 0;
+      kehilanganFokus = false; sedangCetak = false;
+      atribut('data-sip-lindung-tutup', '0');
+      if (tundaPulih) clearTimeout(tundaPulih);
+      if (!aktif) {
+        teksAir = '';
+        document.querySelectorAll('#sip-lindung-air span').forEach(function (n) { n.textContent = ''; });
+      }
+    }
+    atribut('data-sip-lindung', aktif ? '1' : '0');
+    atribut('data-sip-lindung-bagian', aktif);
+    if (aktif) watermark();
+    return aktif;
+  }
+  function pulihkan() {
+    if (!periksa()) return;
+    if (document.hidden || kehilanganFokus || sedangCetak) return;
+    var sisa = tutupSampai - Date.now();
+    if (sisa > 0) {
+      if (tundaPulih) clearTimeout(tundaPulih);
+      tundaPulih = setTimeout(pulihkan, sisa + 50);
+      return;
+    }
+    atribut('data-sip-lindung-tutup', '0');
+  }
+  function sembunyikan(pesan, tangkapan) {
+    if (!periksa()) return;
+    if (tangkapan) tenggangTangkapan = Date.now() + 8000;
+    tutupSampai = Date.now() + 1800;
+    var p = document.getElementById('sip-lindung-pesan');
+    if (p.textContent !== pesan) p.textContent = pesan;
+    atribut('data-sip-lindung-tutup', '1');
+    if (tundaPulih) clearTimeout(tundaPulih);
+    tundaPulih = setTimeout(pulihkan, 1900);
+  }
+  function hentikan(e) {
+    if (e.cancelable) e.preventDefault();
+    e.stopImmediatePropagation();
+  }
+  function tombol(e) {
+    if (!periksa()) return;
+    var k = String(e.key || e.code || '').toLowerCase();
+    var prtsc = k === 'printscreen' || k === 'prtsc' || e.keyCode === 44;
+    if (e.type === 'keyup' && !prtsc) return;
+    var cetak = (e.ctrlKey || e.metaKey) && k === 'p';
+    var potong = e.shiftKey && (e.metaKey && /^(s|3|4|5|6)$/.test(k) || e.ctrlKey && k === 's');
+    if (prtsc || potong || cetak) {
+      hentikan(e);
+      sembunyikan(cetak ? 'Pintasan cetak diterima browser. Tampilan pribadi tidak dicetak.' :
+        'Pintasan tangkapan layar diterima browser. Tampilan pribadi disembunyikan sementara.', true);
+      return;
+    }
+    /* Meta datang SEBELUM Win+Shift+S / Cmd+Shift+3. Tahan handler lama agar
+       siswa tidak didiskualifikasi sebelum kombinasi screenshot selesai. */
+    if (e.type === 'keydown' && (/^(meta|os)$/.test(k) || e.metaKey && /^(shift|control|alt)$/.test(k))) {
+      e.stopImmediatePropagation();
+      sembunyikan('Tombol sistem ditekan. Layar pribadi ditutup sementara; kembali ke aplikasi untuk melanjutkan.', true);
+      return;
+    }
+    /* Kombinasi lain tetap mengikuti anti-cheat lama, tidak diberi pengecualian. */
+    if (e.type === 'keydown' && (e.metaKey || e.ctrlKey || e.altKey) && !/^(shift|control|alt)$/.test(k)) {
+      tenggangTangkapan = 0;
+    }
+  }
+  function bungkusKeamanan() {
+    var asli = window.handleSecurityTrigger;
+    if (typeof asli !== 'function' || asli.__sipLindungLayar) return;
+    var fn = function (alasan) {
+      var s = String(alasan || '');
+      var jenisLunak = /Pindah Tab|Minimize Browser|Membuka Aplikasi Lain|Start Menu|Fullscreen|Tombol Windows/i.test(s);
+      if (periksa() && (/screenshot|printscreen|tangkapan layar|snipping|mencetak/i.test(s) ||
+          jenisLunak && Date.now() < tenggangTangkapan)) {
+        sembunyikan('Peringatan tangkapan layar/cetak. Kembali ke aplikasi untuk melanjutkan.', false);
+        return;                         /* tanpa log, submit paksa, atau diskualifikasi */
+      }
+      return asli.apply(this, arguments);
+    };
+    fn.__sipLindungLayar = true;
+    window.handleSecurityTrigger = fn;
+  }
+  function mulai() {
+    gayaDanLapisan();
+    bungkusKeamanan();
+    /* Fase CAPTURE di window, lebih awal dari handler anti-cheat lama di document. */
+    window.addEventListener('keydown', tombol, true);
+    window.addEventListener('keyup', tombol, true);
+    window.addEventListener('blur', function () {
+      if (!periksa()) return;
+      kehilanganFokus = true;
+      sembunyikan('Layar kehilangan fokus. Kembali ke aplikasi untuk melihat tampilan pribadi.', false);
+    }, true);
+    window.addEventListener('focus', function () { kehilanganFokus = false; pulihkan(); }, true);
+    document.addEventListener('visibilitychange', function () {
+      if (!periksa()) return;
+      if (document.hidden) sembunyikan('Aplikasi sedang tidak terlihat. Tampilan pribadi disembunyikan.', false);
+      else pulihkan();
+    }, true);
+    ['contextmenu', 'dragstart'].forEach(function (nama) {
+      document.addEventListener(nama, function (e) {
+        if (!periksa()) return;
+        var n = e.target;
+        if (n && n.closest && n.closest('input,textarea,[contenteditable="true"]')) return;
+        if (e.cancelable) e.preventDefault();
+      }, true);
+    });
+    window.addEventListener('beforeprint', function () {
+      if (!periksa()) return;
+      sedangCetak = true;
+      sembunyikan('Pratinjau cetak tidak menyertakan soal, nilai, atau jawaban pribadi.', true);
+    });
+    window.addEventListener('afterprint', function () {
+      sedangCetak = false; kehilanganFokus = false; tutupSampai = 0; pulihkan();
+    });
+    /* Deteksi perpindahan halaman sinkron, termasuk hasil selesai di #page-exam. */
+    ['switchPage', 'showSiswaTab', 'showStudentResultPage'].forEach(function (nama) {
+      var asli = window[nama];
+      if (typeof asli !== 'function') return;
+      var fn = function () { var out = asli.apply(this, arguments); periksa(); return out; };
+      window[nama] = fn;
+    });
+    if (window.MutationObserver) {
+      var menunggu = false;
+      new MutationObserver(function () {
+        if (menunggu) return;
+        menunggu = true;
+        Promise.resolve().then(function () { menunggu = false; periksa(); });
+      }).observe(document.body, { childList: true, subtree: true, attributes: true,
+        attributeFilter: ['class', 'style', 'hidden'] });
+    }
+    periksa();
+    setInterval(function () { periksa(); bungkusKeamanan(); }, 1000);
+  }
+  window.sipPeriksaPerlindunganLayar = periksa;
+  window.SIPINTAR_LINDUNG_VERSI = '1.0.0';
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mulai);
+  else mulai();
+})();
+
+  </script>
+</body>
 </html>
