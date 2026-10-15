@@ -175,6 +175,7 @@ window.SIPINTAR_API_ACTIONS = [
   'updateUser',
   'uploadBelajarFile',
   'uploadExamMusicFile',
+  'uploadGambarFolder',
   'uploadGambarSoal',
   'uploadJurnalFile',
   'uploadProfilFoto',
