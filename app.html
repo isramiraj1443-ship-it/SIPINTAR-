@@ -1728,6 +1728,8 @@ input:focus, select:focus, textarea:focus {
 #login-tz-label{display:none !important}
 #sipintar-ui-build{display:none !important}
 #siswa-nav-min-btn{display:none !important}
+#input-image-pos{display:none !important}
+#sip-image-pos-wrap{display:none !important}
   </style>
   <script id="sipintar-instruksi-bagian">
   (function(){
@@ -7155,7 +7157,7 @@ Jawaban: A
                                <option value="w1000" selected>Besar</option>
                            </select>
                        </div>
-                       <div class="w-1/3 md:w-1/4">
+                       <div id="sip-image-pos-wrap" class="w-1/3 md:w-1/4">
                            <select id="input-image-pos" title="Posisi letak gambar pada soal" class="w-full border border-slate-200 p-3 rounded-xl bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500 transition font-medium text-slate-700 cursor-pointer">
                                <option value="akhir" selected>Akhir (bawah soal)</option>
                                <option value="awal">Awal (atas soal)</option>
@@ -23699,5 +23701,5 @@ function sipSisipTandaGambar_() {
 })();
 
   </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4aba5149d8d81d2',t:'MTc5MjAzMzk3NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
