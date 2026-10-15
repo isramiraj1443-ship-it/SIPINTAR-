@@ -535,6 +535,28 @@
     if (typeof Proxy !== 'function') pasangAksiStatis(r);
     window.google.script.run = r;
     log('google.script.run (API mode) terpasang v' + VERSION);
+
+    /* TAMBAHAN 15 Okt 2026 — isolasi rantai callback API yang berjalan bersamaan.
+       Semua fungsi lama di atas TETAP UTUH. Sebelumnya satu runner dipakai
+       bersama: unggahan/notifikasi/dashboard dapat saling menukar handler
+       selama menunggu jaringan. Tiap pembacaan google.script.run kini mendapat
+       runner sendiri, seperti pola layanan GAS. Native GAS tidak ditimpa.
+       Browser tanpa Proxy juga mendapat daftar aksi statis yang sama. */
+    try {
+      Object.defineProperty(window.google.script, 'run', {
+        configurable: true,
+        enumerable: true,
+        get: function () {
+          var baru = buatRunner();
+          if (typeof Proxy !== 'function') pasangAksiStatis(baru);
+          return baru;
+        }
+      });
+      api.runnerTerisolasi = true;
+    } catch (eRunner) {
+      /* Peramban yang tidak mengizinkan getter tetap memakai runner lama. */
+      api.runnerTerisolasi = false;
+    }
   } else {
     log('google.script.run sudah ada — tidak ditimpa.');
   }
