@@ -22697,6 +22697,325 @@ function sipSisipTandaGambar_() {
 
   </script>
 
+  <!-- PERBAIKAN UNGGAH FOTO SOAL · sumber: web/perbaikan-unggah-soal.js -->
+  <script id="sipintar-unggah-perbaikan">
+/* =============================================================================
+   PERBAIKAN UNGGAH FOTO SOAL · TAMBAHAN v1.0.0 · 15 Oktober 2026
+   unggah-gambar.js dan seluruh fungsi asli tetap utuh. Tambahan ini menangani
+   change pada pemilih foto sebelum handler lama: progres + pratinjau + validasi
+   yang tidak macet, lalu memakai uploadGambarFolder (Drive + Riwayat Gambar).
+   Dropdown posisi yang sudah disembunyikan tidak dimunculkan kembali.
+   ============================================================================= */
+(function () {
+  'use strict';
+  var MAKS_HASIL = 5 * 1024 * 1024, MAKS_ASLI = 20 * 1024 * 1024, MAKS_SISI = 1600;
+  var pending = null, aktif = null, urutan = 0;
+
+  function sesi() {
+    var s = window.currentUser;
+    return s && s.userID && s.token && /^(Admin|Guru)$/i.test(s.role || '') ? s : null;
+  }
+  function node(id) { return typeof document !== 'undefined' && document ? document.getElementById(id) : null; }
+  function teks(n, v) { if (n && n.textContent !== String(v)) n.textContent = String(v); }
+  function isi(id) { var n = node(id); return n ? n.value : ''; }
+  function cocok(c) {
+    var s = sesi();
+    return !!(c && s && s.userID === c.s.userID && s.token === c.s.token &&
+      c.input.isConnected && node('input-image-ac') === c.input &&
+      isi('input-question-id') === c.qid && isi('input-exam-id') === c.exam);
+  }
+  function status(pesan, jenis) {
+    var n = node('sip-unggah-soal-status');
+    if (!n) return;
+    teks(n, pesan); n.setAttribute('data-jenis', jenis || 'info');
+  }
+  function bukaFolder(url) {
+    var n = node('sip-unggah-soal-folder');
+    if (!n) return;
+    if (/^https:\/\/drive\.google\.com\/drive\/folders\//.test(url || '')) {
+      n.href = url; n.hidden = false;
+    } else n.hidden = true;
+  }
+  function panggil(args) {
+    return new Promise(function (selesai, gagal) {
+      try {
+        var r = window.google && window.google.script && window.google.script.run;
+        if (!r) throw new Error('Mesin API belum siap. Muat ulang halaman.');
+        var c = r.withSuccessHandler(selesai).withFailureHandler(gagal);
+        var hasil = c.uploadGambarFolder.apply(c, args);
+        /* API client mengembalikan Promise selain memanggil failure handler. */
+        if (hasil && typeof hasil.catch === 'function') hasil.catch(function () {});
+      } catch (e) { gagal(e); }
+    });
+  }
+  function pesanError(e) {
+    var m = String(e && e.message || e || 'Tidak ada konfirmasi penyimpanan.');
+    if (/uploadGambarFolder|tidak terdaftar|not a function|function.*not found/i.test(m)) {
+      return 'Apps Script aktif belum memuat unggahan terbaru. Tempel 1-GAS-code.gs, Simpan, lalu Deploy → Manage deployments → Edit → New version → Deploy. Memperbarui app.html saja belum cukup.';
+    }
+    if (/sesi|token|akses ditolak/i.test(m)) return m + ' Login ulang sebagai Admin/Guru lalu pilih kembali foto.';
+    return m + ' Periksa Riwayat Gambar/Drive sebelum mengulang, agar berkas tidak digandakan.';
+  }
+  function tipeFoto(f) {
+    var t = String(f.type || '').toLowerCase();
+    if (!t || /^(application|binary)\/octet-stream$/.test(t)) {
+      var ext = String(f.name || '').split('.').pop().toLowerCase();
+      t = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : '';
+    }
+    if (/heic|heif/i.test(t + ' ' + f.name)) throw new Error('Foto HEIC/HEIF belum didukung oleh fitur ini. Ekspor atau ubah foto menjadi JPG/PNG, lalu pilih ulang.');
+    if (!/^(image\/png|image\/jpeg|image\/webp)$/.test(t)) throw new Error('Pilih foto PNG/JPG/WebP. Berkas lain tidak dapat dipakai sebagai gambar soal.');
+    if (!f.size) throw new Error('Berkas foto kosong atau tidak bisa dibaca.');
+    if (f.size > MAKS_ASLI) throw new Error('Foto asli melebihi 20 MB. Perkecil atau ekspor ke JPG terlebih dahulu. Batas unggahan akhir tetap 5 MB.');
+    return t;
+  }
+  function ukuranData(data) {
+    var m = String(data).match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+={0,2})$/i);
+    if (!m) return null;
+    var pad = /==$/.test(m[2]) ? 2 : /=$/.test(m[2]) ? 1 : 0;
+    return { tipe: m[1].toLowerCase(), ukuran: m[2].length / 4 * 3 - pad };
+  }
+
+  /* Seluruh callback Image/canvas memakai try/catch: tidak ada Promise menggantung. */
+  function siapkan(f) {
+    return new Promise(function (selesai, gagal) {
+      var tipe;
+      try { tipe = tipeFoto(f); } catch (e) { gagal(e); return; }
+      var sudah = false, rd = new FileReader(), img = null;
+      var timer = setTimeout(function () { selesaiDengan(new Error('Foto belum selesai dibaca dalam 30 detik. Coba foto lebih kecil atau ekspor ke JPG.')); }, 30000);
+      function selesaiDengan(e, data) {
+        if (sudah) return;
+        sudah = true; clearTimeout(timer);
+        rd.onload = rd.onerror = rd.onabort = null;
+        if (img) img.onload = img.onerror = null;
+        if (e) gagal(e); else selesai(data);
+      }
+      rd.onerror = rd.onabort = function () { selesaiDengan(new Error('Berkas foto tidak bisa dibaca. Pilih ulang dari galeri/perangkat.')); };
+      rd.onload = function () {
+        try {
+          img = new Image();
+          img.onerror = function () { selesaiDengan(new Error('Isi foto tidak dapat dibaca browser. Coba JPG/PNG lain; mengganti ekstensi saja tidak mengubah format.')); };
+          img.onload = function () {
+            try {
+              var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+              if (!w || !h) throw new Error('Foto tidak memiliki ukuran yang valid.');
+              var data = String(rd.result), meta = ukuranData(data);
+              if (Math.max(w, h) <= MAKS_SISI && meta && meta.ukuran <= MAKS_HASIL) {
+                selesaiDengan(null, { dataUrl: data, tipe: meta.tipe, ukuran: meta.ukuran, lebar: w, tinggi: h }); return;
+              }
+              var skala = Math.min(1, MAKS_SISI / Math.max(w, h));
+              var kanvas = document.createElement('canvas');
+              var mutu = .88;
+              for (var i = 0; i < 5; i++) {
+                kanvas.width = Math.max(1, Math.round(w * skala));
+                kanvas.height = Math.max(1, Math.round(h * skala));
+                var ctx = kanvas.getContext('2d');
+                if (!ctx) throw new Error('Browser tidak dapat menyiapkan foto (canvas). Coba browser lain atau foto yang sudah diperkecil.');
+                ctx.drawImage(img, 0, 0, kanvas.width, kanvas.height);
+                data = kanvas.toDataURL(tipe, mutu);
+                meta = ukuranData(data);
+                if (!meta) throw new Error('Browser gagal mengubah foto menjadi PNG/JPG/WebP.');
+                if (meta.ukuran <= MAKS_HASIL) {
+                  selesaiDengan(null, { dataUrl: data, tipe: meta.tipe, ukuran: meta.ukuran, lebar: kanvas.width, tinggi: kanvas.height }); return;
+                }
+                skala *= .8; mutu = Math.max(.6, mutu - .08);
+              }
+              throw new Error('Foto hasil pemrosesan masih di atas 5 MB. Perkecil terlebih dahulu.');
+            } catch (e) { selesaiDengan(e); }
+          };
+          /* Sebagian galeri HP memberi MIME kosong/octet-stream. Browser tetap
+             harus membaca foto sesuai ekstensi; hasil akhirnya dikodekan ulang
+             dan diperiksa lagi oleh server, bukan mempercayai ekstensi saja. */
+          var sumberFoto = String(rd.result);
+          if (!/^image\//i.test(f.type || '')) {
+            sumberFoto = sumberFoto.replace(/^data:[^;,]*;base64,/, 'data:' + tipe + ';base64,');
+          }
+          img.src = sumberFoto;
+        } catch (e) { selesaiDengan(e); }
+      };
+      try { rd.readAsDataURL(f); } catch (e) { selesaiDengan(e); }
+    });
+  }
+  function tampilFoto(c, src, keterangan) {
+    if (!cocok(c)) return;
+    var panel = node('sip-unggah-soal-preview'), foto = node('sip-unggah-soal-foto');
+    if (!panel || !foto) return;
+    panel.hidden = false; foto.onload = foto.onerror = null;
+    foto.src = src; teks(node('sip-unggah-soal-caption'), keterangan);
+  }
+  function cacheGambar(res) {
+    try {
+      if (typeof allImagesData !== 'undefined' && Array.isArray(allImagesData) &&
+          !allImagesData.some(function (x) { return x.link === res.url1000; })) {
+        allImagesData.unshift({ id: res.imageID || res.id, name: res.nama || 'Gambar baru',
+          link: res.url1000, folderId: res.folderId, date: new Date().toLocaleDateString('id-ID') });
+      }
+    } catch (e) {}
+  }
+  function verifikasi(c, res) {
+    var foto = node('sip-unggah-soal-foto');
+    if (!foto || !cocok(c)) return;
+    var selesai = false;
+    var timer = setTimeout(function () { akhir(false); }, 8000);
+    function akhir(baik) {
+      if (selesai) return;
+      selesai = true; clearTimeout(timer);
+      if (!cocok(c) || aktif !== c) return;
+      foto.onload = foto.onerror = null;
+      if (baik) {
+        teks(node('sip-unggah-soal-caption'), 'Tersimpan di Drive — tautan gambar berhasil dimuat.');
+        status('Gambar tersimpan di Drive dan Riwayat Gambar. Tautan terisi; sekarang Anda dapat menekan Simpan Pertanyaan.', 'success');
+      } else {
+        foto.src = c.data.dataUrl;
+        teks(node('sip-unggah-soal-caption'), 'Pratinjau di perangkat; berkas sudah tersimpan di Drive.');
+        status('Gambar tersimpan, tetapi tautan Drive belum dapat dimuat browser. Periksa akses “Anyone with the link” atau pembatasan Drive sebelum membagikan soal ke siswa.', 'warning');
+      }
+    }
+    foto.onload = function () { akhir(true); };
+    foto.onerror = function () { akhir(false); };
+    foto.referrerPolicy = 'no-referrer'; foto.src = res.url1000;
+  }
+  function pulihTombol(c) {
+    if (c && c.button) { c.button.disabled = false; c.button.innerHTML = c.label; }
+    var b = node('sip-tb-unggah-gambar');
+    if (b && (!c || b !== c.button)) b.disabled = false;
+  }
+  function unggah(f, button) {
+    pasang();
+    if (!f) return Promise.resolve(false);
+    if (pending) { status('Unggahan sebelumnya masih berjalan. Tunggu konfirmasi sebelum memilih foto berikutnya.', 'warning'); return Promise.resolve(false); }
+    var s = sesi(), input = node('input-image-ac');
+    if (!s || !input) { status('Login ulang sebagai Admin/Guru sebelum mengunggah gambar soal.', 'error'); return Promise.resolve(false); }
+    var c = { no: ++urutan, s: { userID: s.userID, token: s.token }, input: input,
+      qid: isi('input-question-id'), exam: isi('input-exam-id'), button: button || node('sip-tb-unggah-gambar') };
+    c.label = c.button ? c.button.innerHTML : '';
+    pending = aktif = c;
+    if (c.button) { c.button.disabled = true; teks(c.button, 'Menyiapkan foto…'); }
+    status('Foto dipilih. Membaca dan memperkecil foto… belum tersimpan di Drive.', 'info');
+    var previewAwal = node('sip-unggah-soal-preview'); if (previewAwal) previewAwal.hidden = true;
+    bukaFolder('');
+    return siapkan(f).then(function (g) {
+      c.data = g;
+      if (!cocok(c)) throw new Error('Form soal berubah sebelum unggahan dimulai. Pilih foto kembali pada form yang benar.');
+      tampilFoto(c, g.dataUrl, 'Pratinjau di perangkat — belum tersimpan di Drive.');
+      if (c.button) teks(c.button, 'Mengunggah ke Drive…');
+      status('Foto siap: ' + g.lebar + ' × ' + g.tinggi + ' piksel · ' + (g.ukuran / 1024).toFixed(1) + ' KB. Mengunggah ke Drive…', 'info');
+      return panggil([g.dataUrl, f.name || 'gambar-soal', g.tipe, s.userID, s.token]);
+    }).then(function (res) {
+      pending = null; pulihTombol(c);
+      if (!res || !res.success) {
+        if (cocok(c)) {
+          bukaFolder(res && res.folderUrl);
+          status(res && res.message || 'Server tidak mengonfirmasi penyimpanan gambar.', 'error');
+          teks(node('sip-unggah-soal-caption'), res && res.tersimpanDiDrive ? 'Berkas ada di Drive, pencatatan belum selesai — gunakan tautan folder.' : 'Foto belum tersimpan di Drive.');
+        }
+        return false;
+      }
+      cacheGambar(res);
+      if (!cocok(c)) { status('Foto tersimpan di Riwayat Gambar. Form sudah berganti, jadi tautan tidak dipasang ke soal lain. Pilih gambar melalui pencarian.', 'warning'); return true; }
+      bukaFolder(res.folderUrl);
+      if (res.aksesPublik === false) {
+        status(res.message || 'Foto tersimpan, tetapi izin berbagi Drive ditolak. Perbaiki izin folder/berkas sebelum dipakai siswa.', 'warning');
+        teks(node('sip-unggah-soal-caption'), 'Tersimpan di Drive; belum siap untuk siswa karena izin berbagi.');
+        return false;
+      }
+      if (!/^https:\/\/drive\.google\.com\//.test(res.url1000 || '')) throw new Error('Server belum mengembalikan tautan gambar yang valid.');
+      c.savedURL = res.url1000;
+      input.value = res.url1000;
+      var size = node('input-image-size'); if (size) size.value = 'w1000';
+      var ac = node('ac-results'); if (ac) ac.classList.add('hidden');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      status('Gambar tersimpan di Drive dan Riwayat Gambar. Tautan terisi; sedang memeriksa tautan gambar…', 'success');
+      teks(node('sip-unggah-soal-caption'), 'Tersimpan di Drive — memeriksa tautan gambar.');
+      verifikasi(c, res);
+      return true;
+    }).catch(function (e) {
+      pending = null; pulihTombol(c);
+      if (cocok(c)) {
+        status(pesanError(e), 'error');
+        teks(node('sip-unggah-soal-caption'), 'Belum ada konfirmasi penyimpanan foto di Drive.');
+      }
+      return false;
+    });
+  }
+  function gaya() {
+    if (node('sip-unggah-soal-perbaikan-gaya')) return;
+    var s = document.createElement('style'); s.id = 'sip-unggah-soal-perbaikan-gaya';
+    s.textContent = '#sip-tb-unggah-gambar{background:linear-gradient(135deg,#f5d76e,#d4a017);color:#332300;border:1px solid #b88712;padding:9px 13px;font-weight:800}' +
+      '#sip-tb-unggah-gambar:disabled{opacity:.6;cursor:wait}' +
+      '#sip-unggah-soal-controls{margin-top:8px}#sip-unggah-soal-controls>button{margin-top:0!important}' +
+      '#sip-unggah-soal-status{font-size:12px;line-height:1.6;color:#334155;margin-top:9px;overflow-wrap:anywhere}' +
+      '#sip-unggah-soal-status[data-jenis="error"]{color:#b91c1c}#sip-unggah-soal-status[data-jenis="success"]{color:#047857}' +
+      '#sip-unggah-soal-status[data-jenis="warning"]{color:#92400e}' +
+      '#sip-unggah-soal-preview{padding:12px;margin:10px 0 0;background:#f8fafc;border:1px solid #cbd5e1;border-radius:12px}' +
+      '#sip-unggah-soal-foto{display:block;max-width:100%;max-height:240px;object-fit:contain;border-radius:8px}' +
+      '#sip-unggah-soal-caption{font-size:11px;color:#475569;margin-top:8px}' +
+      '#sip-unggah-soal-folder{display:inline-block;margin-top:8px;font-size:12px;color:#1d4ed8;text-decoration:underline}' +
+      '#sip-unggah-soal-preview[hidden],#sip-unggah-soal-folder[hidden]{display:none!important}';
+    document.head.appendChild(s);
+  }
+  function pasang() {
+    var input = node('input-image-ac'), button = node('sip-tb-unggah-gambar'), file = node('sip-berkas-gambar');
+    if (!input || !button || !file) return;
+    if (node('sip-unggah-soal-controls')) return;
+    var row = input.parentElement && input.parentElement.parentElement;
+    var parent = row && row.parentElement || input.parentElement;
+    var controls = document.createElement('div'); controls.id = 'sip-unggah-soal-controls';
+    var catatanLama = file.nextElementSibling;
+    controls.appendChild(button); controls.appendChild(file);
+    if (catatanLama && /Otomatis ke folder Drive/.test(catatanLama.textContent || '')) {
+      controls.appendChild(catatanLama);
+      teks(catatanLama, 'PNG/JPG/WebP · diperkecil otomatis · maksimal 5 MB setelah diproses.');
+    }
+    file.accept = 'image/png,image/jpeg,image/webp';
+    parent.appendChild(controls);
+    var st = document.createElement('div'); st.id = 'sip-unggah-soal-status'; st.setAttribute('role', 'status'); st.setAttribute('aria-live', 'polite');
+    st.textContent = 'Pilih foto. Setelah tersimpan, tautan gambar akan terisi otomatis.'; parent.appendChild(st);
+    var fig = document.createElement('figure'); fig.id = 'sip-unggah-soal-preview'; fig.hidden = true;
+    fig.innerHTML = '<img id="sip-unggah-soal-foto" alt="Pratinjau foto soal"><figcaption id="sip-unggah-soal-caption"></figcaption>';
+    parent.appendChild(fig);
+    var link = document.createElement('a'); link.id = 'sip-unggah-soal-folder'; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.hidden = true;
+    link.textContent = 'Buka folder penyimpanan di Drive ↗'; parent.appendChild(link);
+    if (pending) button.disabled = true;
+  }
+  function mulai() {
+    gaya(); pasang();
+    window.addEventListener('change', function (e) {
+      if (!e.target || e.target.id !== 'sip-berkas-gambar') return;
+      e.stopImmediatePropagation();
+      var f = e.target.files && e.target.files[0];
+      unggah(f, node('sip-tb-unggah-gambar'));
+      e.target.value = '';
+    }, true);
+    window.addEventListener('submit', function (e) {
+      if (!pending || !e.target || !pending.input || pending.input.closest('form') !== e.target) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      status('Tunggu unggahan selesai dan tautan gambar terisi sebelum menekan Simpan Pertanyaan.', 'warning');
+    }, true);
+    if (typeof window.resetQuestionForm === 'function' && !window.resetQuestionForm.__sipUploadPulih) {
+      var asli = window.resetQuestionForm;
+      var fn = function () {
+        var r = asli.apply(this, arguments);
+        if (!pending) { aktif = null; var n = node('sip-unggah-soal-preview'); if (n) n.hidden = true; bukaFolder(''); status('Pilih foto untuk soal berikutnya.'); }
+        return r;
+      };
+      fn.__sipUploadPulih = true; window.resetQuestionForm = fn;
+    }
+    if (window.MutationObserver) {
+      var tunda = null;
+      new MutationObserver(function () {
+        if (tunda) return;
+        tunda = setTimeout(function () { tunda = null; pasang(); }, 150);
+      }).observe(document.body, { childList: true, subtree: true });
+    }
+  }
+  window.sipUnggahGambarSoal = unggah;
+  window.SIPINTAR_UNGGAH_PERBAIKAN_VERSI = '1.0.0';
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mulai);
+  else mulai();
+})();
+
+  </script>
+
   <!-- GERBANG TATA CARA PENGERJAAN · sumber: web/gerbang-jenis.js -->
   <script id="sipintar-gerbang-jenis">
 /* =============================================================================
@@ -23701,5 +24020,5 @@ function sipSisipTandaGambar_() {
 })();
 
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4aba5149d8d81d2',t:'MTc5MjAzMzk3NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4ad86d12ac287c6',t:'MTc5MjA1MzcwNg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
