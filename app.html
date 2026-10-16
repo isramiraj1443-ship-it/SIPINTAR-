@@ -1730,6 +1730,10 @@ input:focus, select:focus, textarea:focus {
 #siswa-nav-min-btn{display:none !important}
 #input-image-pos{display:none !important}
 #sip-image-pos-wrap{display:none !important}
+#menu-pengawas{display:none !important}
+#menu-pgw-ujian{display:none !important}
+#menu-pgw-koreksi{display:none !important}
+#dash-pengawas-box{display:none !important}
   </style>
   <script id="sipintar-instruksi-bagian">
   (function(){
@@ -5893,7 +5897,7 @@ function renderAdminHome(container) {
   try { paintDashUpdateDataBox_(); } catch (eU) {}
 
   // [PENGAWAS] Penyesuaian dashboard untuk Guru (pengawas)
-  if (isGuruDash) {
+  if (isGuruDash && !window.SIPINTAR_PENGAWAS_NONAKTIF) {
     var _ub = document.getElementById('dash-btn-update');
     if (_ub) _ub.style.display = 'none';
     var _ubx = document.getElementById('dash-update-data-box');
@@ -24020,5 +24024,136 @@ function sipSisipTandaGambar_() {
 })();
 
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4ad86d12ac287c6',t:'MTc5MjA1MzcwNg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+  <!-- PENONAKTIFAN SELURUH ALUR PENGAWAS · sumber: web/tanpa-pengawas.js -->
+  <script id="sipintar-tanpa-pengawas">
+window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengawasList","getPengawasSaya","savePengawas","hapusPengawas","pengawasSetPinKelas"],"rute":["dash-pengawas","dash-pgw-ujian","dash-pgw-koreksi"],"elemen":["menu-pengawas","menu-pgw-ujian","menu-pgw-koreksi","dash-pengawas-box"],"fungsiKlien":["sipPgwBukaJadwal_","sipPgwBukaBank_","renderPengawasPage","loadPengawasData","sipPgwForm_","sipPgwHapus_","sipPgwKelasDiawasi_","renderPgwUjianPage","sipPgwSimpanPinKelas_","renderPgwKoreksiPage","sipPgwMuatKoreksi_"]}};
+/* =============================================================================
+   SELURUH ALUR PENGAWAS DINONAKTIFKAN · TAMBAHAN v1.0.0 · 16 Oktober 2026
+   Menu + rute + handler ditutup; otorisasi sebenarnya juga ditutup di GAS.
+   Tidak menghapus akun, sheet, soal, jadwal, hasil, atau koreksi Admin.
+   Hak Guru tetap mengikuti Users.Class; tidak ada peningkatan ke role Admin.
+   ============================================================================= */
+(function () {
+  'use strict';
+  var config = (window.SIPINTAR_FITUR_NONAKTIF || {}).pengawas;
+  if (!config || !config.nonaktif) return;
+  /* Dibaca guard dashboard hasil build sebelum permintaan login pertama. */
+  window.SIPINTAR_PENGAWAS_NONAKTIF = true;
+
+  function node(id) {
+    return typeof document !== 'undefined' && document ? document.getElementById(id) : null;
+  }
+  function pesanNonaktif(container) {
+    var n = container && container.nodeType === 1 ? container : node('admin-content');
+    if (n) {
+      n.innerHTML = '<div class="dash-card p-6" data-sip-pengawas-nonaktif="1">' +
+        '<h2 class="font-bold text-slate-800">Fitur tidak tersedia</h2>' +
+        '<p class="text-sm text-slate-500 mt-2">Seluruh alur Pengawas sudah dinonaktifkan. ' +
+        'Gunakan menu lain yang tersedia sesuai akun Anda.</p></div>';
+    }
+    var title = node('admin-header-title');
+    if (title && title.textContent !== 'Fitur tidak tersedia') title.textContent = 'Fitur tidak tersedia';
+    return false;
+  }
+  function sembunyikan(n) {
+    if (!n) return;
+    if (n.style.display !== 'none') n.style.display = 'none';
+    if (n.getAttribute('aria-hidden') !== 'true') n.setAttribute('aria-hidden', 'true');
+    if (n.tabIndex !== -1) n.tabIndex = -1;
+  }
+  function rapikan() {
+    config.elemen.forEach(function (id) { sembunyikan(node(id)); });
+    /* Guard edit Guru yang lama memang mode pratinjau. Cocokkan tombol/teks
+       agar tidak lagi menjanjikan peran Tim Pembuat Soal dari Pengawas. */
+    var s = window.currentUser;
+    var menuBank = node('menu-questions');
+    if (menuBank && s && (s.role === 'Guru' || s.role === 'Admin')) {
+      var bolehBank = s.role === 'Admin' || !!(s.pengawas && s.pengawas.izinBankSoal === true);
+      menuBank.classList.toggle('hidden', !bolehBank);
+    }
+    if (s && s.role === 'Guru' && node('q-table-container')) {
+      ['qb-mutate-bar', 'form-add-q', 'form-import-q', 'form-import-excel', 'form-copy-q', 'form-batch-q', 'bulk-action-bar']
+        .forEach(function (id) { sembunyikan(node(id)); });
+      document.querySelectorAll('#q-table-container .qb-edit-btn, #q-table-container .qb-del-btn, #q-table-container button[onclick^="deleteQuestion("], #q-table-container button[onclick*="form-add-q"], #q-table-container input[type="checkbox"]')
+        .forEach(sembunyikan);
+      var sub = node('qb-subtitle');
+      var teks = 'Pratinjau Bank Soal sesuai pemetaan mata pelajaran dan kelas pada akun Guru.';
+      if (sub && sub.textContent !== teks) sub.textContent = teks;
+      var pilih = node('select-exam-q');
+      var label = pilih && pilih.parentElement && pilih.parentElement.parentElement.querySelector('label');
+      if (label && label.textContent !== 'Pilih Mata Pelajaran Untuk Pratinjau') label.textContent = 'Pilih Mata Pelajaran Untuk Pratinjau';
+    }
+  }
+  function bungkus(nama, sesudah) {
+    var asli = window[nama];
+    if (typeof asli !== 'function' || asli.__sipTanpaPengawas) return;
+    var fn = function () {
+      var hasil = asli.apply(this, arguments);
+      sesudah();
+      return hasil;
+    };
+    fn.__sipTanpaPengawas = true;
+    window[nama] = fn;
+  }
+  function mulai() {
+    if (!node('sip-tanpa-pengawas-gaya')) {
+      var s = document.createElement('style');
+      s.id = 'sip-tanpa-pengawas-gaya';
+      s.textContent = config.elemen.map(function (id) { return '#' + id; }).join(',') + '{display:none!important}';
+      document.head.appendChild(s);
+    }
+    /* Rute tidak dapat dibuka lewat onclick lama, bookmark, atau console. */
+    var asli = window.showAdminTab;
+    if (typeof asli === 'function' && !asli.__sipTanpaPengawas) {
+      var fn = function (tab) {
+        if (config.rute.indexOf(tab) >= 0) return pesanNonaktif();
+        var hasil = asli.apply(this, arguments);
+        rapikan();
+        return hasil;
+      };
+      fn.__sipTanpaPengawas = true;
+      window.showAdminTab = fn;
+    }
+    /* Pertahankan definisi sumber sebagai arsip, tetapi jangan jalankan handler
+       penunjukan, PIN/kelas, maupun koreksi khusus Pengawas lagi. */
+    config.fungsiKlien.forEach(function (nama) {
+      if (typeof window[nama] !== 'function') return;
+      window[nama] = nama === 'sipPgwKelasDiawasi_' ? function () { return []; } : function (container) {
+        if (container && container.nodeType === 1) pesanNonaktif(container);
+        return false;
+      };
+    });
+    bungkus('initAdminPanel', rapikan);
+    bungkus('applyGuruBankSoalMode_', rapikan);
+    var simpanAsli = window.handleAddQuestion;
+    if (typeof simpanAsli === 'function' && !simpanAsli.__sipTanpaPengawas) {
+      var simpan = function (e) {
+        if (window.currentUser && window.currentUser.role === 'Guru') {
+          if (e && e.preventDefault) e.preventDefault();
+          if (typeof window.guardGuruEditSoal_ === 'function') window.guardGuruEditSoal_();
+          return false;
+        }
+        return simpanAsli.apply(this, arguments);
+      };
+      simpan.__sipTanpaPengawas = true;
+      window.handleAddQuestion = simpan;
+    }
+    rapikan();
+    if (window.MutationObserver) {
+      var tunda = null;
+      new MutationObserver(function () {
+        if (tunda) return;
+        tunda = setTimeout(function () { tunda = null; rapikan(); }, 150);
+      }).observe(document.body, { childList: true, subtree: true });
+    }
+  }
+  window.sipRapikanTanpaPengawas = rapikan;
+  window.SIPINTAR_TANPA_PENGAWAS_VERSI = '1.0.0';
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mulai);
+  else mulai();
+})();
+
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4b32e189cf91dad',t:'MTc5MjExMjk4Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
