@@ -23742,7 +23742,7 @@ function sipSisipTandaGambar_() {
   <!-- MITIGASI TANGKAPAN LAYAR SISWA · sumber: web/perlindungan-layar.js -->
   <script id="sipintar-lindung-layar">
 /* =============================================================================
-   PERLINDUNGAN LAYAR SISWA · versi 1.0.0 · 15 Oktober 2026
+   PERLINDUNGAN LAYAR SISWA · versi 1.1.0 · 17 Oktober 2026
    Tambahan mitigasi, BUKAN pemblokir screenshot sistem/kamera eksternal.
    Cakupan pilihan pengguna: soal, hasil akhir, tab Hasil & Nilai, detail jawaban.
    Dashboard/leaderboard dari dashboard, halaman lain, Admin/Guru tetap normal.
@@ -23757,7 +23757,56 @@ function sipSisipTandaGambar_() {
   var tutupSampai = 0;
   var tenggangTangkapan = 0;
   var tundaPulih = null;
+  var tundaFokus = null;
   var teksAir = '';
+
+  /* Perbaikan 17 Okt: blur pada input/tombol BUKAN blur jendela aplikasi.
+     HP dapat mengirim blur ketika keyboard/fullscreen berubah padahal halaman
+     tetap terlihat. Pakai visibilitychange sebagai sinyal utama pada HP. */
+  function batalTundaFokus() {
+    if (tundaFokus !== null) { clearTimeout(tundaFokus); tundaFokus = null; }
+  }
+  function halamanTersembunyi() {
+    return document.hidden === true || document.visibilityState === 'hidden';
+  }
+  function dokumenBerfokus() {
+    try { return typeof document.hasFocus === 'function' && document.hasFocus(); }
+    catch (e) { return false; }
+  }
+  function perangkatSentuh() {
+    try {
+      return navigator.maxTouchPoints > 0 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '') ||
+        !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+    } catch (e) { return false; }
+  }
+  function fokusKembali() {
+    if (typeof document === 'undefined' || !document || halamanTersembunyi()) return;
+    batalTundaFokus();
+    kehilanganFokus = false;
+    pulihkan();
+  }
+  function fokusJendelaHilang(e) {
+    if (!e || e.target !== window || !periksa() || sedangCetak) return;
+    batalTundaFokus();
+    if (halamanTersembunyi()) {
+      sembunyikan('Aplikasi sedang tidak terlihat. Tampilan pribadi disembunyikan.', false);
+      return;
+    }
+    /* Keyboard HP / dialog sistem yang tetap menampilkan halaman tidak cukup
+       untuk menutup soal. Aplikasi benar-benar tersembunyi tetap ditutup segera. */
+    if (perangkatSentuh()) return;
+    tundaFokus = setTimeout(function () {
+      tundaFokus = null;
+      if (typeof document === 'undefined' || !document || !periksa() || sedangCetak) return;
+      if (halamanTersembunyi()) {
+        sembunyikan('Aplikasi sedang tidak terlihat. Tampilan pribadi disembunyikan.', false);
+        return;
+      }
+      if (perangkatSentuh() || dokumenBerfokus()) return;
+      kehilanganFokus = true;
+      sembunyikan('Layar kehilangan fokus. Kembali ke aplikasi untuk melihat tampilan pribadi.', false);
+    }, 350);
+  }
 
   function sesiSiswa() {
     var s = window.currentUser;
@@ -23853,7 +23902,8 @@ function sipSisipTandaGambar_() {
       'Jangan menyebarkan soal maupun jawaban pribadi.</small></div>';
     document.body.appendChild(tutup);
     document.getElementById('sip-lindung-lanjut').onclick = function () {
-      if (document.hidden || sedangCetak) return;
+      if (halamanTersembunyi() || sedangCetak) return;
+      batalTundaFokus();
       kehilanganFokus = false;
       tutupSampai = 0;
       pulihkan();
@@ -23887,6 +23937,7 @@ function sipSisipTandaGambar_() {
       aktif = baru; identitas = siapa;
       tutupSampai = 0; tenggangTangkapan = 0;
       kehilanganFokus = false; sedangCetak = false;
+      batalTundaFokus();
       atribut('data-sip-lindung-tutup', '0');
       if (tundaPulih) clearTimeout(tundaPulih);
       if (!aktif) {
@@ -23897,11 +23948,17 @@ function sipSisipTandaGambar_() {
     atribut('data-sip-lindung', aktif ? '1' : '0');
     atribut('data-sip-lindung-bagian', aktif);
     if (aktif) watermark();
+    /* Sebagian browser HP tidak mengirim window.focus saat kembali. Jangan
+       biarkan penutup macet jika dokumen sudah benar-benar berfokus lagi. */
+    if (aktif && kehilanganFokus && !halamanTersembunyi() && dokumenBerfokus() && !sedangCetak) {
+      kehilanganFokus = false;
+      if (Date.now() >= tutupSampai) atribut('data-sip-lindung-tutup', '0');
+    }
     return aktif;
   }
   function pulihkan() {
     if (!periksa()) return;
-    if (document.hidden || kehilanganFokus || sedangCetak) return;
+    if (halamanTersembunyi() || kehilanganFokus || sedangCetak) return;
     var sisa = tutupSampai - Date.now();
     if (sisa > 0) {
       if (tundaPulih) clearTimeout(tundaPulih);
@@ -23971,16 +24028,18 @@ function sipSisipTandaGambar_() {
     /* Fase CAPTURE di window, lebih awal dari handler anti-cheat lama di document. */
     window.addEventListener('keydown', tombol, true);
     window.addEventListener('keyup', tombol, true);
-    window.addEventListener('blur', function () {
-      if (!periksa()) return;
-      kehilanganFokus = true;
-      sembunyikan('Layar kehilangan fokus. Kembali ke aplikasi untuk melihat tampilan pribadi.', false);
-    }, true);
-    window.addEventListener('focus', function () { kehilanganFokus = false; pulihkan(); }, true);
+    /* Sengaja BUKAN capture: blur/focus elemen tidak boleh dianggap keluar
+       aplikasi. Pemeriksaan target juga melindungi dari event plugin yang bubble. */
+    window.addEventListener('blur', fokusJendelaHilang, false);
+    window.addEventListener('focus', function (e) {
+      if (e.target === window) fokusKembali();
+    }, false);
+    document.addEventListener('focusin', fokusKembali, true);
     document.addEventListener('visibilitychange', function () {
       if (!periksa()) return;
-      if (document.hidden) sembunyikan('Aplikasi sedang tidak terlihat. Tampilan pribadi disembunyikan.', false);
-      else pulihkan();
+      batalTundaFokus();
+      if (halamanTersembunyi()) sembunyikan('Aplikasi sedang tidak terlihat. Tampilan pribadi disembunyikan.', false);
+      else fokusKembali();
     }, true);
     ['contextmenu', 'dragstart'].forEach(function (nama) {
       document.addEventListener(nama, function (e) {
@@ -23996,6 +24055,7 @@ function sipSisipTandaGambar_() {
       sembunyikan('Pratinjau cetak tidak menyertakan soal, nilai, atau jawaban pribadi.', true);
     });
     window.addEventListener('afterprint', function () {
+      batalTundaFokus();
       sedangCetak = false; kehilanganFokus = false; tutupSampai = 0; pulihkan();
     });
     /* Deteksi perpindahan halaman sinkron, termasuk hasil selesai di #page-exam. */
@@ -24018,7 +24078,7 @@ function sipSisipTandaGambar_() {
     setInterval(function () { periksa(); bungkusKeamanan(); }, 1000);
   }
   window.sipPeriksaPerlindunganLayar = periksa;
-  window.SIPINTAR_LINDUNG_VERSI = '1.0.0';
+  window.SIPINTAR_LINDUNG_VERSI = '1.1.0';
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mulai);
   else mulai();
 })();
@@ -24155,5 +24215,5 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
 })();
 
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4b32e189cf91dad',t:'MTc5MjExMjk4Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
