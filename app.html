@@ -24291,5 +24291,242 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
 })();
 
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4cbc20f7872f876',t:'MTc5MjM3MDcwNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+  <!-- KISI-KISI MATERI DAN VALIDASI LEVEL KOGNITIF · sumber: web/kisi-materi-kognitif.js -->
+  <script id="sipintar-kisi-materi">
+/* Kisi-kisi materi & kognitif v2.0.0 · tambahan, master UI tidak diubah.
+   AI hanya atas tindakan Admin; rekomendasi tidak pernah otomatis disetujui. */
+(function () {
+  'use strict';
+  var T = {"versi":"2.0.0","materiMatematika":["Bilangan","Aljabar","Geometri dan Pengukuran","Data dan Peluang"],"levelC":{"C1":"Mengingat","C2":"Memahami","C3":"Menerapkan","C4":"Menganalisis","C5":"Mengevaluasi","C6":"Mencipta"},"levelL":{"L1":"Pengetahuan dan Pemahaman","L2":"Aplikasi","L3":"Penalaran"},"petaCL":{"C1":"L1","C2":"L1","C3":"L2","C4":"L3","C5":"L3","C6":"L3"},"pedoman":"Pedoman kerja aplikasi: C1–C2 → L1, C3 → L2, C4–C6 → L3. Ini pemetaan operasional, bukan kesetaraan mutlak dua taksonomi. Admin memvalidasi tuntutan berpikir, konteks, dan kebaruan masalah; bentuk PG/Esai atau satu kata kerja tidak menentukan level.","bab":[{"id":"BIL_BULAT","materi":"Bilangan","nama":"Bilangan Bulat dan Operasinya"},{"id":"BIL_PECAHAN","materi":"Bilangan","nama":"Pecahan, Desimal, dan Persen"},{"id":"BIL_PECAHAN_OP","materi":"Bilangan","nama":"Operasi Pecahan"},{"id":"BIL_DESIMAL","materi":"Bilangan","nama":"Bilangan Desimal dan Operasinya"},{"id":"BIL_PERSEN","materi":"Bilangan","nama":"Persen"},{"id":"BIL_PANGKAT","materi":"Bilangan","nama":"Bilangan Berpangkat dan Bentuk Akar"},{"id":"BIL_REAL","materi":"Bilangan","nama":"Bilangan Rasional dan Irasional"},{"id":"BIL_FAKTOR","materi":"Bilangan","nama":"Faktor, Kelipatan, FPB, dan KPK"},{"id":"BIL_PERBANDINGAN","materi":"Bilangan","nama":"Perbandingan dan Skala"},{"id":"BIL_SOSIAL","materi":"Bilangan","nama":"Aritmetika Sosial"},{"id":"BIL_UMUM","materi":"Bilangan","nama":"Konsep dan Keterkaitan Bilangan"},{"id":"ALJ_BENTUK","materi":"Aljabar","nama":"Bentuk dan Operasi Aljabar"},{"id":"ALJ_PLSV","materi":"Aljabar","nama":"Persamaan dan Pertidaksamaan Linear Satu Variabel"},{"id":"ALJ_SPLDV","materi":"Aljabar","nama":"Sistem Persamaan Linear Dua Variabel"},{"id":"ALJ_FUNGSI","materi":"Aljabar","nama":"Relasi dan Fungsi"},{"id":"ALJ_GARIS","materi":"Aljabar","nama":"Persamaan Garis Lurus"},{"id":"ALJ_POLA","materi":"Aljabar","nama":"Pola Bilangan dan Barisan"},{"id":"ALJ_KUADRAT","materi":"Aljabar","nama":"Persamaan dan Fungsi Kuadrat"},{"id":"ALJ_HIMPUNAN","materi":"Aljabar","nama":"Himpunan"},{"id":"ALJ_UMUM","materi":"Aljabar","nama":"Konsep dan Keterkaitan Aljabar"},{"id":"GEO_GARIS","materi":"Geometri dan Pengukuran","nama":"Garis dan Sudut"},{"id":"GEO_DATAR","materi":"Geometri dan Pengukuran","nama":"Bangun Datar"},{"id":"GEO_LINGKARAN","materi":"Geometri dan Pengukuran","nama":"Lingkaran"},{"id":"GEO_RUANG","materi":"Geometri dan Pengukuran","nama":"Bangun Ruang"},{"id":"GEO_UKUR","materi":"Geometri dan Pengukuran","nama":"Pengukuran Panjang, Luas, Volume, dan Satuan"},{"id":"GEO_PYTHAGORAS","materi":"Geometri dan Pengukuran","nama":"Teorema Pythagoras"},{"id":"GEO_SEBANGUN","materi":"Geometri dan Pengukuran","nama":"Kesebangunan dan Kekongruenan"},{"id":"GEO_TRANSFORMASI","materi":"Geometri dan Pengukuran","nama":"Transformasi Geometri"},{"id":"GEO_KOORDINAT","materi":"Geometri dan Pengukuran","nama":"Koordinat Kartesius"},{"id":"GEO_UMUM","materi":"Geometri dan Pengukuran","nama":"Konsep Geometri dan Pengukuran"},{"id":"DATA_SAJI","materi":"Data dan Peluang","nama":"Pengumpulan dan Penyajian Data"},{"id":"DATA_PUSAT","materi":"Data dan Peluang","nama":"Ukuran Pemusatan Data"},{"id":"DATA_SEBAR","materi":"Data dan Peluang","nama":"Ukuran Penyebaran Data"},{"id":"DATA_PELUANG","materi":"Data dan Peluang","nama":"Peluang Kejadian"},{"id":"DATA_EMPIRIK","materi":"Data dan Peluang","nama":"Frekuensi Relatif dan Peluang Empirik"},{"id":"DATA_UMUM","materi":"Data dan Peluang","nama":"Konsep Data dan Peluang"}]};
+  var S = { data:null, dirty:false, busy:false, pause:false, seq:0 };
+  var asli = { render:window.sipRenderKisiAdmin_, tabel:window.sipKisiRenderTable_, muat:window.sipKisiMuatExam_,
+    buat:window.sipKisiBuat_, simpan:window.sipKisiSimpan_, rilis:window.sipKisiRilis_, siswa:window.sipRenderKisiSiswa_,
+    pratinjau:window.sipKisiPratinjauSiswa_, unduh:window.sipKisiUnduh_, unduhSiswa:window.sipKisiUnduhSiswa_ };
+  window.SIPINTAR_KISI_ASLI = asli;
+  window.SIPINTAR_KISI_VERSI = T.versi;
+  function el(id) { return document.getElementById(id); }
+  function e(v) { return String(v == null ? '' : v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+  function items() { return window._sipKisiItems || []; }
+  function exam() { return window._sipKisiExam || ''; }
+  function admin() { return window.currentUser && currentUser.role === 'Admin'; }
+  function tataSiswa() {
+    var hub=el('page-siswa-hub'),pane=el('siswa-tab-kisi');
+    if(hub)hub.classList.toggle('sip-kisi-materi-aktif',!!(pane&&!pane.classList.contains('hidden')));
+  }
+  function msg(title,text,icon) { return Swal.fire(title,text,icon || 'info'); }
+  function api(action,args) {
+    return new Promise(function(resolve,reject) {
+      var run = google.script.run.withSuccessHandler(function(r) {
+        if(!r || !r.success) return reject(new Error((r&&r.message)||'Permintaan tidak berhasil.'));
+        resolve(r);
+      }).withFailureHandler(function(err){reject(new Error((err&&err.message)||String(err)));});
+      run[action].apply(run,(args||[]).concat([currentUser.userID,currentUser.token]));
+    });
+  }
+  function versi(r) { if(r.schema!==T.versi) throw new Error('Versi kisi-kisi belum sesuai. Perbarui code.gs, deploy GAS versi baru, dan gunakan app.html terbaru. Kisi-kisi lama tidak ditampilkan.'); }
+  function ambil(r) {
+    versi(r); S.data=r; S.dirty=false;
+    window._sipKisiItems=(r.items||[]).map(function(it){return Object.assign({},it);});
+    window._sipKisiRilis=!!r.rilis;
+    window.sipKisiUpdateRilisUI_(); window.sipKisiRenderTable_();
+  }
+  function lengkap(r) { return !!(r.materi && r.bab && T.levelC[r.levelC] && String(r.alasan||'').trim().length>=8); }
+  function sibuk(ya) {
+    S.busy=ya;
+    document.querySelectorAll('#kisi-select-exam,#admin-content [data-kisi-edit],#admin-content [data-kisi-approve],#admin-content button[onclick^="sipKisi"],#kisi-v2-preview')
+      .forEach(function(n){n.disabled=ya;});
+    var pause=el('kisi-v2-pause'); if(pause)pause.hidden=!ya;
+  }
+  function stats() {
+    var box=el('kisi-v2-status');
+    if(box)box.textContent=items().filter(function(r){return r.disetujui;}).length+'/'+items().length+' soal dicentang setelah diperiksa. '+
+      (S.dirty?'Ada perubahan belum disimpan.':'Metadata terakhir telah dimuat/disimpan.')+' Rilis memerlukan persetujuan seluruh soal.';
+    if(box)box.dataset.dirty=S.dirty?'1':'0';
+  }
+  function opsiBab(materi,babId) {
+    return '<option value="">— Pilih bab —</option>'+T.bab.filter(function(b){return b.materi===materi;}).map(function(b){return '<option value="'+e(b.id)+'"'+(b.id===babId?' selected':'')+'>'+e(b.nama)+'</option>';}).join('');
+  }
+  function richAman(html) {
+    var t=document.createElement('template');t.innerHTML=String(html||'');
+    t.content.querySelectorAll('script,iframe,object,embed,link,meta,base,form,style').forEach(function(n){n.remove();});
+    t.content.querySelectorAll('*').forEach(function(n){Array.from(n.attributes).forEach(function(a){
+      if(/^on/i.test(a.name)||a.name==='srcdoc'||(/^(href|src|xlink:href)$/i.test(a.name)&&/^\s*(javascript:|data:(?!image\/(png|jpeg|webp|gif)))/i.test(a.value))) n.removeAttribute(a.name);
+    });});
+    return t.innerHTML;
+  }
+  function soalHTML(q,i) {
+    if(!q)return '<p>Pratinjau Bank Soal tidak tersedia. Muat ulang.</p>';
+    var safe=Object.assign({},q,{content:richAman(q.content)}),opts=[];
+    try{opts=typeof q.options==='string'?JSON.parse(q.options):q.options;}catch(err){}
+    safe.options=JSON.stringify((Array.isArray(opts)?opts:[]).map(function(o){
+      return typeof o==='string'?richAman(o):{q:richAman(o&&o.q),a:richAman(o&&o.a)};
+    }));
+    safe.type=['PG','PG_KOMPLEKS','PGK','BS','JODOH','Esai'].indexOf(safe.type)>=0?safe.type:'Esai';
+    if(!/^(https:\/\/|data:image\/(?:png|jpeg|webp);base64,)/i.test(String(safe.image||''))||/["'<>\x00-\x1f]/.test(String(safe.image||'')))safe.image='';
+    return typeof window._renderSingleQuestionForPreview==='function'?window._renderSingleQuestionForPreview(safe,i):'<div>'+safe.content+'</div>';
+  }
+  function kartu(r,i) {
+    var math=S.data.isMatematika || !!r.babId;
+    var domain='<select aria-label="Materi soal '+(i+1)+'" data-kisi-edit="materi" data-index="'+i+'"><option value="">— Pilih materi —</option>'+T.materiMatematika.map(function(m){return '<option'+(m===r.materi?' selected':'')+'>'+e(m)+'</option>';}).join('')+'</select>';
+    var topic=math?'<label>Materi utama'+domain+'</label><label>Bab / Topik<select aria-label="Bab soal '+(i+1)+'" data-kisi-edit="babId" data-index="'+i+'">'+opsiBab(r.materi,r.babId)+'</select></label>':
+      '<label>Materi / Kelompok<input maxlength="100" aria-label="Materi soal '+(i+1)+'" data-kisi-edit="materi" data-index="'+i+'" value="'+e(r.materi)+'"></label><label>Bab / Topik<input maxlength="100" aria-label="Bab soal '+(i+1)+'" data-kisi-edit="bab" data-index="'+i+'" value="'+e(r.bab)+'"></label>';
+    var levels='<label>Level Bloom C1–C6<select aria-label="Level C soal '+(i+1)+'" data-kisi-edit="levelC" data-index="'+i+'"><option value="">— Perlu ditentukan —</option>'+Object.keys(T.levelC).map(function(c){return '<option value="'+c+'"'+(c===r.levelC?' selected':'')+'>'+c+' · '+e(T.levelC[c])+'</option>';}).join('')+'</select></label>'+
+      '<div><span class="sip-kisi-label">Level L1–L3 (pedoman kerja)</span><strong data-kisi-l>'+e(r.levelL?(r.levelL+' · '+T.levelL[r.levelL]):'Belum ditentukan')+'</strong></div>';
+    return '<article class="sip-kisi-card" data-kisi-row="'+i+'"><header><h4>Soal '+(i+1)+' <small>'+e(r.tipe||'')+'</small></h4><span class="sip-kisi-tag">'+(r.disetujui?'Diperiksa Admin':r.attempted?'Rekomendasi — perlu diperiksa':'Belum dianalisis')+'</span></header>'+
+      '<details data-kisi-detail="'+i+'"><summary>Lihat soal asli untuk memeriksa klasifikasi <b>(khusus Admin)</b></summary><div class="sip-kisi-bank">'+soalHTML((S.data.pratinjauBank||[])[i],i)+'</div></details>'+
+      (r.catatan?'<p class="sip-kisi-warning" role="note">'+e(r.catatan)+'</p>':'')+
+      (r.attempted&&r.asal==='AI'&&r.kepercayaan<0.65?'<p class="sip-kisi-warning">AI menyatakan keyakinan rendah/tidak tersedia. Ini bukan penilaian pasti; periksa soal dan konteks secara manual.</p>':'')+
+      '<div class="sip-kisi-grid">'+topic+levels+'</div>'+
+      '<label class="sip-kisi-reason">Alasan tuntutan kognitif (internal Admin, tidak dirilis)<textarea rows="2" maxlength="700" aria-label="Alasan soal '+(i+1)+'" data-kisi-edit="alasan" data-index="'+i+'">'+e(r.alasan)+'</textarea></label>'+
+      '<label class="sip-kisi-approve"><input type="checkbox" data-kisi-approve="'+i+'"'+(r.disetujui?' checked':'')+'> Saya telah memeriksa isi soal, gambar, materi/bab, serta tuntutan berpikir; klasifikasi ini saya setujui.</label></article>';
+  }
+  window.sipRenderKisiAdmin_=function() {
+    if(typeof asli.render!=='function')return;
+    asli.render.apply(this,arguments);S.seq++;S.data=null;S.dirty=false;window._sipKisiItems=[];window._sipKisiExam='';window._sipKisiRilis=false;
+    var h=document.querySelector('#admin-content h3');if(h)h.textContent='Kisi-Kisi Materi & Validasi Kognitif';
+    var p=document.querySelector('#admin-content h3 + p');if(p)p.textContent='Materi/bab sesuai Bank Soal, bukan kutipan soal. AI memberi rekomendasi; Admin wajib memeriksa sebelum merilis. C1–C6 dan L1–L3 ditampilkan bersamaan.';
+    document.querySelectorAll('#admin-content button[onclick]').forEach(function(b){
+      var a=b.getAttribute('onclick')||'';
+      if(a==='sipKisiBuat_()'){b.id='kisi-v2-ai';b.textContent='Buat / Lanjutkan Analisis AI';}
+      if(a==='sipKisiSimpan_()'){b.id='kisi-v2-save';b.textContent='Simpan Metadata & Persetujuan';}
+      if(a==="sipKisiUnduh_('doc')"){b.textContent='Word (.docx)';b.setAttribute('onclick',"sipKisiUnduh_('docx')");}
+    });
+    var bar=el('kisi-folder-bar');if(bar)bar.innerHTML='<div class="sip-kisi-note">Matematika: <b>'+T.materiMatematika.map(e).join(' · ')+'</b>. Bab dipilih sesuai isi Bank Soal, bukan sekadar nama ujian. Gambar/konteks yang tidak terbaca harus diperiksa manual. <details><summary>Pedoman kognitif dan privasi AI</summary><p>'+e(T.pedoman)+'</p><p>Analisis hanya berjalan setelah Anda menekan tombol AI. Isi soal dan gambar yang dapat dibaca dikirim ke penyedia AI yang dikonfigurasi; menggunakan kuota. Kunci tidak disertakan. Tanpa AI, metadata tetap dapat diisi manual.</p></details></div><div class="sip-kisi-tools"><button type="button" id="kisi-v2-preview">Pratinjau Materi untuk Siswa</button><button type="button" id="kisi-v2-pause" hidden>Jeda setelah batch ini</button><span id="kisi-v2-progress" role="status" aria-live="polite"></span></div>';
+    window.sipKisiUpdateRilisUI_();sibuk(S.busy);
+  };
+  window.sipKisiMuatExam_=async function() {
+    if(S.busy)return;
+    var id=(el('kisi-select-exam')||{}).value||'',seq=++S.seq;
+    window._sipKisiExam=id;window._sipKisiItems=[];S.data=null;S.dirty=false;window._sipKisiRilis=false;
+    window.sipKisiUpdateRilisUI_();
+    if(!id){el('kisi-table').textContent='Pilih ujian untuk memuat materi dan bab.';return;}
+    el('kisi-table').textContent='Memuat Bank Soal dan metadata validasi…';
+    try{var r=await api('getKisiKisiByExam',[id]);if(seq!==S.seq)return;ambil(r);}
+    catch(err){if(seq===S.seq)el('kisi-table').textContent=err.message;}
+  };
+  window.sipKisiRenderTable_=function() {
+    var box=el('kisi-table');if(!box)return;
+    if(!S.data){box.textContent='Pilih ujian untuk memuat metadata kisi-kisi.';return;}
+    var open=Array.from(box.querySelectorAll('details[open]')).map(function(n){return n.dataset.kisiDetail;});
+    box.innerHTML=(S.data.butuhPembaruan?'<p class="sip-kisi-warning">Kisi-kisi lama masih disimpan. Untuk mencegah kutipan soal tersebar, rilis lama tidak tersedia bagi siswa sampai diperbarui, diperiksa, disimpan, dan dirilis kembali.</p>':'')+
+      '<p id="kisi-v2-status" class="sip-kisi-note" role="status"></p><div class="sip-kisi-review">'+items().map(kartu).join('')+'</div>'+
+      (!items().length?'<p>Bank Soal ujian ini masih kosong.</p>':'');
+    open.forEach(function(i){var d=box.querySelector('[data-kisi-detail="'+i+'"]');if(d)d.open=true;});stats();sibuk(S.busy);
+    if(window.MathJax&&typeof MathJax.typesetPromise==='function')MathJax.typesetPromise([box]).catch(function(){});
+  };
+  window.sipKisiUbah_=function(i,field,value) {
+    var r=items()[i];if(!r||S.busy)return;
+    r[field]=value;r.asal='Admin';r.attempted=true;r.disetujui=false;S.dirty=true;
+    if(field==='materi' && (S.data.isMatematika||r.babId)){r.babId='';r.bab='';}
+    if(field==='babId'){var b=T.bab.filter(function(x){return x.id===value;})[0];r.bab=b?b.nama:'';r.materi=b?b.materi:r.materi;}
+    if(field==='levelC')r.levelL=T.petaCL[value]||'';
+    var card=document.querySelector('[data-kisi-row="'+i+'"]');
+    if(card){var cb=card.querySelector('[data-kisi-approve]');if(cb)cb.checked=false;
+      var l=card.querySelector('[data-kisi-l]');if(l)l.textContent=r.levelL?r.levelL+' · '+T.levelL[r.levelL]:'Belum ditentukan';
+      var tag=card.querySelector('.sip-kisi-tag');if(tag)tag.textContent='Perubahan — perlu diperiksa';
+      if(field==='materi'){var bsel=card.querySelector('[data-kisi-edit="babId"]');if(bsel)bsel.innerHTML=opsiBab(r.materi,r.babId);}
+    }stats();
+  };
+  window.sipKisiBuat_=async function() {
+    if(!admin()||S.busy)return;
+    if(!exam()||!S.data)return msg('Pilih ujian','Pilih ujian dan tunggu Bank Soal selesai dimuat.','warning');
+    if(S.dirty)return msg('Simpan dulu','Simpan perubahan metadata sebelum melanjutkan analisis AI.','warning');
+    var ask=await Swal.fire({icon:'question',title:'Analisis Bank Soal dengan AI?',text:'Isi soal dan gambar yang dapat dibaca dikirim ke penyedia AI yang dikonfigurasi dan menggunakan kuota. Kunci tidak dikirim. Hasil belum disetujui; Anda wajib memeriksa satu per satu. Analisis bertahap dapat dijeda dan dilanjutkan.',showCancelButton:true,confirmButtonText:'Ya, analisis',cancelButtonText:'Batal'});
+    if(!ask.isConfirmed)return;
+    var id=exam(), seq=S.seq,round=0,last=-1;S.pause=false;
+    var pauseButton=el('kisi-v2-pause');if(pauseButton){pauseButton.disabled=false;pauseButton.textContent='Jeda setelah batch ini';}
+    sibuk(true);
+    try {
+      var r;
+      do {
+        if(el('kisi-v2-progress'))el('kisi-v2-progress').textContent='Menganalisis batch berikutnya…';
+        r=await api('buatKisiKisi',[id]);if(seq!==S.seq||exam()!==id||!admin()||!el('kisi-table'))return;ambil(r);
+        if(el('kisi-v2-progress'))el('kisi-v2-progress').textContent='Analisis '+r.selesaiAnalisis+'/'+r.jumlahSoal+' soal tersimpan; perlu pemeriksaan Admin.';
+        if(r.perluLanjut&&r.selesaiAnalisis===last)throw new Error('Analisis tidak bertambah. Muat ulang untuk melanjutkan tanpa menimpa hasil yang telah tersimpan.');
+        last=r.selesaiAnalisis;round++;
+      } while(r.perluLanjut&&!S.pause&&round<100);
+      await msg(S.pause||r.perluLanjut?'Analisis dijeda':'Rekomendasi siap',r.message+' '+(r.perluLanjut?'Tekan Buat / Lanjutkan Analisis AI untuk meneruskan.':'Periksa soal asli, koreksi jika perlu, centang persetujuan tiap soal, lalu Simpan.'),'info');
+    }catch(err){await msg('Analisis belum selesai',err.message+' Hasil batch sebelumnya tetap tersimpan; metadata dapat diisi manual.','warning');}
+    finally{sibuk(false);}
+  };
+  window.sipKisiSimpan_=async function() {
+    if(!admin()||S.busy)return;
+    if(!S.data||!items().length)return msg('Belum siap','Pilih ujian yang memiliki soal.','warning');
+    sibuk(true);try{var r=await api('saveKisiKisi',[{schema:T.versi,examId:exam(),bankHash:S.data.bankHash,items:items()}]);ambil(r);await msg('Tersimpan',r.message,'success');}
+    catch(err){await msg('Simpan belum berhasil',err.message,'error');}finally{sibuk(false);}
+  };
+  window.sipKisiRilis_=async function() {
+    if(!admin()||S.busy)return;
+    if(!S.data)return msg('Pilih ujian','Pilih ujian terlebih dahulu.','warning');
+    var ya=!window._sipKisiRilis;
+    if(ya&&(S.dirty||S.data.perluSimpan||items().some(function(r){return !r.disetujui||!lengkap(r);})))return msg('Belum dapat dirilis','Periksa, centang persetujuan setiap soal, lalu Simpan Metadata & Persetujuan. Tidak ada klasifikasi AI yang otomatis disetujui.','warning');
+    var ask=await Swal.fire({icon:'question',title:ya?'Rilis kisi-kisi materi/bab?':'Tarik rilis kisi-kisi?',text:ya?'Siswa hanya menerima materi, bab, kompetensi umum, serta C1–C6 dan L1–L3; bukan isi soal atau alasan AI.':'Kisi-kisi tidak lagi tersedia bagi siswa.',showCancelButton:true,confirmButtonText:ya?'Ya, rilis':'Ya, tarik',cancelButtonText:'Batal'});
+    if(!ask.isConfirmed)return;sibuk(true);
+    try{var r=await api('rilisKisiKisi',[exam(),ya?'YA':'TIDAK']);window._sipKisiRilis=!!r.rilis;S.data.rilis=!!r.rilis;window.sipKisiUpdateRilisUI_();await msg('Status diperbarui',r.message,'success');}
+    catch(err){await msg('Rilis ditolak',err.message,'error');}finally{sibuk(false);}
+  };
+  window.sipKisiUnduh_=async function(fmt) {
+    if(S.busy)return;if(!S.data)return msg('Pilih ujian','Pilih ujian terlebih dahulu.','warning');
+    if(S.dirty||S.data.perluSimpan)return msg('Simpan dulu','Simpan perubahan dan persetujuan untuk versi Bank Soal ini sebelum mengunduh.','warning');
+    sibuk(true);try{var r=await api('unduhKisiKisi',[exam(),fmt]);await Swal.fire({icon:'success',title:'Berkas materi siap',html:'<p>'+e(r.fileName)+'</p><a target="_blank" rel="noopener" href="'+e(r.download||r.url)+'">Unduh '+(fmt==='pdf'?'PDF':'Word (.docx)')+'</a>'});}
+    catch(err){await msg('Unduh belum berhasil',err.message,'error');}finally{sibuk(false);}
+  };
+  function agregat() {
+    var out=[],index={};items().forEach(function(r){if(!r.bab||!T.levelC[r.levelC])return;
+      var key=JSON.stringify([r.materi,r.bab,r.levelC]);if(index[key]===undefined){index[key]=out.length;out.push({materi:r.materi,bab:r.bab,levelC:r.levelC,levelL:T.petaCL[r.levelC],jumlahSoal:0});}out[index[key]].jumlahSoal++;
+    });return out;
+  }
+  window.sipKisiTabelItemsHtml_=function(rows) {
+    if((rows||[]).some(function(r){return !r.bab||!T.levelC[r.levelC]||!T.levelL[r.levelL];}))return '<p>Kisi-kisi perlu diperbarui dan diverifikasi Admin.</p>';
+    var groups=[];(rows||[]).forEach(function(r){if(groups.indexOf(r.materi)<0)groups.push(r.materi);});
+    return '<div class="sip-kisi-public">'+groups.map(function(g){return '<section><h4>'+e(g)+'</h4><ul>'+rows.filter(function(r){return r.materi===g;}).map(function(r){return '<li><strong>'+e(r.bab)+'</strong><p>'+e(r.indikator||'Kompetensi umum sesuai materi dan tuntutan kognitif yang telah diperiksa Admin.')+'</p><span>'+e(r.levelC+' · '+T.levelC[r.levelC])+'</span> <span>'+e(r.levelL+' · '+T.levelL[r.levelL])+'</span><small>'+Number(r.jumlahSoal||0)+' butir</small></li>';}).join('')+'</ul></section>';}).join('')+'</div>';
+  };
+  window.sipRenderKisiSiswa_=async function() {
+    var box=el('siswa-tab-kisi');if(!box)return;tataSiswa();
+    box.innerHTML='<div class="dash-card p-5"><h3 class="text-lg font-bold">Kisi-Kisi Materi Ujian</h3><p>Acuan belajar: materi, bab, dan tuntutan kognitif. Bukan daftar pertanyaan atau kunci ujian.</p><div id="sip-kisi-siswa-list" class="mt-4">Memuat…</div></div>';
+    try{var r=await api('listKisiKisiSiswa',[]);versi(r);var list=el('sip-kisi-siswa-list');if(!list)return;
+      list.innerHTML=(r.items||[]).map(function(k){return '<article class="sip-kisi-card"><h4>'+e(k.mapel)+'</h4><p>Kelas '+e(k.kelas)+' · '+Number(k.jumlahSoal||0)+' butir dalam Bank Soal</p><p>'+e((k.materi||[]).join(' · '))+'</p><p class="text-xs text-slate-500">Penyusun: '+e(k.namaPembuat||'-')+' · Dibuat: '+e(k.dibuatPada||'-')+'</p><div class="sip-kisi-tools"><button type="button" data-kisi-student="preview" data-exam="'+e(k.examId)+'">Pratinjau Materi</button><button type="button" data-kisi-student="pdf" data-exam="'+e(k.examId)+'">Unduh PDF</button></div></article>';}).join('')||'<p>Belum ada kisi-kisi terverifikasi yang dirilis untuk kelas Anda.</p>';
+    }catch(err){var list=el('sip-kisi-siswa-list');if(list)list.textContent=err.message;}
+  };
+  window.sipKisiPratinjauSiswa_=async function(id) {
+    Swal.fire({title:'Memuat kisi-kisi materi…',allowOutsideClick:false,didOpen:function(){Swal.showLoading();}});
+    try{var r=await api('getKisiKisiSiswa',[id]);versi(r);Swal.close();await Swal.fire({title:'Kisi-Kisi Materi — '+e(r.mapel),html:'<p>Kelas '+e(r.kelas)+'. Urutan materi bukan urutan soal ujian.</p>'+window.sipKisiTabelItemsHtml_(r.items||[])+'<p class="sip-kisi-note">'+e(T.pedoman)+'</p>',width:860,confirmButtonText:'Tutup'});}
+    catch(err){Swal.close();await msg('Kisi-kisi tidak tersedia',err.message,'warning');}
+  };
+  window.sipKisiUnduhSiswa_=async function(id) {
+    Swal.fire({title:'Menyiapkan PDF materi…',allowOutsideClick:false,didOpen:function(){Swal.showLoading();}});
+    try{var check=await api('getKisiKisiSiswa',[id]);versi(check);var r=await api('unduhKisiKisiSiswa',[id]);versi(r);Swal.close();await Swal.fire({icon:'success',title:'PDF materi siap',html:'<p>'+e(r.fileName)+'</p><a target="_blank" rel="noopener" href="'+e(r.download||r.url)+'">Unduh PDF</a>'});}
+    catch(err){Swal.close();await msg('PDF tidak tersedia',err.message,'warning');}
+  };
+  document.addEventListener('input',function(ev){var n=ev.target;if(n.matches('[data-kisi-edit]')&&(n.tagName==='INPUT'||n.tagName==='TEXTAREA'))window.sipKisiUbah_(Number(n.dataset.index),n.dataset.kisiEdit,n.value);});
+  document.addEventListener('change',function(ev){var n=ev.target;
+    if(n.matches('select[data-kisi-edit]'))window.sipKisiUbah_(Number(n.dataset.index),n.dataset.kisiEdit,n.value);
+    if(n.matches('[data-kisi-approve]')){var r=items()[Number(n.dataset.kisiApprove)];if(!r||S.busy)return;
+      if(n.checked&&!lengkap(r)){n.checked=false;msg('Lengkapi pemeriksaan','Pilih materi/bab dan C1–C6, serta tulis alasan tuntutan kognitif sebelum menyetujui.','warning');return;}
+      r.disetujui=n.checked;r.attempted=true;S.dirty=true;stats();
+      var tag=n.closest('.sip-kisi-card').querySelector('.sip-kisi-tag');if(tag)tag.textContent=n.checked?'Diperiksa Admin — belum disimpan':'Perlu diperiksa';
+    }
+  });
+  document.addEventListener('click',function(ev){var n=ev.target.closest('[data-kisi-student],#kisi-v2-preview,#kisi-v2-pause');if(!n)return;
+    if(n.id==='kisi-v2-pause'){S.pause=true;n.disabled=true;n.textContent='Menunggu batch berjalan selesai…';return;}
+    if(n.id==='kisi-v2-preview'){if(!S.data)return msg('Pilih ujian','Muat metadata terlebih dahulu.','warning');return Swal.fire({title:'Pratinjau Materi untuk Siswa',html:'<p>PRATINJAU DRAF — yang dirilis tetap metadata terakhir yang disetujui dan disimpan. Tidak memuat soal asli.</p>'+window.sipKisiTabelItemsHtml_(agregat())+'<p class="sip-kisi-note">'+e(T.pedoman)+'</p>',width:860,confirmButtonText:'Tutup'});}
+    if(n.dataset.kisiStudent==='preview')window.sipKisiPratinjauSiswa_(n.dataset.exam);
+    if(n.dataset.kisiStudent==='pdf')window.sipKisiUnduhSiswa_(n.dataset.exam);
+  });
+  var css=document.createElement('style');css.id='sipintar-kisi-materi-css';css.textContent=
+    '.sip-kisi-review{display:grid;gap:16px}.sip-kisi-card{background:#fff;border:1px solid #dbe2ec;border-radius:16px;padding:18px;min-width:0;margin:12px 0;color:#1e293b}.sip-kisi-card header{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap}.sip-kisi-card h4{font-size:17px;font-weight:800;margin:0}.sip-kisi-card h4 small{font-size:11px;font-weight:500;margin-left:8px}.sip-kisi-tag{font-size:11px;padding:5px 9px;background:#eef2ff;border-radius:20px}.sip-kisi-card details{margin:12px 0}.sip-kisi-card summary{cursor:pointer;font-size:12px;color:#334e79}.sip-kisi-bank{margin-top:12px;max-height:65vh;overflow:auto}.sip-kisi-grid{display:grid;grid-template-columns:1fr 1.2fr 1fr 1fr;gap:12px;align-items:start}.sip-kisi-grid label,.sip-kisi-label,.sip-kisi-reason{font-size:11px;font-weight:700;display:block;color:#516078}.sip-kisi-grid select,.sip-kisi-grid input,.sip-kisi-reason textarea{display:block;width:100%;min-width:0;padding:10px;border:1px solid #cbd5e1;border-radius:9px;margin-top:5px;background:white;font-size:13px;color:#172033;font-weight:500}.sip-kisi-grid strong{display:block;margin-top:12px;font-size:13px}.sip-kisi-reason{margin:12px 0}.sip-kisi-approve{display:flex;align-items:flex-start;gap:10px;font-size:12px;line-height:1.6;background:#f0fdf4;padding:12px;border-radius:10px;color:#166534}.sip-kisi-approve input{flex-shrink:0;width:18px;height:18px;margin-top:1px}.sip-kisi-note{font-size:12px;line-height:1.7;color:#475569;background:#f1f5f9;padding:12px;border-radius:10px;margin:10px 0}.sip-kisi-note[data-dirty="1"],.sip-kisi-warning{background:#fffbeb;color:#92400e;padding:12px;border-radius:10px;font-size:12px;margin:10px 0}.sip-kisi-tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px;font-size:12px}.sip-kisi-tools button{padding:9px 12px;border:1px solid #cbd5e1;background:#fff;border-radius:9px;color:#1e3a5f;font-weight:700}.sip-kisi-tools button[hidden]{display:none}.sip-kisi-public{text-align:left}.sip-kisi-public section{margin:16px 0;border:1px solid #dbe2ec;border-radius:14px;overflow:hidden}.sip-kisi-public h4{background:#edf2f9;padding:12px 16px;font-size:16px;font-weight:800}.sip-kisi-public ul{list-style:none;margin:0;padding:0}.sip-kisi-public li{padding:14px 16px;border-top:1px solid #e2e8f0;line-height:1.7}.sip-kisi-public li p{font-size:12px;color:#64748b}.sip-kisi-public li span{display:inline-block;font-size:11px;padding:3px 8px;margin:5px 3px 0 0;background:#eef2ff;border-radius:6px}.sip-kisi-public small{display:block;font-size:11px;color:#64748b}'+
+    '@media(max-width:800px){.sip-kisi-grid{grid-template-columns:1fr 1fr}}@media(max-width:480px){.sip-kisi-grid{grid-template-columns:1fr}.sip-kisi-card{padding:13px}.sip-kisi-card header{align-items:flex-start}#kisi-select-exam{min-width:0!important;width:100%}#admin-content button[onclick^="sipKisi"]{white-space:normal} .sip-kisi-public li{padding:12px}}';
+  /* Wadah hub bawaan masih berupa flex-row di HP: nav w-full mendorong
+     konten kisi keluar layar. Koreksi HANYA ketika tab Kisi aktif; menu,
+     handler navigasi, tampilan ujian dan tab lain tetap milik sumber asli. */
+  css.textContent+='@media(max-width:639px){#page-siswa-hub.sip-kisi-materi-aktif>div.flex{flex-direction:column;min-width:0}#page-siswa-hub.sip-kisi-materi-aktif #siswa-side-nav{flex:0 0 auto;width:100%;max-width:100%;min-height:44px;position:relative;bottom:auto;align-items:flex-start}#page-siswa-hub.sip-kisi-materi-aktif>div.flex>main{min-width:0;width:100%;flex:1 1 auto}}';
+  document.head.appendChild(css);
+  tataSiswa();
+  var pane=el('siswa-tab-kisi');
+  if(pane&&window.MutationObserver)new MutationObserver(tataSiswa).observe(pane,{attributes:true,attributeFilter:['class']});
+})();
+
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4cc6e78da5afdac',t:'MTc5MjM3Nzc2Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
