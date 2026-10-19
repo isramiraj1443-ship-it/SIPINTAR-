@@ -23263,6 +23263,80 @@ function sipSisipTandaGambar_() {
 
   </script>
 
+  <!-- PERBAIKAN PILIHAN GANDA KOMPLEKS · sumber: web/perbaikan-pg-kompleks.js -->
+  <script id="sipintar-perbaikan-pg-kompleks">
+/* =============================================================================
+   PERBAIKAN PRATINJAU PILIHAN GANDA KOMPLEKS · 19 Okt 2026 · versi 1.0.0
+   Renderer pratinjau lama belum memiliki cabang PG_KOMPLEKS, sehingga teks soal
+   terlihat tetapi seluruh opsi terlewat. Tambahan ini menjalankan renderer lama,
+   lalu melengkapi kartu PG kompleks dengan opsi netral (tanpa menampilkan kunci).
+   Soal selain PG kompleks, konten/gambar, dan mesin jawaban ujian tidak diubah.
+   ============================================================================= */
+(function () {
+  'use strict';
+
+  function pgKompleks(tipe) {
+    var t = String(tipe || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
+    return t === 'PG_KOMPLEKS' || t === 'PGK';
+  }
+
+  function bacaOpsi(nilai) {
+    /* Bank Soal mengirim JSON sel; beberapa pemanggil sudah mengirim array.
+       Terima pula JSON berlapis tanpa eval dan tanpa mengubah data sumber. */
+    for (var i = 0; typeof nilai === 'string' && i < 3; i++) {
+      try { nilai = JSON.parse(nilai); }
+      catch (e) { return []; }
+    }
+    return Array.isArray(nilai) ? nilai : [];
+  }
+
+  function pilihanHTML(opsi) {
+    var html = '<div class="sip-pgk-preview space-y-3" data-sip-pgk-preview="1" ' +
+      'role="group" aria-label="Pilihan jawaban pilihan ganda kompleks">' +
+      '<p class="text-sm font-semibold text-blue-700 mb-3">Pilih satu atau lebih jawaban yang benar.</p>';
+    if (!opsi.length) {
+      html += '<p role="status" class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">' +
+        'Pilihan jawaban belum tersedia atau formatnya tidak terbaca. Periksa isian opsi soal ini di Bank Soal.</p>';
+    } else {
+      opsi.forEach(function (isi, i) {
+        var huruf = i < 26 ? String.fromCharCode(65 + i) : String(i + 1);
+        html += '<label class="option-label flex items-start gap-3 p-3 border border-slate-200 rounded-lg bg-white">' +
+          '<input type="checkbox" disabled aria-label="Pilihan ' + huruf + '" ' +
+          'class="w-5 h-5 mt-0.5 flex-shrink-0 rounded border-slate-300 accent-blue-600">' +
+          '<div class="min-w-0 flex-1 text-sm text-slate-700">' +
+            '<span class="font-bold text-slate-500 mr-2">' + huruf + '.</span>' +
+            '<div class="prose prose-sm max-w-none break-words">' + (isi == null ? '' : String(isi)) + '</div>' +
+          '</div></label>';
+      });
+    }
+    return html + '</div>';
+  }
+
+  function pasang() {
+    var asli = window._renderSingleQuestionForPreview;
+    if (typeof asli !== 'function' || asli.__sipPGKPreview) return;
+    var bungkus = function (q) {
+      var html = asli.apply(this, arguments);
+      if (!q || !pgKompleks(q.type)) return html;
+      /* Tutup terakhir adalah pembungkus kartu soal milik renderer asli.
+         Opsi ditambahkan di dalamnya; header, teks, dan gambar tidak dibangun ulang. */
+      var akhir = html.lastIndexOf('</div>');
+      var tambahan = pilihanHTML(bacaOpsi(q.options));
+      return akhir < 0 ? html + tambahan : html.slice(0, akhir) + tambahan + html.slice(akhir);
+    };
+    bungkus.__sipPGKPreview = true;
+    bungkus.__sipPGKAsli = asli;
+    window._renderSingleQuestionForPreview = bungkus;
+  }
+
+  pasang();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', pasang);
+  window.addEventListener('load', pasang);
+  window.SIPINTAR_PGK_VERSI = '1.0.0';
+})();
+
+  </script>
+
   <!-- POIN PER PERTANYAAN (BANK SOAL) · sumber: web/bank-soal-poin.js -->
   <script id="sipintar-bank-soal-poin">
 /* =============================================================================
@@ -24217,5 +24291,5 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
 })();
 
   </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4cbc20f7872f876',t:'MTc5MjM3MDcwNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
