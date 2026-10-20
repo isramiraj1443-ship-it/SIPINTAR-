@@ -3,7 +3,6 @@
    Dipakai api-client.js pada browser yang tidak mendukung Proxy. */
 window.SIPINTAR_API_ACTIONS = [
   'addQuestion',
-  'auditFolderSistem',
   'buatKisiKisi',
   'buatSoalDariKisiAI',
   'bulkResetStudents',
@@ -122,7 +121,6 @@ window.SIPINTAR_API_ACTIONS = [
   'logViolation',
   'loginUser',
   'logoutUser',
-  'migrasiFolderSistem',
   'normalizeQuestionType',
   'persistQuestionSet',
   'pingLoginWarm',
