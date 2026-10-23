@@ -180,6 +180,7 @@ window.SIPINTAR_API_ACTIONS = [
   'usulkanPaketMateri',
   'validasiKumpulPenugasan',
   'validateExamPIN',
+  'verifikasiLevelKognitifAI',
   'verifyAdminAccess',
   'verifyStaffAccess'
 ];
