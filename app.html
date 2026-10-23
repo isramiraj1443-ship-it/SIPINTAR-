@@ -9986,7 +9986,7 @@ function renderQuestion(index) {
       tableHTML += `
             <tr class="${rowClass} hover:bg-blue-50 transition duration-150">
               <td class="px-4 py-3 font-medium text-slate-800 leading-relaxed prose prose-sm max-w-none">
-                ${sipMathSourceHTML_(stmt)}
+                ${sipFieldMathSourceHTML_(stmt)}
               </td>
               <td class="px-2 py-3 text-center border-l border-slate-100 align-middle">
                 <label class="cursor-pointer flex justify-center items-center h-full w-full p-2">
@@ -10072,7 +10072,7 @@ function renderQuestion(index) {
       btn.onclick = function() {
         selectMatchLeft(q.id, it, this);
       };
-      btn.innerHTML = `<span>${sipMathSourceHTML_(it)}</span> ${isPaired ? '<i class="fas fa-link text-xs opacity-60"></i>' : ''}`;
+      btn.innerHTML = `<span>${sipFieldMathSourceHTML_(it)}</span> ${isPaired ? '<i class="fas fa-link text-xs opacity-60"></i>' : ''}`;
 
       leftCol.appendChild(btn);
     });
@@ -10113,7 +10113,7 @@ function renderQuestion(index) {
       btn.onclick = function() {
         selectMatchRight(q.id, it, this);
       };
-      btn.innerHTML = sipMathSourceHTML_(it);
+      btn.innerHTML = sipFieldMathSourceHTML_(it);
 
       rightCol.appendChild(btn);
     });
@@ -23429,7 +23429,7 @@ function sipSisipTandaGambar_() {
       var kolomKiri = kiri.closest('div');
       var kolomTengah = baris.querySelector('.pair-middle') && baris.querySelector('.pair-middle').closest('div');
       var kolomKanan = baris.querySelector('.pair-right') && baris.querySelector('.pair-right').closest('div');
-      var kolomHapus = baris.querySelector('button') && baris.querySelector('button').closest('div');
+      var kolomHapus = baris.querySelector('button[onclick*="remove()"]') && baris.querySelector('button[onclick*="remove()"]').closest('div');
       if (kolomKiri) kolomKiri.className = kolomKiri.className.replace(/col-span-\d+/, 'col-span-4');
       if (kolomTengah) kolomTengah.className = kolomTengah.className.replace(/col-span-\d+/, 'col-span-3');
       if (kolomKanan) kolomKanan.className = kolomKanan.className.replace(/col-span-\d+/, 'col-span-3');
@@ -23447,7 +23447,7 @@ function sipSisipTandaGambar_() {
     if (teks) {
       var kTeks = teks.closest('div');
       var kKey = baris.querySelector('.bs-key') && baris.querySelector('.bs-key').closest('div');
-      var kHapus = baris.querySelector('button') && baris.querySelector('button').closest('div');
+      var kHapus = baris.querySelector('button[onclick*="remove()"]') && baris.querySelector('button[onclick*="remove()"]').closest('div');
       if (kTeks) kTeks.className = kTeks.className.replace(/col-span-\d+/, 'col-span-6');
       if (kKey) kKey.className = kKey.className.replace(/col-span-\d+/, 'col-span-3');
       var p2 = poinInput(1);
@@ -24576,7 +24576,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
 
   <!-- MATERI WAJIB, JENIS TETAP DAN PERBAIKAN SOAL AI · sumber: web/bank-soal-materi.js -->
   <script id="sipintar-bank-materi">
-/* Bank Soal Materi v3.0.0 — 22 Oktober 2026. Tambahan pada editor asli.
+/* Bank Soal Materi v3.1.0 — 23 Oktober 2026 (Terapkan + verifikasi level independen). Tambahan pada editor asli.
    Preferensi hanya jenis/topik/target, bukan isi soal, jawaban atau token. */
 (function(){
  'use strict';
@@ -24609,13 +24609,13 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
   if(!admin())return;var form=document.querySelector('#form-add-q form');if(!form)return;
   if(!el('sip-soal-metadata')){
    var panel=document.createElement('fieldset');panel.id='sip-soal-metadata';panel.className='sip-soal-meta';panel.innerHTML='<legend>Materi soal & target kognitif</legend><p>Materi/bab wajib diisi untuk kisi-kisi dan pemilihan paket. Jenis soal tetap setelah simpan; ubah sendiri bila diperlukan.</p><div id="sip-soal-topik" class="sip-soal-grid"></div><div class="sip-soal-grid sip-soal-ai-row"><label>Target kognitif Admin<select id="sip-soal-target" name="targetKognitif"><option value="">— Pilih jika menetapkan target / memakai AI —</option>'+Object.keys(T.levelC).map(function(c){return '<option value="'+c+'">'+c+' · '+esc(T.levelC[c])+' / '+T.petaCL[c]+'</option>';}).join('')+'</select></label><div><button type="button" id="sip-soal-ai">Bantu perbaiki soal dengan AI</button><button type="button" id="sip-soal-ai-batal" hidden>Batalkan menunggu usulan</button></div></div><p class="sip-soal-note">Target bukan hasil penilaian. AI memberi usulan, bukan jaminan level atau kebenaran kunci. Isi asli tetap sampai Anda menyetujui draf dan menekan Simpan.</p><input type="hidden" name="sourceHash" id="sip-soal-source-hash"><p id="sip-soal-ai-status" role="status" aria-live="polite"></p>';
-   form.insertBefore(panel,form.firstChild);setMeta(pref(),'');el('sip-soal-ai').disabled=S.inflight;
+   form.insertBefore(panel,form.firstChild);var hb=document.createElement('div');hb.id='sip-soal-ai-hasil';hb.className='sip-ai-hasil';hb.hidden=true;hb.setAttribute('role','region');hb.setAttribute('aria-label','Hasil perbaikan AI');panel.appendChild(hb);renderHasil();setMeta(pref(),'');el('sip-soal-ai').disabled=S.inflight;
   }
  }
  window.sipPasangMateriSoal=mount;
- window.resetQuestionForm=function(){var out=native.reset&&native.reset.apply(this,arguments);mount();if(admin()){setMeta(pref(),'');restoreType();S.seq++;}return out;};
+ window.resetQuestionForm=function(){var out=native.reset&&native.reset.apply(this,arguments);mount();if(admin()){setMeta(pref(),'');restoreType();S.seq++;if(!S.busy)clearHasil();}return out;};
  window.openManualQuestionForm=function(){var out=native.open&&native.open.apply(this,arguments);mount();if(admin()&&!val('input-question-id')){setMeta(pref(),'');restoreType();}return out;};
- window.editQuestion=function(qStr){var out=native.edit&&native.edit.apply(this,arguments);if(admin()){mount();var q=typeof qStr==='object'?qStr:JSON.parse(decodeURIComponent(qStr));setMeta(q,q.sourceHash);S.seq++;}return out;};
+ window.editQuestion=function(qStr){var out=native.edit&&native.edit.apply(this,arguments);if(admin()){mount();var q=typeof qStr==='object'?qStr:JSON.parse(decodeURIComponent(qStr));setMeta(q,q.sourceHash);S.seq++;if(!S.busy)clearHasil();}return out;};
  window.renderQuestionBank=function(){var out=native.render&&native.render.apply(this,arguments);mount();return out;};
  window.loadQuestionsTable=function(){var out=native.load&&native.load.apply(this,arguments);mount();if(admin()&&!val('input-question-id')){setMeta(pref(),'');restoreType();}return out;};
  function validTopic(){if(!val('sip-soal-materi').trim()||!val('sip-soal-bab').trim()||(math()&&!val('sip-soal-bab-id')))return false;return true;}
@@ -24638,36 +24638,83 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
  function rich(s){if(window.SIPINTAR_MATEMATIKA)return SIPINTAR_MATEMATIKA.html(s);var t=document.createElement('template');t.innerHTML=String(s||'');t.content.querySelectorAll('script,style,iframe,object,embed,link,meta,base,form,input,button').forEach(function(n){n.remove();});t.content.querySelectorAll('*').forEach(function(n){Array.from(n.attributes).forEach(function(a){if(/^on/i.test(a.name)||a.name==='srcdoc'||/^(src|href|xlink:href)$/i.test(a.name)&&/^\s*(javascript:|data:(?!image\/))/i.test(a.value))n.removeAttribute(a.name);});});return t.innerHTML;}
  function mathText(s){var text=String(s||''),out='',last=0; text.replace(/<math\b[\s\S]*?<\/math>/gi,function(m,pos){out+=esc(text.slice(last,pos))+rich(m);last=pos+m.length;return m;});return out+esc(text.slice(last));}
  function proposedHTML(r){var u=r.usulan;var opts=u.options.map(function(o,i){return typeof o==='string'?'<li><b>'+String.fromCharCode(65+i)+'.</b> '+rich(o)+'</li>':'<li>'+rich(o.q)+' → '+rich(o.a)+'</li>';}).join('');return '<div class="sip-ai-review"><p class="sip-soal-note">USULAN — belum mengubah soal asli atau Bank Soal. Periksa kebenaran solusi, gambar, dan tuntutan berpikir.</p><h4>Soal yang diusulkan</h4><div id="sip-ai-usulan">'+rich(u.content)+'</div>'+(r.image?'<p>Gambar utama tetap dari draf:</p><img alt="Gambar utama draf" style="max-width:100%;max-height:280px;object-fit:contain" src="'+esc(r.image)+'">':'')+(opts?'<ol>'+opts+'</ol>':'')+'<h4>Kunci / pedoman baru (khusus Admin)</h4><div class="sip-ai-key">'+rich(typeof u.correct==='string'?u.correct:JSON.stringify(u.correct))+'</div><h4>Alasan kognitif</h4><p>'+esc(u.targetC)+' → penilaian usulan '+esc(u.levelC)+': '+rich(u.alasan)+'</p><h4>Pembahasan kunci</h4><p>'+rich(u.pembahasan)+'</p><label class="sip-ai-check"><input type="checkbox" id="sip-ai-check"> Saya telah memeriksa soal, opsi/pasangan, gambar, kunci baru dan kecocokan level. Terapkan hanya ke draf editor; belum simpan/rilis.</label></div>';}
+ var MAKS_PERCOBAAN=3;
+ function plain(s){var d=document.createElement('div');d.innerHTML=String(s||'');return (d.textContent||'').replace(/\s+/g,' ').trim();}
+ function hasilBox(){return el('sip-soal-ai-hasil');}
+ function riwayatHTML(rw){return '<ol class="sip-ai-riwayat">'+rw.map(function(x){return '<li>Percobaan '+x.n+': pembuat menilai <b>'+esc(x.pembuat)+'</b>'+(x.pemeriksa?' · pemeriksa independen <b>'+esc(x.pemeriksa)+'</b>':' · tidak diperiksa (pembuat sendiri belum mencapai target)')+(x.lolos?' ✓':' ✗')+'</li>';}).join('')+'</ol>';}
+ function verHTML(h){var v=h.ver;return '<div class="sip-ai-verif sip-ai-verif-ok" id="sip-ai-verifikasi"><b>Level terverifikasi: '+esc(h.draft.targetC)+'</b><p>Pemeriksa AI independen (panggilan terpisah, tidak diberi target maupun klaim pembuat) menilai usulan <b>'+esc(v.levelC)+(v.namaLevel?' · '+esc(v.namaLevel):'')+'</b>: '+esc(v.alasan)+'</p>'+(v.masalah?'<p class="sip-ai-masalah">Catatan pemeriksa: '+esc(v.masalah)+'</p>':'')+riwayatHTML(h.riwayat)+'</div>';}
+ function renderHasil(){
+  var box=hasilBox(),h=S.hasil;if(!box)return;if(!h){box.hidden=true;box.innerHTML='';return;}
+  box.hidden=false;
+  if(!h.lolos){box.className='sip-ai-hasil sip-ai-hasil-gagal';box.innerHTML='<b>Usulan belum sesuai target '+esc(h.draft.targetC)+'</b><p>Setelah '+h.riwayat.length+' percobaan otomatis, level usulan belum terverifikasi. Draf tidak diubah. Ubah konteks/materi draf atau revisi manual, lalu minta usulan lagi.</p>'+riwayatHTML(h.riwayat)+'<button type="button" id="sip-soal-ai-terapkan" disabled title="Aktif hanya bila level terverifikasi sesuai target">Terapkan</button>';return;}
+  var berubah=!h.diterapkan&&!same(h.ctx);
+  box.className='sip-ai-hasil '+(h.diterapkan?'sip-ai-hasil-selesai':berubah?'sip-ai-hasil-gagal':'sip-ai-hasil-ok');
+  box.innerHTML='<b>'+(h.diterapkan?'Usulan sudah diterapkan ke draf':'Usulan '+esc(h.draft.targetC)+' terverifikasi — siap diterapkan')+'</b><p>Pembuat: '+esc(h.r.usulan.levelC)+' · Pemeriksa independen: '+esc(h.ver.levelC)+' · '+h.riwayat.length+' percobaan. '+(h.diterapkan?'Periksa lalu tekan Simpan Pertanyaan.':berubah?'Draf berubah sejak usulan dibuat; minta usulan baru agar tidak menimpa suntingan Anda.':'Terapkan hanya mengisi draf editor; Bank Soal belum berubah sampai Anda menekan Simpan.')+'</p><button type="button" id="sip-soal-ai-terapkan"'+(h.diterapkan||berubah?' disabled':'')+'>Terapkan</button>';
+ }
+ function clearHasil(){var had=!!S.hasil;S.hasil=null;renderHasil();var st=el('sip-soal-ai-status');if(had&&st)st.textContent='';}
+ async function review(h){
+  var r=h.r,draft=h.draft,ctx=h.ctx,st=el('sip-soal-ai-status');
+  if(!h.lolos||h.diterapkan)return false;
+  if(!same(ctx)){renderHasil();await message('Draf berubah','Draf/akun/ujian berubah sejak usulan dibuat. Usulan tidak diterapkan; minta usulan baru.');return false;}
+  var approvalVerified=false,mathReviewPromise=null;
+  function checkMath(){var root=document.querySelector('.sip-ai-review');if(!root||!window.SIPINTAR_MATEMATIKA)return Promise.resolve({ok:false,errors:['Pratinjau matematika belum tersedia. Muat versi aplikasi terbaru.']});return SIPINTAR_MATEMATIKA.check(root);}
+  var accept=await Swal.fire({title:'Periksa usulan menuju '+draft.targetC,html:verHTML(h)+proposedHTML(r),width:900,showCancelButton:true,confirmButtonText:'Terapkan ke draf',cancelButtonText:'Nanti / pertahankan draf asli',didOpen:function(){mathReviewPromise=checkMath();},preConfirm:async function(){
+   approvalVerified=false;
+   if(!h.lolos||!h.ver||!h.ver.cocok||h.ver.levelC!==draft.targetC||r.usulan.levelC!==draft.targetC){Swal.showValidationMessage('Level belum terverifikasi sesuai target; tidak dapat diterapkan.');return false;}
+   if(!same(ctx)){Swal.showValidationMessage('Draf/akun telah berubah; usulan tidak diterapkan.');return false;}
+   if(!el('sip-ai-check')||!el('sip-ai-check').checked){Swal.showValidationMessage('Periksa lalu centang persetujuan soal, kunci, gambar, dan level terlebih dahulu.');return false;}
+   var mathResult=await (mathReviewPromise||checkMath());
+   if(!mathResult.ok){Swal.showValidationMessage('Rumus belum valid/terbaca: '+mathResult.errors.join(' ')+' Perbaiki usulan atau pertahankan draf asli.');return false;}
+   if(!same(ctx))return false;approvalVerified=true;return true;
+  }});
+  if(!accept.isConfirmed||!same(ctx)){renderHasil();if(st&&st.isConnected&&!h.diterapkan)st.textContent=same(ctx)?'Usulan terverifikasi disimpan sementara di bawah. Tekan Terapkan bila sudah siap; draf belum diubah.':'Draf berubah; usulan tidak diterapkan.';return false;}
+  if(!approvalVerified)throw new Error('Dialog belum memverifikasi persetujuan dan pratinjau rumus. Draf asli tidak diubah.');
+  var u=r.usulan,newKey=typeof u.correct==='string'?u.correct:JSON.stringify(u.correct),q={id:draft.questionId,examId:draft.examId,type:draft.type,content:u.content,image:draft.image,options:JSON.stringify(u.options),key:newKey,point:draft.point,isRequired:draft.isRequired,materi:draft.materi,babId:draft.babId,bab:draft.bab,targetKognitif:draft.targetC,sourceHash:draft.sourceHash};
+  native.edit(q);setMeta(q,draft.sourceHash);document.dispatchEvent(new Event('sip-soal-ai-applied'));if(!draft.questionId){el('input-question-id').value='';var save=ctx.form.querySelector('button[type="submit"]');if(save)save.innerHTML='<i class="fas fa-save"></i> Simpan Pertanyaan';}
+  h.diterapkan=true;renderHasil();
+  if(st)st.textContent='Usulan '+draft.targetC+' terverifikasi diterapkan hanya ke draf. Periksa sekali lagi dan tekan Simpan Pertanyaan bila sudah benar. Analisis/persetujuan kisi-kisi tetap wajib setelah disimpan.';
+  return true;
+ }
  async function requestAI(){
   if(!admin()||S.busy||S.inflight)return;mount();if(!validTopic())return message('Lengkapi materi/bab','Pilih topik pembelajaran terlebih dahulu.');if(!val('sip-soal-target'))return message('Pilih target kognitif','Tentukan target Admin C1–C6 sebelum meminta perbaikan AI.');
   var draft=snapshot(),ctx={uid:currentUser.userID,token:currentUser.token,form:document.querySelector('#form-add-q form'),fingerprint:JSON.stringify(draft)},seq=++S.seq;
-  var consent=await Swal.fire({icon:'question',title:'Minta usulan perbaikan soal?',text:'Teks, opsi tanpa kunci lama/pemetaan pasangan, topik, target, dan gambar yang dapat dibaca akan dikirim ke AI yang dikonfigurasi dan memakai kuota. AI menyusun kunci BARU untuk Anda periksa. Tidak ada penyimpanan atau rilis otomatis.',showCancelButton:true,confirmButtonText:'Setuju, buat usulan',cancelButtonText:'Batal'});
+  var consent=await Swal.fire({icon:'question',title:'Minta usulan perbaikan soal?',text:'Teks, opsi tanpa kunci lama/pemetaan pasangan, topik, target, dan gambar yang dapat dibaca akan dikirim ke AI yang dikonfigurasi. AI menyusun kunci BARU untuk Anda periksa. Usulan lalu diperiksa oleh pemeriksa AI independen yang tidak diberi target; bila level belum '+draft.targetC+', usulan dibuat ulang otomatis maksimal 2 kali (paling banyak '+(MAKS_PERCOBAAN*2)+' panggilan AI/kuota). Tombol Terapkan hanya aktif bila level terverifikasi. Tidak ada penyimpanan atau rilis otomatis.',showCancelButton:true,confirmButtonText:'Setuju, buat usulan',cancelButtonText:'Batal'});
   if(!consent.isConfirmed||!same(ctx))return;
-  S.busy=true;S.inflight=true;S.ctx=ctx;el('sip-soal-ai-batal').hidden=false;var b=el('sip-soal-ai');if(b)b.disabled=true;var st=el('sip-soal-ai-status');if(st)st.textContent='AI sedang membuat usulan. Anda boleh membaca/menyunting draf; hasil lama tidak akan menimpa perubahan baru.';
+  clearHasil();S.busy=true;S.inflight=true;S.ctx=ctx;el('sip-soal-ai-batal').hidden=false;var b=el('sip-soal-ai');if(b)b.disabled=true;var st=el('sip-soal-ai-status');
+  function status(t){if(st&&st.isConnected)st.textContent=t;}
+  function masihSama(){if(seq!==S.seq||!same(ctx))throw new Error('Draf/akun/ujian berubah saat AI bekerja. Usulan tidak diterapkan; perubahan Anda tetap utuh.');}
   try{
    var wire={examId:draft.examId,questionId:draft.questionId,sourceHash:draft.sourceHash,type:draft.type,content:draft.content,image:draft.image,materi:draft.materi,babId:draft.babId,bab:draft.bab,targetC:draft.targetC,setujuKirim:true,clientRef:String(seq)};
    // Pemetaan q→a Menjodohkan dan kunci lama tidak dikirim dari browser pun.
    wire.options=draft.type==='JODOH'?draft.options.map(function(o){return {q:o.q};}):draft.options;
-   var r=await api('perbaikiSoalKognitifAI',[wire]);if(seq!==S.seq||!same(ctx))throw new Error('Draf/akun/ujian berubah saat AI bekerja. Usulan tidak diterapkan; perubahan Anda tetap utuh.');
-   if(!r.usulan.sesuaiTarget){if(st)st.textContent=r.message;return message('Target belum tercapai',r.message+' '+r.usulan.alasan);}
-   var approvalVerified=false,mathReviewPromise=null;
-   function checkMath(){var root=document.querySelector('.sip-ai-review');if(!root||!window.SIPINTAR_MATEMATIKA)return Promise.resolve({ok:false,errors:['Pratinjau matematika belum tersedia. Muat versi aplikasi terbaru.']});return SIPINTAR_MATEMATIKA.check(root);}
-   var accept=await Swal.fire({title:'Periksa usulan menuju '+draft.targetC,html:proposedHTML(r),width:900,showCancelButton:true,confirmButtonText:'Terapkan ke draf',cancelButtonText:'Pertahankan draf asli',didOpen:function(){mathReviewPromise=checkMath();},preConfirm:async function(){
-    approvalVerified=false;
-    if(!same(ctx)){Swal.showValidationMessage('Draf/akun telah berubah; usulan tidak diterapkan.');return false;}
-    if(!el('sip-ai-check')||!el('sip-ai-check').checked){Swal.showValidationMessage('Periksa lalu centang persetujuan soal, kunci, gambar, dan level terlebih dahulu.');return false;}
-    var mathResult=await (mathReviewPromise||checkMath());
-    if(!mathResult.ok){Swal.showValidationMessage('Rumus belum valid/terbaca: '+mathResult.errors.join(' ')+' Perbaiki usulan atau pertahankan draf asli.');return false;}
-    if(!same(ctx))return false;approvalVerified=true;return true;
-   }});
-   if(!accept.isConfirmed||!same(ctx))return;
-   if(!approvalVerified)throw new Error('Dialog belum memverifikasi persetujuan dan pratinjau rumus. Draf asli tidak diubah.');
-   var u=r.usulan,newKey=typeof u.correct==='string'?u.correct:JSON.stringify(u.correct),q={id:draft.questionId,examId:draft.examId,type:draft.type,content:u.content,image:draft.image,options:JSON.stringify(u.options),key:newKey,point:draft.point,isRequired:draft.isRequired,materi:draft.materi,babId:draft.babId,bab:draft.bab,targetKognitif:draft.targetC,sourceHash:draft.sourceHash};
-   native.edit(q);setMeta(q,draft.sourceHash);document.dispatchEvent(new Event('sip-soal-ai-applied'));if(!draft.questionId){el('input-question-id').value='';var save=ctx.form.querySelector('button[type="submit"]');if(save)save.innerHTML='<i class="fas fa-save"></i> Simpan Pertanyaan';}
-   if(st)st.textContent='Usulan diterapkan hanya ke draf. Periksa sekali lagi dan tekan Simpan Pertanyaan bila sudah benar. Analisis/persetujuan kisi-kisi tetap wajib setelah disimpan.';
+   var r=null,ver=null,lolos=false,riwayat=[],umpan='';
+   for(var n=1;n<=MAKS_PERCOBAAN&&!lolos;n++){
+    status('Percobaan '+n+' dari '+MAKS_PERCOBAAN+': AI menyusun usulan menuju '+draft.targetC+'. Anda boleh membaca/menyunting draf; hasil lama tidak akan menimpa perubahan baru.');
+    wire.umpanBalik=umpan;wire.clientRef=seq+':'+n;
+    r=await api('perbaikiSoalKognitifAI',[wire]);masihSama();ver=null;
+    if(!r.usulan||!r.usulan.sesuaiTarget||r.usulan.levelC!==draft.targetC){
+     riwayat.push({n:n,pembuat:r.usulan&&r.usulan.levelC||'-',pemeriksa:'',lolos:false});
+     umpan='Percobaan '+n+': pembuat sendiri menilai usulannya '+(r.usulan&&r.usulan.levelC||'-')+', belum '+draft.targetC+'. '+plain(r.usulan&&r.usulan.alasan).slice(0,500);continue;
+    }
+    status('Percobaan '+n+' dari '+MAKS_PERCOBAAN+': pemeriksa AI independen menilai level usulan (tanpa diberi target)...');
+    var u=r.usulan;
+    ver=await api('verifikasiLevelKognitifAI',[{examId:draft.examId,type:draft.type,content:u.content,options:u.options,correct:u.correct,image:draft.image,materi:draft.materi,babId:draft.babId,bab:draft.bab,targetC:draft.targetC,setujuKirim:true}]);masihSama();
+    lolos=!!(ver&&ver.cocok&&ver.levelC===draft.targetC);
+    riwayat.push({n:n,pembuat:u.levelC,pemeriksa:ver.levelC,lolos:lolos});
+    if(!lolos)umpan='Percobaan '+n+': penilai independen menilai usulan '+ver.levelC+', belum '+draft.targetC+'. Alasan: '+ver.alasan+(ver.masalah?' Masalah: '+ver.masalah:'');
+   }
+   var h={r:r,ver:ver,lolos:lolos,riwayat:riwayat,draft:draft,ctx:ctx,diterapkan:false};S.hasil=h;renderHasil();
+   if(!lolos){var last=riwayat[riwayat.length-1]||{};status('Level belum terverifikasi setelah '+riwayat.length+' percobaan. Terapkan tidak aktif; draf tetap utuh.');return message('Target belum tercapai','Setelah '+riwayat.length+' percobaan otomatis, usulan masih dinilai '+(last.pemeriksa||last.pembuat||'-')+(last.pemeriksa?' oleh pemeriksa independen':' oleh AI pembuat')+', belum '+draft.targetC+'. Tombol Terapkan tidak diaktifkan dan draf tidak diubah. '+umpan);}
+   status('Usulan '+draft.targetC+' terverifikasi pemeriksa independen. Periksa lalu tekan Terapkan.');
+   await review(h);
   }catch(e){if(!ctx.cancelled&&admin()&&currentUser.userID===ctx.uid&&currentUser.token===ctx.token){if(st&&st.isConnected)st.textContent=e.message;await message('Usulan belum diterapkan',e.message);}}
   finally{S.busy=false;S.inflight=false;S.ctx=null;var cancel=el('sip-soal-ai-batal');if(cancel)cancel.hidden=true;if(b&&b.isConnected)b.disabled=false;}
  }
+ async function terapkanTersimpan(){
+  if(!admin()||S.busy||!S.hasil)return;var h=S.hasil;S.busy=true;
+  try{await review(h);}catch(e){await message('Usulan belum diterapkan',e.message);}finally{S.busy=false;renderHasil();}
+ }
+ window.sipSoalTerapkanUsulan_=terapkanTersimpan;
  window.sipSoalMintaPerbaikan_=requestAI;
  document.addEventListener('change',function(e){var n=e.target;if(!admin())return;
   if(n.id==='sip-soal-materi'&&math()){el('sip-soal-bab-id').innerHTML=babOptions(n.value,'');el('sip-soal-bab').value='';}
@@ -24676,11 +24723,12 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
   if(n.id==='select-exam-q'&&!val('input-question-id')){mount();setMeta(pref(),'');restoreType();}
  });
  document.addEventListener('input',function(e){if(admin()&&/^sip-soal-(materi|bab)$/.test(e.target.id))remember();});
- document.addEventListener('click',function(e){if(e.target.closest('#sip-soal-ai'))requestAI();if(e.target.closest('#sip-soal-ai-batal')&&S.ctx){S.ctx.cancelled=true;S.seq++;S.busy=false;el('sip-soal-ai-batal').hidden=true;el('sip-soal-ai-status').textContent='Menunggu dibatalkan. Tidak ada usulan diterapkan. Panggilan provider mungkin tetap memakai kuota sampai selesai; permintaan AI baru menunggu panggilan itu berakhir. Anda boleh menyimpan draf sendiri.';}});
- var css=document.createElement('style');css.id='sip-soal-materi-css';css.textContent='.sip-soal-meta{border:1px solid #c7d2fe;background:#f8faff;border-radius:14px;padding:18px;margin:4px 0 22px;min-width:0}.sip-soal-meta legend{font-weight:800;color:#273b62;padding:0 7px;font-size:15px}.sip-soal-meta p{font-size:12px;color:#526480;line-height:1.7;margin-bottom:12px}.sip-soal-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.sip-soal-grid label{font-size:12px;font-weight:700;color:#334766}.sip-soal-grid input,.sip-soal-grid select{display:block;width:100%;min-width:0;border:1px solid #cbd5e1;border-radius:9px;padding:10px;margin:6px 0 12px;background:#fff;font-size:13px;color:#172033}.sip-soal-grid b{color:#b91c1c}.sip-soal-ai-row{align-items:end}.sip-soal-ai-row button{border:1px solid #6366f1;background:#eef2ff;border-radius:10px;padding:12px;color:#3730a3;font-weight:700;font-size:12px;margin-bottom:12px}.sip-soal-ai-row button:disabled{opacity:.5}.sip-soal-note{font-size:12px;line-height:1.7;color:#526480;background:#eff4fb;padding:12px;border-radius:10px}.sip-ai-review{text-align:left;font-size:14px;line-height:1.7;overflow-wrap:anywhere}.sip-ai-review h4{font-weight:800;margin:16px 0 7px}.sip-ai-review ol{padding-left:22px}.sip-ai-review pre{white-space:pre-wrap;background:#f1f5f9;padding:12px;border-radius:9px}.sip-ai-check{display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;color:#166534;padding:14px;margin-top:18px;font-size:13px;border-radius:10px}.sip-ai-check input{flex-shrink:0;margin-top:5px}@media(max-width:650px){.sip-soal-grid{grid-template-columns:1fr}.sip-soal-meta{padding:13px}}';document.head.appendChild(css);
+ var hasilTimer=0;function cekHasil(){if(!S.hasil||S.hasil.diterapkan||!S.hasil.lolos||S.busy)return;clearTimeout(hasilTimer);hasilTimer=setTimeout(renderHasil,250);}document.addEventListener('input',cekHasil,true);document.addEventListener('change',cekHasil,true);
+ document.addEventListener('click',function(e){if(e.target.closest('#sip-soal-ai'))requestAI();if(e.target.closest('#sip-soal-ai-terapkan'))terapkanTersimpan();if(e.target.closest('#sip-soal-ai-batal')&&S.ctx){S.ctx.cancelled=true;S.seq++;S.busy=false;el('sip-soal-ai-batal').hidden=true;el('sip-soal-ai-status').textContent='Menunggu dibatalkan. Tidak ada usulan diterapkan. Panggilan provider mungkin tetap memakai kuota sampai selesai; permintaan AI baru menunggu panggilan itu berakhir. Anda boleh menyimpan draf sendiri.';}});
+ var css=document.createElement('style');css.id='sip-soal-materi-css';css.textContent='.sip-ai-hasil{margin-top:10px;border:1px solid #cbd5e1;border-radius:12px;padding:12px 14px;font-size:12px;line-height:1.6;color:#334155;background:#fff}.sip-ai-hasil p{margin:4px 0 8px}.sip-ai-hasil-ok{border-color:#86efac;background:#f0fdf4}.sip-ai-hasil-gagal{border-color:#fca5a5;background:#fef2f2}.sip-ai-hasil-selesai{border-color:#a5b4fc;background:#eef2ff}.sip-ai-hasil button{border:0;border-radius:9px;padding:9px 18px;font-weight:800;background:#059669;color:#fff;cursor:pointer}.sip-ai-hasil button:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed}.sip-ai-riwayat{margin:6px 0 8px 18px;list-style:decimal;font-size:11.5px}.sip-ai-verif{text-align:left;border:1px solid #86efac;background:#f0fdf4;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:13px;color:#14532d}.sip-ai-masalah{color:#92400e}.sip-soal-meta{border:1px solid #c7d2fe;background:#f8faff;border-radius:14px;padding:18px;margin:4px 0 22px;min-width:0}.sip-soal-meta legend{font-weight:800;color:#273b62;padding:0 7px;font-size:15px}.sip-soal-meta p{font-size:12px;color:#526480;line-height:1.7;margin-bottom:12px}.sip-soal-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.sip-soal-grid label{font-size:12px;font-weight:700;color:#334766}.sip-soal-grid input,.sip-soal-grid select{display:block;width:100%;min-width:0;border:1px solid #cbd5e1;border-radius:9px;padding:10px;margin:6px 0 12px;background:#fff;font-size:13px;color:#172033}.sip-soal-grid b{color:#b91c1c}.sip-soal-ai-row{align-items:end}.sip-soal-ai-row button{border:1px solid #6366f1;background:#eef2ff;border-radius:10px;padding:12px;color:#3730a3;font-weight:700;font-size:12px;margin-bottom:12px}.sip-soal-ai-row button:disabled{opacity:.5}.sip-soal-note{font-size:12px;line-height:1.7;color:#526480;background:#eff4fb;padding:12px;border-radius:10px}.sip-ai-review{text-align:left;font-size:14px;line-height:1.7;overflow-wrap:anywhere}.sip-ai-review h4{font-weight:800;margin:16px 0 7px}.sip-ai-review ol{padding-left:22px}.sip-ai-review pre{white-space:pre-wrap;background:#f1f5f9;padding:12px;border-radius:9px}.sip-ai-check{display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;color:#166534;padding:14px;margin-top:18px;font-size:13px;border-radius:10px}.sip-ai-check input{flex-shrink:0;margin-top:5px}@media(max-width:650px){.sip-soal-grid{grid-template-columns:1fr}.sip-soal-meta{padding:13px}}';document.head.appendChild(css);
  function start(){mount();if(window.MutationObserver){new MutationObserver(function(){if(admin()&&document.querySelector('#form-add-q form')&&!el('sip-soal-metadata'))mount();}).observe(document.body,{childList:true,subtree:true});var page=el('page-admin');if(page)new MutationObserver(function(){if(!admin()){S.seq++;if(S.ctx)S.ctx.cancelled=true;if(el('sip-ai-check'))Swal.close();}}).observe(page,{attributes:true,attributeFilter:['class']});}}
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
- window.SIPINTAR_BANK_MATERI_VERSI='3.0.0';
+ window.SIPINTAR_BANK_MATERI_VERSI='3.1.0';
 })();
 
   </script>
@@ -24761,7 +24809,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
 
   <!-- MATEMATIKA TEX DAN MATHML TANPA MENGUBAH SUMBER SOAL · sumber: web/matematika-soal.js -->
   <script id="sipintar-matematika">
-/* Matematika Soal v1.0.0 — 23 Oktober 2026.
+/* Matematika Soal v1.1.0 — 23 Oktober 2026.
    Lapisan tampilan saja: tidak menulis bank/answers/opsi/kunci, tidak menjalankan AI.
    TeX dan presentation MathML tetap sumber. SVG hanya di DOM pratinjau/peserta. */
 (function(){
@@ -24904,8 +24952,8 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
   if(!window.currentUser||currentUser.role!=='Admin'){panel.hidden=true;var oldBody=el('sip-math-editor-body');clear(oldBody);if(oldBody){oldBody.innerHTML='';delete oldBody.__sipSource;}return;}
   var parts=[['Soal',value('editor-content')]],type=(el('q-type-select')||{}).value;
   if(type==='PG'||type==='PG_KOMPLEKS')for(var i=0;i<5;i++){var opt=value('opt-'+i);if(opt)parts.push(['Opsi '+String.fromCharCode(65+i),opt]);}
-  if(type==='BS')document.querySelectorAll('#bs-container .bs-text').forEach(function(n,i){parts.push(['Pernyataan '+(i+1),n.value]);});
-  if(type==='JODOH')document.querySelectorAll('#pairs-container .pair-row').forEach(function(n,i){['pair-left','pair-middle','pair-right'].forEach(function(c){var inp=n.querySelector('.'+c);if(inp&&inp.value)parts.push(['Pasangan '+(i+1)+' ('+({'pair-left':'kiri','pair-middle':'opsi kanan','pair-right':'kunci Admin'})[c]+')',inp.value]);});});
+  if(type==='BS')document.querySelectorAll('#bs-container .bs-text').forEach(function(n,i){parts.push(['Pernyataan '+(i+1),window.sipFieldMathSourceHTML_?sipFieldMathSourceHTML_(n.value):n.value]);});
+  if(type==='JODOH')document.querySelectorAll('#pairs-container .pair-row').forEach(function(n,i){['pair-left','pair-middle','pair-right'].forEach(function(c){var inp=n.querySelector('.'+c);if(inp&&inp.value)parts.push(['Pasangan '+(i+1)+' ('+({'pair-left':'kiri','pair-middle':'opsi kanan','pair-right':'kunci Admin'})[c]+')',window.sipFieldMathSourceHTML_?sipFieldMathSourceHTML_(inp.value):inp.value]);});});
   if(type==='Esai'&&value('correct-input'))parts.push(['Pedoman jawaban (khusus Admin)',value('correct-input')]);
   var primary=value('input-image-ac');if(primary)parts.push(['Gambar utama (asli)','<img src="'+esc(primary)+'" alt="Gambar utama asli" style="max-width:100%;max-height:280px">']);
   var active=parts.some(function(p){return hasMath(p[1]);});panel.hidden=!active;if(!active){var emptyBody=el('sip-math-editor-body');clear(emptyBody);if(emptyBody){emptyBody.innerHTML='';delete emptyBody.__sipSource;}return;}
@@ -24936,7 +24984,12 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     // tidak boleh merusak atribut input atau berubah menjadi event handler.
     if(spec[0]==='addBsRowInput')empty[1]=args[1]||'Benar';
     var out=old.apply(this,empty),box=el(spec[1]),rows=box&&box.querySelectorAll(spec[2]),row=rows&&rows[rows.length-1];
-    if(row)spec[3].forEach(function(sel,i){var n=row.querySelector(sel);if(n)n.value=args[i]==null?'':String(args[i]);});
+    if(row)spec[3].forEach(function(sel,i){var n=row.querySelector(sel);if(n){
+     // Input type=text membuang newline pada TeX/MathML saat value diisi.
+     // Pertahankan class/kontrak value; textarea mendukung sumber multiline.
+     if(n.tagName==='INPUT'){var ta=document.createElement('textarea');Array.from(n.attributes).forEach(function(a){if(a.name!=='type'&&a.name!=='value')ta.setAttribute(a.name,a.value);});ta.rows=2;n.replaceWith(ta);n=ta;}
+     n.value=args[i]==null?'':String(args[i]);
+    }});
     if(row){var n=row.querySelector(spec[3][0]);if(n)n.dispatchEvent(new Event('input',{bubbles:true}));if(window.sipHitungPoinSoal)window.sipHitungPoinSoal();}refreshEditor();return out;
    };
    fn.__sipMath=true;if(old.__sipPoin)fn.__sipPoin=true;window[spec[0]]=fn;
@@ -24956,7 +25009,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
   hook('renderQuestionsInternal','#q-table-container',bank);
   hook('renderQuestion','#question-container');
   hook('showQuestionPreview','#preview-content');hook('previewAllQuestions','#preview-content');
-  var oldPreview=window._renderSingleQuestionForPreview;if(typeof oldPreview==='function'){var protectedPreview=function(){return protect(oldPreview.apply(this,arguments));};Object.keys(oldPreview).forEach(function(k){protectedPreview[k]=oldPreview[k];});protectedPreview.__sipMath=true;window._renderSingleQuestionForPreview=protectedPreview;}
+  var oldPreview=window._renderSingleQuestionForPreview;if(typeof oldPreview==='function'){var protectedPreview=function(){var args=Array.from(arguments);if(window.SIPINTAR_FIELD_MATH)args[0]=SIPINTAR_FIELD_MATH.presentationQuestion(args[0]);return protect(oldPreview.apply(this,args));};Object.keys(oldPreview).forEach(function(k){protectedPreview[k]=oldPreview[k];});protectedPreview.__sipMath=true;window._renderSingleQuestionForPreview=protectedPreview;}
   ['editQuestion','openManualQuestionForm','resetQuestionForm','toggleQuestionFields'].forEach(function(name){hook(name,'#sip-math-editor-body',refreshEditor);});
   document.addEventListener('sip-soal-ai-applied',refreshEditor);
   document.addEventListener('input',function(e){if(e.target.closest('#form-add-q'))refreshEditor();});
@@ -24969,12 +25022,230 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
   watch();bank();refreshEditor();
  }
  window.sipMathTypeset_=render;window.sipMathSourceHTML_=protect;
- window.SIPINTAR_MATEMATIKA={version:'1.0.0',render:render,check:render,html:html,canonical:canonical,protectSource:protect,hasMath:hasMath,refreshEditor:refreshEditor,sourceErrors:sourceErrors};
+ window.SIPINTAR_MATEMATIKA={version:'1.1.0',render:render,check:render,html:html,canonical:canonical,protectSource:protect,hasMath:hasMath,refreshEditor:refreshEditor,sourceErrors:sourceErrors};
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
 })();
 
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4ed00488edb88d4',t:'MTc5MjcxOTI4NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+  <!-- FIELD MATEMATIKA BENAR SALAH DAN MENJODOHKAN · sumber: web/field-matematika-bs-jodoh.js -->
+  <script id="sipintar-field-math">
+/* Field matematika BS/JODOH v1.0.0 — 23 Oktober 2026.
+   Memakai value/class dan Math Studio asli. Tidak melakukan API/AI/auto-save.
+   Sumber TeX/MathML/HTML disimpan; pratinjau tidak pernah ditulis ke value. */
+(function(){
+ 'use strict';
+ if(window.SIPINTAR_FIELD_MATH)return;
+ var SCHEMA={"mathTags":["math","mrow","mi","mn","mo","mtext","ms","mspace","mfrac","msqrt","mroot","msup","msub","msubsup","mover","munder","munderover","mtable","mtr","mlabeledtr","mtd","mfenced","menclose","mphantom","mpadded","mstyle","semantics","annotation","mmultiscripts","mprescripts","none"],"mathAttrs":["xmlns","display","mathvariant","mathsize","mathcolor","mathbackground","dir","stretchy","symmetric","fence","separator","form","largeop","movablelimits","minsize","maxsize","lspace","rspace","accent","accentunder","linethickness","bevelled","scriptlevel","displaystyle","columnalign","rowalign","columnspacing","rowspacing","columnlines","rowlines","frame","framespacing","equalrows","equalcolumns","columnspan","rowspan","side","minlabelspacing","open","close","separators","notation","width","height","depth","voffset","encoding"]};
+ var SELECTOR='#bs-container .bs-text,#pairs-container .pair-left,#pairs-container .pair-middle,#pairs-container .pair-right';
+ var richRE=new RegExp('<\\/?(?:'+SCHEMA.mathTags.concat('p br span div b strong em i u s sup sub table thead tbody tfoot tr th td ul ol li blockquote img svg g path rect circle ellipse line polyline polygon a script style iframe object embed foreignObject'.split(' ')).join('|')+')\\b[^>]*>','i');
+ var fields=new WeakMap(),observed=new WeakSet(),serial=0,timer,context=null,pending=null,saving=false;
+ function node(id){return document.getElementById(id);}
+ function val(id){return (node(id)||{}).value||'';}
+ function admin(){return !!(window.currentUser&&currentUser.role==='Admin');}
+ function math(){return window.SIPINTAR_MATEMATIKA;}
+ function copyFlags(from,to){Object.keys(from).forEach(function(k){to[k]=from[k];});return to;}
+ function clear(root){if(!root)return;try{if(window.MathJax&&MathJax.typesetClear)MathJax.typesetClear([root]);}catch(e){}root.innerHTML='';root.removeAttribute('data-sip-math-state');}
+ function escaped(s){return String(s).replace(/&(?!#(?:[0-9]+|x[0-9a-f]+);|[a-z][a-z0-9]+;)/gi,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+ function presentation(source){
+  var s=String(source==null?'':source);
+  // Input biasa boleh berisi x<y atau a&b. Hanya presentasinya yang di-escape;
+  // string asli tetap menjadi identitas opsi/kunci dan jawaban peserta.
+  if(!richRE.test(s))s=escaped(s);
+  s=window.sipMathSourceHTML_?sipMathSourceHTML_(s):s;
+  // Campuran HTML pecahan dan perbandingan biasa juga harus aman: x<y
+  // tidak boleh hilang hanya karena di kolom yang sama ada <span>/<sup>.
+  var out='',i=0,lower=s.toLowerCase(),svg=0;
+  while(i<s.length){
+   if(s[i]==='<'){
+    var m=s.slice(i).match(/^<(\/)?([a-z][a-z0-9:-]*)(?=[\s/>])/i),j=i+1,quote='',good=false;
+    if(m){for(;j<s.length;j++){var c=s[j];if(quote){if(c===quote)quote='';}else if(c==='"'||c==="'")quote=c;else if(c==='<')break;else if(c==='>'){good=true;break;}}
+     var tag=good?s.slice(i,j+1):'',name=m[2].toLowerCase(),self=/\/\s*>$/.test(tag),voidTag=/^(?:br|img|hr|input|meta|link|source|wbr|area|base|col|embed|param|track)$/.test(name);
+     // <b> pada a<b>c adalah perbandingan, bukan elemen b tanpa penutup.
+     if(good&&!m[1]&&!self&&!voidTag&&lower.indexOf('</'+name,j+1)<0)good=false;
+     if(good&&(richRE.test(tag)||svg)){if(name==='svg')svg=Math.max(0,svg+(m[1]?-1:self?0:1));out+=tag;i=j+1;continue;}
+    }
+    out+='&lt;';i++;continue;
+   }
+   if(s[i]==='>'){out+='&gt;';i++;continue;}
+   if(s[i]==='&'&&!/^&(?:#(?:[0-9]+|x[0-9a-f]+)|[a-z][a-z0-9]+);/i.test(s.slice(i))){out+='&amp;';i++;continue;}
+   out+=s[i++];
+  }return out;
+ }
+ function presentationQuestion(q){
+  if(!q||!['BS','JODOH'].includes(q.type))return q;
+  var opts;try{opts=typeof q.options==='string'?JSON.parse(q.options):q.options;}catch(e){return q;}
+  if(!Array.isArray(opts))return q;
+  var changed=false,out=opts.map(function(o){
+   if(q.type==='BS'){var s=presentation(o);if(s!==o)changed=true;return s;}
+   if(!o||typeof o!=='object')return o;
+   var a=presentation(o.q),b=presentation(o.a);if(a!==o.q||b!==o.a)changed=true;return Object.assign({},o,{q:a,a:b});
+  });
+  return changed?Object.assign({},q,{options:typeof q.options==='string'?JSON.stringify(out):out}):q;
+ }
+ function label(n){
+  if(n.matches('.bs-text'))return 'Pernyataan Benar/Salah';
+  if(n.matches('.pair-left'))return 'Soal / pernyataan kiri';
+  if(n.matches('.pair-middle'))return 'Opsi / pengacoh kanan';
+  return 'Kunci pasangan (khusus Admin)';
+ }
+ function rawErrors(s){
+  var out=[];
+  if(/<mjx-container\b|\bdata-sip-math-(?:source|input)\s*=/i.test(s))out.push('Gunakan sumber TeX/MathML, bukan hasil SVG MathJax.');
+  if(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(s)||/(?:\t(?:heta|imes|au|ext\{|an\b)|\r(?:ight|ho\b))/.test(s))out.push('Karakter kontrol merusak backslash rumus.');
+  if(/<(?:script|iframe|object|embed|foreignObject)\b|<[^>]*\bon\w+\s*=|(?:javascript\s*:)/i.test(s))out.push('Markup atau event yang tidak aman tidak boleh disimpan dalam field.');
+  return out;
+ }
+ function warning(root,text){var n=document.createElement('p');n.className='sip-field-math-error';n.setAttribute('role','status');n.textContent=text;root.appendChild(n);}
+ async function preview(n,root){
+  var s=n.value,errs=rawErrors(s);clear(root);
+  try{root.innerHTML=math().html(presentation(s));}catch(e){errs.push(e.message);}
+  if(!s.trim()){root.hidden=true;return {ok:true,errors:[],count:0};}
+  root.hidden=false;
+  var result=await math().check(root);
+  if(!n.isConnected||n.value!==s){root.removeAttribute('data-sip-math-state');return {ok:false,stale:true,errors:['Isi field berubah saat pratinjau diproses.']};}
+  if(errs.length){result={ok:false,errors:errs.concat(result.errors||[]),count:result.count||0};root.setAttribute('data-sip-math-state','error');warning(root,errs.join(' '));}
+  return result;
+ }
+ function refresh(n,force){
+  var state=fields.get(n);if(!state)return;
+  if(!admin()){clear(state.preview);state.tools.hidden=true;return;}
+  state.tools.hidden=false;
+  if(!force&&state.source===n.value)return;
+  state.source=n.value;return preview(n,state.preview);
+ }
+ function schedule(n){var s=fields.get(n);if(s){s.preview.removeAttribute('data-sip-math-state');clearTimeout(s.timer);s.timer=setTimeout(function(){refresh(n,true);},100);}}
+ function attach(n){
+  if(fields.has(n))return;
+  var tools=document.createElement('div'),bar=document.createElement('div'),button=document.createElement('button'),view=document.createElement('div');
+  tools.className='sip-field-math-tools';bar.className='sip-field-math-actions';button.type='button';button.className='sip-field-math-open';button.textContent='∑ Matematika';
+  button.setAttribute('aria-label','Tulis matematika: '+label(n));button.title='Simbol, Equation, TeX dan MathML untuk kolom ini';
+  view.className='sip-field-math-preview';view.id='sip-field-preview-'+(++serial);view.setAttribute('aria-label','Tampilan '+label(n));
+  n.setAttribute('aria-describedby',view.id);n.setAttribute('aria-label',label(n));n.setAttribute('spellcheck','false');n.setAttribute('data-sip-field-math','1');
+  n.parentElement.classList.add('sip-field-math-column');bar.appendChild(button);tools.append(bar,view);n.insertAdjacentElement('afterend',tools);
+  fields.set(n,{tools:tools,preview:view,source:null,timer:null});button.addEventListener('click',function(){open(n);});
+  n.addEventListener('input',function(){schedule(n);});n.addEventListener('paste',function(e){paste(n,e);});refresh(n);
+ }
+ function mount(){
+  document.querySelectorAll(SELECTOR).forEach(attach);
+  ['bs-container','pairs-container'].forEach(function(id){var box=node(id);if(!box||observed.has(box))return;observed.add(box);
+   new MutationObserver(function(ms){var rows=false;ms.forEach(function(m){Array.from(m.removedNodes).forEach(function(n){if(n.nodeType!==1)return;n.querySelectorAll('.sip-field-math-preview').forEach(clear);if(n.matches('.bs-row,.pair-row'))rows=true;});Array.from(m.addedNodes).forEach(function(n){if(n.nodeType===1&&(n.matches('.bs-row,.pair-row')||n.querySelector('.bs-text,.pair-left')))rows=true;});});if(rows){mount();if(context&&!valid(context))invalidate(context);}}).observe(box,{childList:true,subtree:true});
+  });
+ }
+ function identity(){return [currentUser.userID,currentUser.token,val('select-exam-q'),val('input-exam-id'),val('input-question-id'),val('q-type-select')].join('\u0001');}
+ function valid(c){return !!(c&&admin()&&c.field.isConnected&&c.form===document.querySelector('#form-add-q form')&&c.identity===identity()&&c.field.value===c.expected&&c.body&&c.body.isConnected);}
+ function warn(c,text){var n=node('sip-math-warn');if(n&&c&&c.body&&c.body.isConnected)n.textContent=text;}
+ function invalidate(c){
+  if(!c)return;
+  if(c.body&&c.body.isConnected){c.body.querySelectorAll('textarea').forEach(function(n){n.value='';});c.body.querySelectorAll('.sip-field-source-preview').forEach(clear);c.body.textContent='Draf, baris, ujian, atau sesi berubah. Studio lama tidak dapat mengisi field lain. Tutup lalu buka kembali pada field yang benar.';}
+ }
+ function write(c,text,start,end){
+  if(!valid(c)){invalidate(c);return false;}
+  c.field.value=text;c.expected=text;c.start=start==null?text.length:start;c.end=end==null?c.start:end;
+  c.field.setSelectionRange(c.start,c.end);c.field.dispatchEvent(new Event('input',{bubbles:true}));refresh(c.field,true);return true;
+ }
+ function insideTeX(s,pos){
+  var stack='',i=0;while(i<pos){if(s[i]==='\\'&&s[i+1]==='$'){i+=2;continue;}var t=s.slice(i,i+2),len=2;if(!['\\(','\\)','\\[','\\]','$$'].includes(t)){if(s[i]==='$'){t='$';len=1;}else{i++;continue;}}if(stack){if(t===stack)stack='';}else if(t==='\\(')stack='\\)';else if(t==='\\[')stack='\\]';else if(t==='$'||t==='$$')stack=t;i+=len;}return !!stack;
+ }
+ function insert(c,source){var s=c.field.value,a=c.start,b=c.end;return write(c,s.slice(0,a)+source+s.slice(b),a+source.length);}
+ function open(n){
+  if(!admin()||!n||!n.isConnected||!n.matches(SELECTOR))return;
+  pending={field:n,form:document.querySelector('#form-add-q form'),identity:identity(),original:n.value,expected:n.value,start:n.selectionStart==null?n.value.length:n.selectionStart,end:n.selectionEnd==null?n.value.length:n.selectionEnd};
+  try{window.sipOpenMathStudio_();}finally{pending=null;}
+ }
+ function sourceTab(c){
+  if(!valid(c)){invalidate(c);return;}
+  var box=c.body;clear(box);
+  var note=document.createElement('p'),ta=document.createElement('textarea'),buttons=document.createElement('div'),view=document.createElement('div');
+  note.className='sip-field-source-note';note.textContent='Sunting isi kolom ini. Rumus TeX memakai \\( … \\) atau \\[ … \\]; MathML memakai <math> … </math>. Perubahan hanya pada draf, bukan Simpan/Rilis.';
+  ta.className='sip-field-source-editor';ta.setAttribute('aria-label','Sumber matematika '+label(c.field));ta.spellcheck=false;ta.rows=6;ta.value=c.field.value;
+  buttons.className='sip-field-source-templates';view.className='sip-field-source-preview';view.setAttribute('aria-label','Pratinjau sumber matematika');
+  var samples=[['Pecahan','\\frac{a}{b}'],['Akar','\\sqrt{x}'],['Pangkat','x^{2}'],['Indeks','a_{n}'],['Fungsi','f(x)=x^{2}+1'],['Sudut','\\angle P_{1}=45^{\\circ}'],['Pertidaksamaan','x<y'],['Matriks','\\begin{pmatrix}a&b\\\\c&d\\end{pmatrix}'],['MathML','<math xmlns="http://www.w3.org/1998/Math/MathML"><mfrac><mn>1</mn><mn>2</mn></mfrac></math>']];
+  function update(){if(!write(c,ta.value,ta.selectionStart,ta.selectionEnd))return;preview(c.field,view);}
+  ta.addEventListener('input',update);ta.addEventListener('select',function(){c.start=ta.selectionStart;c.end=ta.selectionEnd;});
+  samples.forEach(function(item){var b=document.createElement('button');b.type='button';b.textContent=item[0];b.setAttribute('data-sip-field-template',item[0]);b.addEventListener('click',function(){
+   if(!valid(c)){invalidate(c);return;}
+   var a=ta.selectionStart,z=ta.selectionEnd,s=item[1];if(item[0]!=='MathML'&&!insideTeX(ta.value,a))s='\\('+s+'\\)';
+   if(item[0]==='MathML'&&insideTeX(ta.value,a)){warn(c,'MathML tidak disisipkan di dalam TeX. Pindahkan kursor ke luar pembatas rumus.');return;}
+   ta.setRangeText(s,a,z,'end');update();ta.focus();
+  });buttons.appendChild(b);});
+  box.append(note,buttons,ta,view);ta.setSelectionRange(c.start,c.end);preview(c.field,view);
+ }
+ function studio(){
+  // Math Studio asli memanggil empat builder pratinjau lewat window.
+  // Sebelumnya builder belum terdefinisi; isi helper yang hilang saja.
+  var builders={
+   frac:function(n,d){return sipMathFrac_(sipMathEsc_(n),sipMathEsc_(d));},
+   mix:function(w,n,d){return sipMathMixed_(sipMathEsc_(w),sipMathEsc_(n),sipMathEsc_(d));},
+   pow:function(b,e){return sipMathPow_(sipMathEsc_(b),sipMathEsc_(e));},
+   root:function(i,r){return sipMathRoot_(sipMathEsc_(i),sipMathEsc_(r));}
+  };
+  Object.keys(builders).forEach(function(k){if(typeof window['sipMathBuild_'+k]!=='function')window['sipMathBuild_'+k]=builders[k];});
+  var nativeOpen=window.sipOpenMathStudio_,nativeBind=window.sipMathBindStudio_,nativeInsert=window.sipMathInsert_;
+  if(typeof nativeOpen!=='function'||typeof nativeBind!=='function'||typeof nativeInsert!=='function')return;
+  window.sipOpenMathStudio_=copyFlags(nativeOpen,function(){context=pending||null;return nativeOpen.apply(this,arguments);});
+  window.sipMathBindStudio_=copyFlags(nativeBind,function(){
+   var out=nativeBind.apply(this,arguments),c=context;if(!c)return out;c.body=node('sip-math-body');if(!valid(c)){invalidate(c);return out;}
+   var popup=c.body.closest('.swal2-popup')||c.body.parentElement;c.popup=popup;popup.setAttribute('data-sip-field-math-dialog','1');
+   var header=document.createElement('p');header.className='sip-field-source-note';header.textContent='Tujuan: '+label(c.field)+'. Sisipan hanya masuk ke kolom ini; belum disimpan ke Bank Soal.';c.body.parentElement.insertBefore(header,c.body);
+   var tab=document.createElement('button');tab.type='button';tab.className='sip-field-source-tab';tab.setAttribute('data-sip-field-source-tab','1');tab.textContent='TeX / MathML';
+   var oldTab=popup.querySelector('[data-sipmat-tab]');if(oldTab)oldTab.parentElement.appendChild(tab);else header.appendChild(tab);
+   tab.addEventListener('click',function(){sourceTab(c);});
+   var undo=document.createElement('button');undo.type='button';undo.className='sip-field-source-undo';undo.textContent='Urungkan perubahan Studio pada kolom ini';undo.addEventListener('click',function(){if(write(c,c.original)){if(node('sip-math-body').querySelector('.sip-field-source-editor'))sourceTab(c);warn(c,'Isi kolom dikembalikan ke saat Studio dibuka. Bank Soal tidak diubah.');}});c.body.parentElement.appendChild(undo);
+   return out;
+  });
+  window.sipMathInsert_=copyFlags(nativeInsert,function(html){
+   var c=context;if(!c)return nativeInsert.apply(this,arguments);
+   if(!valid(c)){invalidate(c);return;}
+   var s=String(html),inside=insideTeX(c.field.value,c.start);
+   if(inside){if(/<[^>]+>/.test(s)){warn(c,'Kursor berada di dalam TeX. Gunakan tab TeX / MathML untuk bentuk bertingkat, atau pindahkan kursor ke luar rumus sebelum memakai Equation.');return;}
+    var t=document.createElement('textarea');t.innerHTML=s;s=t.value.replace(/[{}%&#$]/g,function(x){return '\\'+x;});
+   }
+   if(insert(c,s))warn(c,'Sisipan masuk ke '+label(c.field)+'. Tekan Simpan Pertanyaan setelah selesai memeriksa.');
+  });
+ }
+ function paste(n,e){
+  var data=e.clipboardData,html=data&&data.getData('text/html');if(!html||!/<mjx-container\b|<math\b/i.test(html))return;
+  e.preventDefault();try{var s=math().html(math().canonical(html)),a=n.selectionStart,b=n.selectionEnd;n.setRangeText(s,a,b,'end');n.dispatchEvent(new Event('input',{bubbles:true}));}catch(err){var state=fields.get(n);if(state){clear(state.preview);state.preview.hidden=false;warning(state.preview,err.message);}}
+ }
+ function fingerprint(form){
+  var ed=window.tinymce&&tinymce.get('editor-content');return JSON.stringify({identity:identity(),form:Array.from(new FormData(form).entries()),content:ed&&ed.initialized?ed.getContent():val('editor-content'),fields:Array.from(document.querySelectorAll(SELECTOR)).map(function(n){return n.value;}),keys:Array.from(document.querySelectorAll('#bs-container .bs-key')).map(function(n){return n.value;})});
+ }
+ function saveGuard(){
+  var original=window.handleAddQuestion;if(typeof original!=='function')return;
+  window.handleAddQuestion=copyFlags(original,function(e){
+   if(!admin()||!['BS','JODOH'].includes(val('q-type-select')))return original.apply(this,arguments);
+   var list=Array.from(document.querySelectorAll(val('q-type-select')==='BS'?'#bs-container .bs-text':'#pairs-container .pair-left,#pairs-container .pair-middle,#pairs-container .pair-right'));
+   if(!list.some(function(n){return rawErrors(n.value).length||math().hasMath(n.value);}))return original.apply(this,arguments);
+   if(e&&e.preventDefault)e.preventDefault();if(saving)return false;saving=true;
+   var form=e&&e.target,args=arguments,self=this,before=fingerprint(form);
+   return (async function(){try{
+    var errors=[];for(var n of list){attach(n);var r=await refresh(n,true);if(r&&!r.ok)errors.push(label(n)+': '+r.errors.join(' '));}
+    if(!admin()||!form||!form.isConnected||document.querySelector('#form-add-q form')!==form||fingerprint(form)!==before){await Swal.fire('Draf berubah','Periksa kembali field dan tekan Simpan lagi. Tidak ada sumber lama yang dipaksakan ke draf baru.','warning');return false;}
+    if(errors.length){await Swal.fire('Rumus field belum valid',errors.join('\n')+' Isi tetap berada di draf; belum disimpan.','warning');return false;}
+    return original.apply(self,args);
+   }catch(err){if(admin())await Swal.fire('Field belum dapat disimpan',err.message,'warning');return false;}finally{saving=false;}})();
+  });
+ }
+ function refreshAll(){mount();document.querySelectorAll(SELECTOR).forEach(function(n){refresh(n,true);});if(context&&!valid(context))invalidate(context);}
+ function start(){
+  var style=document.createElement('style');style.id='sip-field-math-style';style.textContent=
+   '.sip-field-math-column{min-width:0}.sip-field-math-column textarea{min-height:62px;resize:vertical;white-space:pre-wrap;overflow-wrap:anywhere}.sip-field-math-actions{display:flex;flex-wrap:wrap;gap:5px;margin:5px 0}.sip-field-math-open,.sip-field-source-tab{background:#eaf0ff;color:#1e3a68;border:1px solid #b7c8ef;border-radius:7px;padding:5px 8px;font-size:11px;font-weight:700;cursor:pointer}.sip-field-math-preview{background:#f8fafc;border:1px solid #dbe2ec;border-radius:8px;padding:8px;max-width:100%;overflow-x:auto;font-size:14px;overflow-wrap:anywhere}.sip-field-math-preview:before{content:"Tampilan";display:block;font:10px system-ui;color:#64748b;margin-bottom:5px}.sip-field-math-preview[hidden],.sip-field-math-tools[hidden]{display:none}.sip-field-math-error{font-size:11px;line-height:1.5;color:#9a3412;background:#fff7ed;padding:6px;border-radius:6px}.sip-field-source-note{font-size:12px;line-height:1.6;color:#475569;margin:8px 0}.sip-field-source-editor{width:100%;min-height:130px;border:1px solid #94a3b8;border-radius:8px;padding:10px;font:13px/1.6 ui-monospace,monospace;resize:vertical;box-sizing:border-box}.sip-field-source-templates{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}.sip-field-source-templates button,.sip-field-source-undo{border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;color:#334155;padding:5px 8px;font-size:11px;cursor:pointer}.sip-field-source-preview{border:1px solid #dbe2ec;border-radius:8px;padding:10px;max-width:100%;overflow-x:auto;margin-top:8px;min-height:40px}.sip-field-source-undo{margin-top:10px}.sip-field-math-preview img{max-width:100%;height:auto}'+
+   '@media(min-width:701px){#pairs-container .pair-row{grid-template-columns:repeat(12,minmax(0,1fr))}#pairs-container .pair-row>.sip-field-math-column{grid-column:span 3 / span 3}}'+
+   '@media(max-width:700px){#bs-container .bs-row,#pairs-container .pair-row{display:flex;flex-wrap:wrap;gap:8px;padding:10px;border:1px solid #dbe2ec;border-radius:10px;margin:8px 0}#bs-container .bs-row>.sip-field-math-column,#pairs-container .pair-row>.sip-field-math-column{width:100%;flex:0 0 100%}#bs-container .bs-row>div:not(.sip-field-math-column),#pairs-container .pair-row>div:not(.sip-field-math-column){flex:1;min-width:65px}}';document.head.appendChild(style);
+  studio();saveGuard();mount();
+  new MutationObserver(function(ms){if(ms.some(function(m){return Array.from(m.addedNodes).some(function(n){return n.nodeType===1&&(n.id==='form-add-q'||n.id==='bs-container'||n.id==='pairs-container'||n.querySelector('#bs-container,#pairs-container'));});})){clearTimeout(timer);timer=setTimeout(mount,20);}if(context&&context.body&&!context.body.isConnected)context=null;}).observe(document.body,{childList:true,subtree:true});
+  document.addEventListener('change',function(e){if(['q-type-select','select-exam-q','input-question-id'].includes(e.target.id))refreshAll();});
+  document.addEventListener('sip-soal-ai-applied',refreshAll);window.addEventListener('sip-math-ready',refreshAll);
+  var page=node('page-admin');if(page)new MutationObserver(function(){if(!admin()){document.querySelectorAll(SELECTOR).forEach(function(n){refresh(n,true);});if(context){invalidate(context);if(context.popup&&context.popup.isConnected)Swal.close();context=null;}}}).observe(page,{attributes:true,attributeFilter:['class']});
+ }
+ window.sipFieldMathSourceHTML_=presentation;
+ window.SIPINTAR_FIELD_MATH={version:'1.0.0',presentation:presentation,presentationQuestion:presentationQuestion,open:open,mount:mount,refresh:refreshAll};
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+})();
+
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4ef4c03a86e9d05',t:'MTc5Mjc0MzM1OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 <!-- Lisensi MathJax tertanam:
 
                                  Apache License
