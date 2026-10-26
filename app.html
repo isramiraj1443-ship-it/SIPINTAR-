@@ -24643,13 +24643,35 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
  function hasilBox(){return el('sip-soal-ai-hasil');}
  function riwayatHTML(rw){return '<ol class="sip-ai-riwayat">'+rw.map(function(x){return '<li>Percobaan '+x.n+': pembuat menilai <b>'+esc(x.pembuat)+'</b>'+(x.pemeriksa?' · pemeriksa independen <b>'+esc(x.pemeriksa)+'</b>':' · tidak diperiksa (pembuat sendiri belum mencapai target)')+(x.lolos?' ✓':' ✗')+'</li>';}).join('')+'</ol>';}
  function verHTML(h){var v=h.ver;return '<div class="sip-ai-verif sip-ai-verif-ok" id="sip-ai-verifikasi"><b>Level terverifikasi: '+esc(h.draft.targetC)+'</b><p>Pemeriksa AI independen (panggilan terpisah, tidak diberi target maupun klaim pembuat) menilai usulan <b>'+esc(v.levelC)+(v.namaLevel?' · '+esc(v.namaLevel):'')+'</b>: '+esc(v.alasan)+'</p>'+(v.masalah?'<p class="sip-ai-masalah">Catatan pemeriksa: '+esc(v.masalah)+'</p>':'')+riwayatHTML(h.riwayat)+'</div>';}
+ /* Diagnosis beda versi: AI (aksi lambat) berjalan lewat URL GAS langsung (config.js),
+    sedangkan tabel/Simpan lewat proxy Vercel. Bandingkan keduanya tanpa menulis apa pun. */
+ function diagnosaVersi(draft,versi){
+  var A=window.SIPINTAR_API,base={versi:versi,jenis:versi==='hash-kosong'?'hash-kosong':'tidak-diketahui'};
+  if(versi==='hash-kosong'||!A||typeof A.request!=='function')return Promise.resolve(base);
+  var cfg={};try{cfg=A.config()||{};}catch(e){}
+  function ambil(ch){return A.request('getQuestionsByExam',[draft.examId,currentUser.userID,currentUser.token],{channel:ch,timeout:45000,cid:'diag-'+ch+'-'+Date.now()}).then(function(h){var list=h&&Array.isArray(h.data)?h.data:[],q=list.filter(function(x){return String(x.id)===String(draft.questionId);})[0];return {ok:true,saluran:h.channel,hash:q?String(q.sourceHash||''):null};},function(e){return {ok:false,error:String(e&&e.message||e)};});}
+  return Promise.all([ambil('proxy'),cfg.hasDirect?ambil('direct'):Promise.resolve(null)]).then(function(x){
+   var p=x[0],d=x[1],f=String(draft.sourceHash||'');base.proxy=p;base.direct=d;
+   if(p&&p.ok&&d&&d.ok&&p.saluran!==d.saluran&&p.hash!==d.hash)base.jenis='saluran-berbeda';
+   else if(p&&p.ok&&(!d||!d.ok||d.hash===p.hash)&&p.hash!==f)base.jenis='soal-berubah';
+   return base;
+  },function(){return base;});
+ }
+ function pesanDiagnosa(g){
+  if(!g)return '';
+  if(g.jenis==='saluran-berbeda')return 'Penyebab terdeteksi: proxy Vercel (/api/gas) dan URL Apps Script di config.js membaca versi soal yang BERBEDA, artinya keduanya menunjuk deployment/spreadsheet yang tidak sama. Tabel dan Simpan memakai proxy, sedangkan AI memakai URL config.js. Samakan Environment Variable GAS_WEB_APP_URL di Vercel dengan GAS_WEB_APP_URL di config.js, lalu Redeploy Vercel. Usulan tetap dibuat dari draf yang tampil.';
+  if(g.jenis==='soal-berubah')return 'Soal ini sudah diubah di server sejak dibuka. Usulan dibuat dari draf yang tampil; sebelum Simpan, sebaiknya tutup dan buka ulang soal dari tabel agar perubahan lain tidak tertimpa (Simpan akan menolak versi lama).';
+  if(g.jenis==='hash-kosong')return 'Editor belum memiliki versi sumber soal. Usulan tetap dibuat, tetapi untuk Simpan buka ulang soal dari tabel Bank Soal.';
+  return 'Versi soal di server AI berbeda dengan editor. Usulan dibuat dari draf yang tampil; Simpan tetap memeriksa versi.';
+ }
+ function diagHTML(h){var t=h&&h.diagnosa?pesanDiagnosa(h.diagnosa):'';return t?'<p class="sip-ai-peringatan sip-ai-diagnosa">⚠ '+esc(t)+'</p>':'';}
  function renderHasil(){
   var box=hasilBox(),h=S.hasil;if(!box)return;if(!h){box.hidden=true;box.innerHTML='';return;}
   box.hidden=false;
-  if(!h.lolos){box.className='sip-ai-hasil sip-ai-hasil-gagal';box.innerHTML='<b>Usulan belum sesuai target '+esc(h.draft.targetC)+'</b><p>Setelah '+h.riwayat.length+' percobaan otomatis, level usulan belum terverifikasi. Draf tidak diubah. Ubah konteks/materi draf atau revisi manual, lalu minta usulan lagi.</p>'+riwayatHTML(h.riwayat)+'<button type="button" id="sip-soal-ai-terapkan" disabled title="Aktif hanya bila level terverifikasi sesuai target">Terapkan</button>';return;}
+  if(!h.lolos){box.className='sip-ai-hasil sip-ai-hasil-gagal';box.innerHTML='<b>Usulan belum sesuai target '+esc(h.draft.targetC)+'</b><p>Setelah '+h.riwayat.length+' percobaan otomatis, level usulan belum terverifikasi. Draf tidak diubah. Ubah konteks/materi draf atau revisi manual, lalu minta usulan lagi.</p>'+riwayatHTML(h.riwayat)+diagHTML(h)+'<button type="button" id="sip-soal-ai-terapkan" disabled title="Aktif hanya bila level terverifikasi sesuai target">Terapkan</button>';return;}
   var berubah=!h.diterapkan&&!same(h.ctx);
   box.className='sip-ai-hasil '+(h.diterapkan?'sip-ai-hasil-selesai':berubah?'sip-ai-hasil-gagal':'sip-ai-hasil-ok');
-  box.innerHTML='<b>'+(h.diterapkan?'Usulan sudah diterapkan ke draf':'Usulan '+esc(h.draft.targetC)+' terverifikasi — siap diterapkan')+'</b><p>Pembuat: '+esc(h.r.usulan.levelC)+' · Pemeriksa independen: '+esc(h.ver.levelC)+' · '+h.riwayat.length+' percobaan. '+(h.diterapkan?'Periksa lalu tekan Simpan Pertanyaan.':berubah?'Draf berubah sejak usulan dibuat; minta usulan baru agar tidak menimpa suntingan Anda.':'Terapkan hanya mengisi draf editor; Bank Soal belum berubah sampai Anda menekan Simpan.')+'</p><button type="button" id="sip-soal-ai-terapkan"'+(h.diterapkan||berubah?' disabled':'')+'>Terapkan</button>';
+  box.innerHTML='<b>'+(h.diterapkan?'Usulan sudah diterapkan ke draf':'Usulan '+esc(h.draft.targetC)+' terverifikasi — siap diterapkan')+'</b><p>Pembuat: '+esc(h.r.usulan.levelC)+' · Pemeriksa independen: '+esc(h.ver.levelC)+' · '+h.riwayat.length+' percobaan. '+(h.diterapkan?'Periksa lalu tekan Simpan Pertanyaan.':berubah?'Draf berubah sejak usulan dibuat; minta usulan baru agar tidak menimpa suntingan Anda.':'Terapkan hanya mengisi draf editor; Bank Soal belum berubah sampai Anda menekan Simpan.')+'</p>'+diagHTML(h)+'<button type="button" id="sip-soal-ai-terapkan"'+(h.diterapkan||berubah?' disabled':'')+'>Terapkan</button>';
  }
  function clearHasil(){var had=!!S.hasil;S.hasil=null;renderHasil();var st=el('sip-soal-ai-status');if(had&&st)st.textContent='';}
  async function review(h){
@@ -24658,7 +24680,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
   if(!same(ctx)){renderHasil();await message('Draf berubah','Draf/akun/ujian berubah sejak usulan dibuat. Usulan tidak diterapkan; minta usulan baru.');return false;}
   var approvalVerified=false,mathReviewPromise=null;
   function checkMath(){var root=document.querySelector('.sip-ai-review');if(!root||!window.SIPINTAR_MATEMATIKA)return Promise.resolve({ok:false,errors:['Pratinjau matematika belum tersedia. Muat versi aplikasi terbaru.']});return SIPINTAR_MATEMATIKA.check(root);}
-  var accept=await Swal.fire({title:'Periksa usulan menuju '+draft.targetC,html:verHTML(h)+proposedHTML(r),width:900,showCancelButton:true,confirmButtonText:'Terapkan ke draf',cancelButtonText:'Nanti / pertahankan draf asli',didOpen:function(){mathReviewPromise=checkMath();},preConfirm:async function(){
+  var accept=await Swal.fire({title:'Periksa usulan menuju '+draft.targetC,html:diagHTML(h)+verHTML(h)+proposedHTML(r),width:900,showCancelButton:true,confirmButtonText:'Terapkan ke draf',cancelButtonText:'Nanti / pertahankan draf asli',didOpen:function(){mathReviewPromise=checkMath();},preConfirm:async function(){
    approvalVerified=false;
    if(!h.lolos||!h.ver||!h.ver.cocok||h.ver.levelC!==draft.targetC||r.usulan.levelC!==draft.targetC){Swal.showValidationMessage('Level belum terverifikasi sesuai target; tidak dapat diterapkan.');return false;}
    if(!same(ctx)){Swal.showValidationMessage('Draf/akun telah berubah; usulan tidak diterapkan.');return false;}
@@ -24687,11 +24709,12 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
    var wire={examId:draft.examId,questionId:draft.questionId,sourceHash:draft.sourceHash,type:draft.type,content:draft.content,image:draft.image,materi:draft.materi,babId:draft.babId,bab:draft.bab,targetC:draft.targetC,setujuKirim:true,clientRef:String(seq)};
    // Pemetaan q→a Menjodohkan dan kunci lama tidak dikirim dari browser pun.
    wire.options=draft.type==='JODOH'?draft.options.map(function(o){return {q:o.q};}):draft.options;
-   var r=null,ver=null,lolos=false,riwayat=[],umpan='';
+   var r=null,ver=null,lolos=false,riwayat=[],umpan='',diagnosa=null;
    for(var n=1;n<=MAKS_PERCOBAAN&&!lolos;n++){
     status('Percobaan '+n+' dari '+MAKS_PERCOBAAN+': AI menyusun usulan menuju '+draft.targetC+'. Anda boleh membaca/menyunting draf; hasil lama tidak akan menimpa perubahan baru.');
     wire.umpanBalik=umpan;wire.clientRef=seq+':'+n;
     r=await api('perbaikiSoalKognitifAI',[wire]);masihSama();ver=null;
+    if(!diagnosa&&r.versi&&['berbeda','tidak-ditemukan','hash-kosong'].indexOf(r.versi)>=0){status('Memeriksa penyebab beda versi soal antara editor dan server AI...');diagnosa=await diagnosaVersi(draft,r.versi);masihSama();}
     if(!r.usulan||!r.usulan.sesuaiTarget||r.usulan.levelC!==draft.targetC){
      riwayat.push({n:n,pembuat:r.usulan&&r.usulan.levelC||'-',pemeriksa:'',lolos:false});
      umpan='Percobaan '+n+': pembuat sendiri menilai usulannya '+(r.usulan&&r.usulan.levelC||'-')+', belum '+draft.targetC+'. '+plain(r.usulan&&r.usulan.alasan).slice(0,500);continue;
@@ -24703,8 +24726,8 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     riwayat.push({n:n,pembuat:u.levelC,pemeriksa:ver.levelC,lolos:lolos});
     if(!lolos)umpan='Percobaan '+n+': penilai independen menilai usulan '+ver.levelC+', belum '+draft.targetC+'. Alasan: '+ver.alasan+(ver.masalah?' Masalah: '+ver.masalah:'');
    }
-   var h={r:r,ver:ver,lolos:lolos,riwayat:riwayat,draft:draft,ctx:ctx,diterapkan:false};S.hasil=h;renderHasil();
-   if(!lolos){var last=riwayat[riwayat.length-1]||{};status('Level belum terverifikasi setelah '+riwayat.length+' percobaan. Terapkan tidak aktif; draf tetap utuh.');return message('Target belum tercapai','Setelah '+riwayat.length+' percobaan otomatis, usulan masih dinilai '+(last.pemeriksa||last.pembuat||'-')+(last.pemeriksa?' oleh pemeriksa independen':' oleh AI pembuat')+', belum '+draft.targetC+'. Tombol Terapkan tidak diaktifkan dan draf tidak diubah. '+umpan);}
+   var h={r:r,ver:ver,lolos:lolos,riwayat:riwayat,draft:draft,ctx:ctx,diterapkan:false,diagnosa:diagnosa};S.hasil=h;renderHasil();
+   if(!lolos){var last=riwayat[riwayat.length-1]||{};status('Level belum terverifikasi setelah '+riwayat.length+' percobaan. Terapkan tidak aktif; draf tetap utuh.');return message('Target belum tercapai','Setelah '+riwayat.length+' percobaan otomatis, usulan masih dinilai '+(last.pemeriksa||last.pembuat||'-')+(last.pemeriksa?' oleh pemeriksa independen':' oleh AI pembuat')+', belum '+draft.targetC+'. Tombol Terapkan tidak diaktifkan dan draf tidak diubah. '+umpan+(diagnosa?' '+pesanDiagnosa(diagnosa):''));}
    status('Usulan '+draft.targetC+' terverifikasi pemeriksa independen. Periksa lalu tekan Terapkan.');
    await review(h);
   }catch(e){if(!ctx.cancelled&&admin()&&currentUser.userID===ctx.uid&&currentUser.token===ctx.token){if(st&&st.isConnected)st.textContent=e.message;await message('Usulan belum diterapkan',e.message);}}
@@ -24725,10 +24748,10 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
  document.addEventListener('input',function(e){if(admin()&&/^sip-soal-(materi|bab)$/.test(e.target.id))remember();});
  var hasilTimer=0;function cekHasil(){if(!S.hasil||S.hasil.diterapkan||!S.hasil.lolos||S.busy)return;clearTimeout(hasilTimer);hasilTimer=setTimeout(renderHasil,250);}document.addEventListener('input',cekHasil,true);document.addEventListener('change',cekHasil,true);
  document.addEventListener('click',function(e){if(e.target.closest('#sip-soal-ai'))requestAI();if(e.target.closest('#sip-soal-ai-terapkan'))terapkanTersimpan();if(e.target.closest('#sip-soal-ai-batal')&&S.ctx){S.ctx.cancelled=true;S.seq++;S.busy=false;el('sip-soal-ai-batal').hidden=true;el('sip-soal-ai-status').textContent='Menunggu dibatalkan. Tidak ada usulan diterapkan. Panggilan provider mungkin tetap memakai kuota sampai selesai; permintaan AI baru menunggu panggilan itu berakhir. Anda boleh menyimpan draf sendiri.';}});
- var css=document.createElement('style');css.id='sip-soal-materi-css';css.textContent='.sip-ai-hasil{margin-top:10px;border:1px solid #cbd5e1;border-radius:12px;padding:12px 14px;font-size:12px;line-height:1.6;color:#334155;background:#fff}.sip-ai-hasil p{margin:4px 0 8px}.sip-ai-hasil-ok{border-color:#86efac;background:#f0fdf4}.sip-ai-hasil-gagal{border-color:#fca5a5;background:#fef2f2}.sip-ai-hasil-selesai{border-color:#a5b4fc;background:#eef2ff}.sip-ai-hasil button{border:0;border-radius:9px;padding:9px 18px;font-weight:800;background:#059669;color:#fff;cursor:pointer}.sip-ai-hasil button:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed}.sip-ai-riwayat{margin:6px 0 8px 18px;list-style:decimal;font-size:11.5px}.sip-ai-verif{text-align:left;border:1px solid #86efac;background:#f0fdf4;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:13px;color:#14532d}.sip-ai-masalah{color:#92400e}.sip-soal-meta{border:1px solid #c7d2fe;background:#f8faff;border-radius:14px;padding:18px;margin:4px 0 22px;min-width:0}.sip-soal-meta legend{font-weight:800;color:#273b62;padding:0 7px;font-size:15px}.sip-soal-meta p{font-size:12px;color:#526480;line-height:1.7;margin-bottom:12px}.sip-soal-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.sip-soal-grid label{font-size:12px;font-weight:700;color:#334766}.sip-soal-grid input,.sip-soal-grid select{display:block;width:100%;min-width:0;border:1px solid #cbd5e1;border-radius:9px;padding:10px;margin:6px 0 12px;background:#fff;font-size:13px;color:#172033}.sip-soal-grid b{color:#b91c1c}.sip-soal-ai-row{align-items:end}.sip-soal-ai-row button{border:1px solid #6366f1;background:#eef2ff;border-radius:10px;padding:12px;color:#3730a3;font-weight:700;font-size:12px;margin-bottom:12px}.sip-soal-ai-row button:disabled{opacity:.5}.sip-soal-note{font-size:12px;line-height:1.7;color:#526480;background:#eff4fb;padding:12px;border-radius:10px}.sip-ai-review{text-align:left;font-size:14px;line-height:1.7;overflow-wrap:anywhere}.sip-ai-review h4{font-weight:800;margin:16px 0 7px}.sip-ai-review ol{padding-left:22px}.sip-ai-review pre{white-space:pre-wrap;background:#f1f5f9;padding:12px;border-radius:9px}.sip-ai-check{display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;color:#166534;padding:14px;margin-top:18px;font-size:13px;border-radius:10px}.sip-ai-check input{flex-shrink:0;margin-top:5px}@media(max-width:650px){.sip-soal-grid{grid-template-columns:1fr}.sip-soal-meta{padding:13px}}';document.head.appendChild(css);
+ var css=document.createElement('style');css.id='sip-soal-materi-css';css.textContent='.sip-ai-hasil{margin-top:10px;border:1px solid #cbd5e1;border-radius:12px;padding:12px 14px;font-size:12px;line-height:1.6;color:#334155;background:#fff}.sip-ai-hasil p{margin:4px 0 8px}.sip-ai-hasil-ok{border-color:#86efac;background:#f0fdf4}.sip-ai-hasil-gagal{border-color:#fca5a5;background:#fef2f2}.sip-ai-hasil-selesai{border-color:#a5b4fc;background:#eef2ff}.sip-ai-hasil button{border:0;border-radius:9px;padding:9px 18px;font-weight:800;background:#059669;color:#fff;cursor:pointer}.sip-ai-hasil button:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed}.sip-ai-riwayat{margin:6px 0 8px 18px;list-style:decimal;font-size:11.5px}.sip-ai-verif{text-align:left;border:1px solid #86efac;background:#f0fdf4;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:13px;color:#14532d}.sip-ai-masalah{color:#92400e}.sip-ai-peringatan{text-align:left;border:1px solid #fcd34d;background:#fffbeb;color:#78350f;border-radius:10px;padding:9px 12px;margin:6px 0 10px;font-size:12px;line-height:1.6}.sip-soal-meta{border:1px solid #c7d2fe;background:#f8faff;border-radius:14px;padding:18px;margin:4px 0 22px;min-width:0}.sip-soal-meta legend{font-weight:800;color:#273b62;padding:0 7px;font-size:15px}.sip-soal-meta p{font-size:12px;color:#526480;line-height:1.7;margin-bottom:12px}.sip-soal-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.sip-soal-grid label{font-size:12px;font-weight:700;color:#334766}.sip-soal-grid input,.sip-soal-grid select{display:block;width:100%;min-width:0;border:1px solid #cbd5e1;border-radius:9px;padding:10px;margin:6px 0 12px;background:#fff;font-size:13px;color:#172033}.sip-soal-grid b{color:#b91c1c}.sip-soal-ai-row{align-items:end}.sip-soal-ai-row button{border:1px solid #6366f1;background:#eef2ff;border-radius:10px;padding:12px;color:#3730a3;font-weight:700;font-size:12px;margin-bottom:12px}.sip-soal-ai-row button:disabled{opacity:.5}.sip-soal-note{font-size:12px;line-height:1.7;color:#526480;background:#eff4fb;padding:12px;border-radius:10px}.sip-ai-review{text-align:left;font-size:14px;line-height:1.7;overflow-wrap:anywhere}.sip-ai-review h4{font-weight:800;margin:16px 0 7px}.sip-ai-review ol{padding-left:22px}.sip-ai-review pre{white-space:pre-wrap;background:#f1f5f9;padding:12px;border-radius:9px}.sip-ai-check{display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;color:#166534;padding:14px;margin-top:18px;font-size:13px;border-radius:10px}.sip-ai-check input{flex-shrink:0;margin-top:5px}@media(max-width:650px){.sip-soal-grid{grid-template-columns:1fr}.sip-soal-meta{padding:13px}}';document.head.appendChild(css);
  function start(){mount();if(window.MutationObserver){new MutationObserver(function(){if(admin()&&document.querySelector('#form-add-q form')&&!el('sip-soal-metadata'))mount();}).observe(document.body,{childList:true,subtree:true});var page=el('page-admin');if(page)new MutationObserver(function(){if(!admin()){S.seq++;if(S.ctx)S.ctx.cancelled=true;if(el('sip-ai-check'))Swal.close();}}).observe(page,{attributes:true,attributeFilter:['class']});}}
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
- window.SIPINTAR_BANK_MATERI_VERSI='3.1.0';
+ window.SIPINTAR_BANK_MATERI_VERSI='3.1.1';
 })();
 
   </script>
@@ -25245,7 +25268,489 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
 })();
 
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4ef4c03a86e9d05',t:'MTc5Mjc0MzM1OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+  <!-- GAMBAR PILIHAN JAWABAN PG DAN PG KOMPLEKS · sumber: web/gambar-opsi-jawaban.js -->
+  <script id="sipintar-gambar-opsi">
+/* Gambar pilihan jawaban v1.0.0 — 23 Oktober 2026.
+   Tombol "Unggah gambar" di bawah setiap opsi PG / PG Kompleks (opt-0..opt-4).
+   Berkas disimpan ke folder Drive "SIPINTAR-Jawaban Exam" lewat
+   uploadGambarJawaban; tautannya disisipkan ke DRAF opsi. Bank Soal baru
+   berubah ketika Admin menekan Simpan. Gambar tempel (data:image) pada opsi
+   juga dipindahkan ke folder itu agar sel Spreadsheet tidak membengkak. */
+(function(){
+ 'use strict';
+ var HURUF=['A','B','C','D','E'],MAKS_SISI=1200,MAKS_BYTE=5*1024*1024,S={unggah:0,konversi:{}};
+ function el(id){return document.getElementById(id);}
+ function staf(){var u=window.currentUser;return !!(u&&u.userID&&u.token&&(u.role==='Admin'||u.role==='Guru'));}
+ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+ function editor(i){try{var ed=window.tinymce&&tinymce.get('opt-'+i);return ed&&ed.initialized?ed:null;}catch(e){return null;}}
+ function konteks(){var u=window.currentUser||{};return [u.userID,u.token,(el('select-exam-q')||{}).value||'',(el('input-exam-id')||{}).value||'',(el('input-question-id')||{}).value||''].join('|');}
+ function panggil(aksi,args){return new Promise(function(ok,gagal){try{var r=google.script.run.withSuccessHandler(function(x){if(!x||x.success===false)return gagal(new Error(x&&x.message||'Unggahan belum berhasil.'));ok(x);}).withFailureHandler(function(e){var m=e&&e.message||String(e);if(/tidak terdaftar|not a function|tidak diizinkan/i.test(m))m='Versi backend belum mendukung gambar pilihan jawaban. Pasang 1-GAS-code.gs terbaru lalu deploy New version; perbarui juga api-actions.js dan api-client.js.';gagal(new Error(m));});var x=r[aksi].apply(r,args);if(x&&x.catch)x.catch(function(){});}catch(e){gagal(e);}});}
+ function bacaDataUrl(blob){return new Promise(function(ok,gagal){var fr=new FileReader();fr.onerror=function(){gagal(new Error('Berkas tidak dapat dibaca.'));};fr.onload=function(){ok(String(fr.result||''));};fr.readAsDataURL(blob);});}
+ function perkecil(dataUrl,tipe,ukuran){
+  return new Promise(function(ok,gagal){
+   var img=new Image();img.onerror=function(){gagal(new Error('Berkas ini bukan gambar yang dikenali.'));};
+   img.onload=function(){
+    var w=img.naturalWidth||img.width,h=img.naturalHeight||img.height,skala=Math.min(1,MAKS_SISI/Math.max(w,h,1));
+    if(skala>=1&&ukuran<=1.5*1024*1024&&/^image\/(png|jpeg|webp|gif)$/.test(tipe))return ok({dataUrl:dataUrl,tipe:tipe});
+    try{var c=document.createElement('canvas');c.width=Math.max(1,Math.round(w*skala));c.height=Math.max(1,Math.round(h*skala));var g=c.getContext('2d');
+     var png=tipe==='image/png'||tipe==='image/gif';if(!png){g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);}g.drawImage(img,0,0,c.width,c.height);
+     var out=png?c.toDataURL('image/png'):c.toDataURL('image/jpeg',0.86);if(png&&out.length>2.5*1024*1024){g.globalCompositeOperation='destination-over';g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);out=c.toDataURL('image/jpeg',0.86);}
+     ok({dataUrl:out,tipe:out.slice(5,out.indexOf(';'))});}catch(e){ok({dataUrl:dataUrl,tipe:tipe});}
+   };img.src=dataUrl;
+  });
+ }
+ function unggahDataUrl(dataUrl,nama){
+  var tipe=(dataUrl.match(/^data:(image\/[a-z0-9.+-]+);base64,/i)||[])[1];tipe=String(tipe||'').toLowerCase().replace('image/jpg','image/jpeg');
+  if(!/^image\/(png|jpeg|webp|gif)$/.test(tipe))return Promise.reject(new Error('Gunakan gambar PNG, JPG, WebP, atau GIF.'));
+  var ukuran=Math.floor((dataUrl.length-dataUrl.indexOf(',')-1)*3/4);
+  return perkecil(dataUrl,tipe,ukuran).then(function(h){
+   if(Math.floor((h.dataUrl.length-h.dataUrl.indexOf(',')-1)*3/4)>MAKS_BYTE)throw new Error('Gambar masih lebih dari 5 MB setelah diperkecil.');
+   var u=window.currentUser;return panggil('uploadGambarJawaban',[h.dataUrl,nama||'opsi',h.tipe,u.userID,u.token]);
+  });
+ }
+ function imgHTML(url,i){return '<img src="'+esc(url)+'" alt="Gambar pilihan '+HURUF[i]+'" class="sip-opsi-gambar">';}
+ function status(i,t,jenis){var s=document.querySelector('.sip-opsi-gambar-bar[data-opsi="'+i+'"] .sip-opsi-status');if(s){s.textContent=t||'';s.className='sip-opsi-status'+(jenis?' sip-opsi-'+jenis:'');}}
+ function sisip(i,url){
+  var html='<p>'+imgHTML(url,i)+'</p>',ed=editor(i);
+  if(ed){var isi=ed.getContent(),kosong=!isi.replace(/<p>(?:<br\s*\/?>|&nbsp;|\s)*<\/p>/gi,'').trim();ed.setContent(kosong?html:isi+html);ed.undoManager&&ed.undoManager.add();ed.fire('change');ed.save&&ed.save();}
+  else{var ta=el('opt-'+i);if(ta){ta.value=(ta.value.trim()?ta.value:'')+html;ta.dispatchEvent(new Event('input',{bubbles:true}));}}
+ }
+ function pilihBerkas(i,file){
+  if(!file)return;if(!staf())return;
+  if(!/^image\/(png|jpe?g|webp|gif)$/i.test(file.type||''))return Swal.fire('Jenis berkas','Gunakan gambar PNG, JPG, WebP, atau GIF untuk pilihan jawaban.','warning');
+  if(file.size>20*1024*1024)return Swal.fire('Berkas terlalu besar','Pilih gambar di bawah 20 MB; aplikasi akan memperkecilnya otomatis.','warning');
+  var awal=konteks();S.unggah++;status(i,'Mengunggah ke folder Drive Jawaban Exam…','proses');tombol();
+  bacaDataUrl(file).then(function(d){return unggahDataUrl(d,file.name);}).then(function(r){
+   if(konteks()!==awal){status(i,'Soal/akun berubah saat mengunggah. Gambar tersimpan di Drive tetapi tidak dipasang ke draf ini.','gagal');return;}
+   sisip(i,r.url);status(i,'Gambar tersimpan di folder Drive Jawaban Exam dan dipasang ke draf opsi '+HURUF[i]+'. Tekan Simpan untuk menyimpan soal.','ok');
+  },function(e){status(i,e.message||String(e),'gagal');Swal.fire('Gambar belum terunggah',e.message||String(e),'error');})
+  .then(function(){S.unggah=Math.max(0,S.unggah-1);tombol();});
+ }
+ function tombol(){document.querySelectorAll('.sip-opsi-unggah').forEach(function(b){b.disabled=S.unggah>0;});}
+ function gayaEditor(ed){try{var d=ed.getDoc();if(d&&!d.getElementById('sip-opsi-gambar-gaya')){var st=d.createElement('style');st.id='sip-opsi-gambar-gaya';st.textContent='img.sip-opsi-gambar{max-width:100%;max-height:150px;height:auto;object-fit:contain;border-radius:6px}';d.head.appendChild(st);}}catch(e){}}
+ function pasang(){
+  if(!staf())return;
+  for(var i=0;i<5;i++){
+   var ta=el('opt-'+i);if(!ta)continue;var ed=editor(i),anchor=ed&&ed.getContainer?ed.getContainer():ta;
+   if(ed)gayaEditor(ed);
+   if(!S.unggah&&ed&&!ed.getContent().replace(/<p>(?:<br\s*\/?>|&nbsp;|\s)*<\/p>/gi,'').trim())status(i,'');
+   if(!anchor||!anchor.parentNode)continue;var ada=anchor.parentNode.querySelector('.sip-opsi-gambar-bar[data-opsi="'+i+'"]');if(ada)continue;
+   var bar=document.createElement('div');bar.className='sip-opsi-gambar-bar';bar.setAttribute('data-opsi',String(i));
+   bar.innerHTML='<button type="button" class="sip-opsi-unggah" aria-label="Unggah gambar untuk pilihan '+HURUF[i]+'">🖼 Unggah gambar pilihan '+HURUF[i]+'</button><input type="file" class="sip-opsi-berkas" accept="image/png,image/jpeg,image/webp,image/gif" hidden><span class="sip-opsi-status" role="status" aria-live="polite"></span>';
+   anchor.parentNode.insertBefore(bar,anchor.nextSibling);
+  }
+  tombol();
+ }
+ /* Gambar tempel/seret (base64) pada opsi → pindahkan ke Drive agar sel tidak membengkak. */
+ function konversiTempel(){
+  if(!staf()||S.unggah)return;
+  for(var i=0;i<5;i++){
+   var ed=editor(i);if(!ed)continue;var body=ed.getBody&&ed.getBody();if(!body)continue;
+   var img=body.querySelector('img[src^="data:image"]');if(!img)continue;
+   (function(i,ed,img){
+    var src=img.getAttribute('src'),kunci=i+':'+src.length+':'+src.slice(-40);if(S.konversi[kunci])return;S.konversi[kunci]=1;
+    var awal=konteks();S.unggah++;tombol();status(i,'Memindahkan gambar tempel ke folder Drive Jawaban Exam…','proses');
+    unggahDataUrl(src,'tempel-opsi-'+HURUF[i]).then(function(r){
+     if(konteks()!==awal||!img.isConnected||img.getAttribute('src')!==src){status(i,'Draf berubah; gambar tempel dibiarkan apa adanya.','gagal');return;}
+     ed.dom.setAttribs(img,{src:r.url,'data-mce-src':r.url,alt:img.getAttribute('alt')||('Gambar pilihan '+HURUF[i])});ed.dom.addClass(img,'sip-opsi-gambar');ed.undoManager&&ed.undoManager.add();ed.fire('change');ed.save&&ed.save();
+     status(i,'Gambar tempel dipindahkan ke folder Drive Jawaban Exam.','ok');
+    },function(e){status(i,'Gambar tempel tetap tersimpan di draf (belum ke Drive): '+(e.message||e),'gagal');})
+    .then(function(){S.unggah=Math.max(0,S.unggah-1);tombol();});
+   })(i,ed,img);
+   return;
+  }
+ }
+ document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('.sip-opsi-unggah');if(!b||b.disabled)return;var f=b.parentNode.querySelector('.sip-opsi-berkas');if(f){f.value='';f.click();}});
+ document.addEventListener('change',function(e){var f=e.target;if(!f.classList||!f.classList.contains('sip-opsi-berkas'))return;var i=Number(f.parentNode.getAttribute('data-opsi'));pilihBerkas(i,f.files&&f.files[0]);});
+ var asliSimpan=window.handleAddQuestion;
+ function pasangPenjaga(){
+  if(typeof window.handleAddQuestion!=='function'||window.handleAddQuestion.__sipOpsiGambar)return;
+  var sebelumnya=window.handleAddQuestion;
+  var baru=function(e){if(S.unggah>0){if(e&&e.preventDefault)e.preventDefault();Swal.fire('Tunggu sebentar','Gambar pilihan jawaban masih diunggah ke folder Drive Jawaban Exam. Simpan setelah unggahan selesai; draf tidak berubah.','info');return false;}return sebelumnya.apply(this,arguments);};
+  baru.__sipOpsiGambar=true;window.handleAddQuestion=baru;
+ }
+ var css=document.createElement('style');css.id='sip-opsi-gambar-css';
+ css.textContent='img.sip-opsi-gambar{display:inline-block;max-width:min(100%,320px);max-height:220px;height:auto;object-fit:contain;border-radius:8px;border:1px solid #e2e8f0;background:#fff;vertical-align:middle;margin:4px 0}'+
+  '.sip-opsi-gambar-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:6px 0 10px}.sip-opsi-unggah{border:1px dashed #6366f1;background:#eef2ff;color:#3730a3;border-radius:9px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer}.sip-opsi-unggah:disabled{opacity:.55;cursor:wait}'+
+  '.sip-opsi-status{font-size:11.5px;color:#475569;line-height:1.5}.sip-opsi-ok{color:#047857}.sip-opsi-gagal{color:#b91c1c}.sip-opsi-proses{color:#4338ca}';
+ (document.head||document.documentElement).appendChild(css);
+ if(asliSimpan)pasangPenjaga();
+ setInterval(function(){pasangPenjaga();if(document.getElementById('opt-0'))pasang();konversiTempel();},800);
+ window.SIPINTAR_GAMBAR_OPSI={versi:'1.0.0',unggahDataUrl:unggahDataUrl,sedangUnggah:function(){return S.unggah;}};
+})();
+
+  </script>
+
+  <!-- RILIS KISI-KISI LANGSUNG DARI BANK SOAL · sumber: web/kisi-bank-langsung.js -->
+  <script id="sipintar-kisi-langsung">
+/* Rilis kisi-kisi langsung dari Bank Soal v1 · 26 Oktober 2026 · tambahan.
+   Satu tombol: pratinjau (materi/bab/level dari Bank Soal, tanpa isi soal) →
+   satu konfirmasi → simpan + rilis melalui jalur resmi server. Alur AI/manual
+   lama tetap tersedia dan tidak diubah. */
+(function () {
+  'use strict';
+  var asli = { render: window.sipRenderKisiAdmin_ };
+  var sibuk = false;
+  function el(id) { return document.getElementById(id); }
+  function e(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function admin() { return window.currentUser && currentUser.role === 'Admin'; }
+  function api(action, args) {
+    return new Promise(function (ok, no) {
+      var run = google.script.run.withSuccessHandler(function (r) { ok(r || { success: false, message: 'Tidak ada respons.' }); })
+        .withFailureHandler(function (err) { no(new Error((err && err.message) || String(err))); });
+      var ret = run[action].apply(run, (args || []).concat([currentUser.userID, currentUser.token])); if (ret && ret.catch) ret.catch(function () {});
+    });
+  }
+  function pasangTombol() {
+    if (!admin() || el('kisi-v2-langsung')) return;
+    var simpan = el('kisi-v2-save'); if (!simpan || !simpan.parentNode) return;
+    var b = document.createElement('button');
+    b.type = 'button'; b.id = 'kisi-v2-langsung';
+    b.className = simpan.className || 'px-4 py-2 rounded-lg text-sm font-bold';
+    b.style.background = '#b45309'; b.style.color = '#fff';
+    b.textContent = '⚡ Rilis langsung dari Bank Soal';
+    b.title = 'Memakai materi/bab dan target kognitif yang ditetapkan Admin pada Bank Soal; isi soal tidak ditampilkan.';
+    simpan.parentNode.insertBefore(b, simpan.nextSibling);
+  }
+  if (typeof asli.render === 'function') {
+    window.sipRenderKisiAdmin_ = function () { var r = asli.render.apply(this, arguments); pasangTombol(); return r; };
+  }
+  window.sipKisiRilisLangsung_ = async function () {
+    if (!admin() || sibuk) return;
+    var id = window._sipKisiExam || ((el('kisi-select-exam') || {}).value || '');
+    if (!id) return Swal.fire('Pilih ujian', 'Pilih ujian terlebih dahulu.', 'warning');
+    var st = el('kisi-v2-status');
+    sibuk = true;
+    try {
+      Swal.fire({ title: 'Menyiapkan pratinjau dari Bank Soal…', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+      var p = await api('rilisKisiDariBankSoal', [id, { mode: 'pratinjau' }]);
+      Swal.close();
+      if (!p.success) return Swal.fire('Pratinjau gagal', p.message, 'error');
+      if (!p.siap) {
+        return Swal.fire({ icon: 'warning', title: 'Belum dapat dirilis langsung', width: 720,
+          html: '<p>' + e(p.message) + '</p><ul class="sip-kisi-kurang">' + (p.kurang || []).map(function (k) { return '<li>' + e(k) + '</li>'; }).join('') + '</ul>' +
+            (p.jumlahKurang > (p.kurang || []).length ? '<p>…dan ' + (p.jumlahKurang - p.kurang.length) + ' soal lainnya.</p>' : '') +
+            '<p class="sip-kisi-note">Buka Bank Soal, lengkapi Materi, Bab dan Target Kognitif C1–C6 tiap soal, lalu coba lagi.</p>' });
+      }
+      var berubah = st && st.dataset.dirty === '1';
+      var paket = p.paketMateri && p.paketMateri.aktif ? '<p class="sip-kisi-warning">Mode paket materi aktif: pembagian total soal per bab harus sudah disimpan; bila belum, rilis akan ditolak dan metadata tetap tersimpan.</p>' : '';
+      var tabel = typeof window.sipKisiTabelItemsHtml_ === 'function' ? window.sipKisiTabelItemsHtml_(p.items || []) : '';
+      var ok = await Swal.fire({ icon: 'question', title: 'Rilis kisi-kisi dari Bank Soal?', width: 860,
+        html: '<p><b>' + e(p.mapel) + '</b> · Kelas ' + e(p.kelas) + ' · ' + Number(p.jumlahSoal || 0) + ' soal.</p>' +
+          '<p>Materi, bab dan level C1–C6 diambil persis dari isian Admin pada Bank Soal. Siswa hanya menerima materi/bab, kompetensi umum serta level; <b>isi soal, kunci dan alasan tidak ditampilkan</b>.</p>' +
+          (berubah ? '<p class="sip-kisi-warning">Ada perubahan manual yang belum disimpan pada halaman ini; perubahan tersebut diganti oleh data Bank Soal.</p>' : '') + paket + tabel,
+        showCancelButton: true, confirmButtonText: 'Ya, simpan & rilis', cancelButtonText: 'Batal', focusCancel: true });
+      if (!ok.isConfirmed) return;
+      Swal.fire({ title: 'Menyimpan dan merilis…', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+      var r = await api('rilisKisiDariBankSoal', [id, { mode: 'rilis', setuju: true, bankHash: p.bankHash }]);
+      Swal.close();
+      if (typeof window.sipKisiMuatExam_ === 'function') { sibuk = false; await window.sipKisiMuatExam_(); }
+      await Swal.fire(r.success ? 'Kisi-kisi dirilis' : (r.tersimpan ? 'Tersimpan, belum dirilis' : 'Rilis ditolak'), r.message, r.success ? 'success' : (r.tersimpan ? 'warning' : 'error'));
+    } catch (err) {
+      Swal.close();
+      Swal.fire('Rilis belum berhasil', err.message, 'error');
+    } finally { sibuk = false; }
+  };
+  document.addEventListener('click', function (ev) { var n = ev.target.closest && ev.target.closest('#kisi-v2-langsung'); if (n) window.sipKisiRilisLangsung_(); });
+  var css = document.createElement('style'); css.id = 'sipintar-kisi-langsung-css';
+  css.textContent = '#kisi-v2-langsung{margin-left:6px}#kisi-v2-langsung:disabled{opacity:.6}.sip-kisi-kurang{text-align:left;max-height:240px;overflow:auto;font-size:13px;padding-left:18px;list-style:disc}';
+  document.head.appendChild(css);
+})();
+
+  </script>
+
+  <!-- FOTO PROFIL KAMERA, FOLDER SISWA DAN GERBANG MENU PEMBELAJARAN · sumber: web/profil-siswa.js -->
+  <script id="sipintar-profil-siswa">
+/* PROFIL SISWA v2 · 26 Oktober 2026 · tambahan, fungsi asli tidak dihapus.
+   1) Foto tajam & pas frame 3×4: dipotong (cover), diperkecil bertahap berkualitas
+      tinggi, tanpa latar merah/letterbox, lalu WAJIB dikompres < 1 MB.
+   2) Ambil foto langsung dari kamera (getUserMedia) dengan cadangan input kamera HP.
+   3) Ikon default (pocong) tampil selama belum ada foto sah; tidak pernah disimpan
+      sebagai fotoUrl.
+   4) Menu Pembelajaran (Materi, Penugasan, Jurnal, Kisi-Kisi) tersembunyi sampai
+      seluruh field profil terisi (foto tidak wajib), lalu tampil otomatis.
+   5) Unggah foto yang gagal tidak lagi menggagalkan penyimpanan profil. */
+(function () {
+  'use strict';
+  var DEF = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAQDAwQDAwQEBAQFBQQFBwsHBwYGBw4KCggLEA4RERAOEA8SFBoWEhMYEw8QFh8XGBsbHR0dERYgIh8cIhocHRz/2wBDAQUFBQcGBw0HBw0cEhASHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBz/wAARCAHgAWgDASIAAhEBAxEB/8QAHQABAAICAwEBAAAAAAAAAAAAAAYHBQgDBAkCAf/EAFYQAAEDAwEEBgUEDgcECQUBAAEAAgMEBREGBxIhMQgTIkFRYRQycYGRFSNCoRYYM1JiZ3KCkqWxwdHjCRckQ6KywmNzg+E1VFVWZpOVs9IlJjej8MP/xAAaAQEAAwEBAQAAAAAAAAAAAAAAAQIDBAUG/8QALBEBAAICAQMCBQQCAwAAAAAAAAECAxESBCExE0EiMlGh0QUVUmFxgRQzQv/aAAwDAQACEQMRAD8A1FREXmvlxERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQERckcJkPgFI40WUp7LJUYw/GfwcrJQ6NnmGRNj/h/81G0xWZRlFLhoKpIz1//AOv/AJr5+wSpz93/AP1/81G4W9O30RNFM4dnlTKcek4/4X/NZWl2RVdSR/bt3P8AsM/6lHOqYxXn2VuitebYr6JH1lbqCnpGffVEbWD/ABPCw9RofSlISJ9otmY4cwA1xHweVMWifC0dPlnxCAIpy3SWj5HBrNo9oLj4x7v1lyzVPscZXw9db9R0tbHjO9Tsa8f4XlJnXlM9NljzCrEVhVuymqowSa3ex/scf6lHqvSc9KSDLnH4GP3pFonwzmlo8wjyLvS2ySI8Tn3Lh9Dfnv8AgpU066LtCgkPj8F9fJ0vn8FKdS6aLsuopG8/2LhdC5vMfBEafCIiAiIoBERAREQEREBERAREQEREBERAREQEREBERARE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';
+  var BATAS = 1024 * 1024, TARGET = 900 * 1024, LEBAR = 720, MIN_LEBAR = 300;
+  var MENU = ['materi', 'tugas', 'jurnal', 'kisi'];
+  var asli = { siap: window.sipSiswaProfilSiap_, gerbang: window.sipTerapkanGerbangBelajarSiswa_, tab: window.showSiswaTab,
+    hub: window.showStudentHub, pilih: window.sipProfilPickFoto_, foto: window.sipSetSiswaFotoUI_, ikat: window.sipBindFotoImg_,
+    kandidat: window.sipProfilFotoCandidates_, form: window.profilFormHtml_, komit: window.sipCommitProfilFotoThen_ };
+  var S = { ulangFoto: false, stream: null, hadap: 'user' };
+  window.SIPINTAR_PROFIL_ASLI = asli;
+  window.SIPINTAR_FOTO_DEFAULT = DEF;
+  window.SIPINTAR_FOTO_BATAS = BATAS;
+  function el(id) { return document.getElementById(id); }
+  function pesan(t) { var m = el('pf-foto-msg'); if (m) m.textContent = t; }
+  function lengkapKlien(p) {
+    if (typeof window.sipProfilMissingFields_ === 'function') return !window.sipProfilMissingFields_(p).length;
+    return ['namaLengkap','nisn','nis','nomorAbsen','kelas','tempatLahir','tanggalLahir','jenisKelamin','agama','alamat','noHP','namaOrtu','noHPOrtu']
+      .every(function (k) { return String((p && p[k]) || '').trim(); });
+  }
+
+  /* ---------- Gerbang Menu Pembelajaran ---------- */
+  function siap() {
+    var p = window._siswaProfilCache;
+    if (!p) return false;
+    if (p.profilLengkap === true) return true;
+    if (p.profilLengkap === false && Array.isArray(p.profilKurang) && p.profilKurang.length) return false;
+    return lengkapKlien(p);
+  }
+  window.sipSiswaProfilSiap_ = siap;
+  window.sipTerapkanGerbangBelajarSiswa_ = function () {
+    var ok = siap(), mod = el('siswa-mod-belajar');
+    if (mod) { mod.classList.toggle('sip-belajar-terkunci', !ok); mod.hidden = !ok; mod.setAttribute('aria-hidden', ok ? 'false' : 'true'); }
+    MENU.forEach(function (t) { var b = el('siswa-nav-' + t); if (b) b.classList.toggle('hidden', !ok); });
+    var info = el('sip-belajar-info');
+    if (info) info.hidden = ok;
+    if (ok && S.ulangFoto && window._sipProfilFotoPending) {
+      S.ulangFoto = false;
+      setTimeout(function () { if (typeof window.sipAutoSimpanFotoProfil_ === 'function') window.sipAutoSimpanFotoProfil_(el('pf-foto-msg')); }, 60);
+    }
+    return ok;
+  };
+  if (typeof asli.tab === 'function') {
+    window.showSiswaTab = function (tab) {
+      if ((tab === 'jurnal' || tab === 'kisi') && !siap()) {
+        if (window.Swal) Swal.fire({ icon: 'info', title: 'Lengkapi profil dulu', text: 'Menu Pembelajaran terbuka setelah seluruh field profil diisi. Foto boleh ditambahkan nanti.' });
+        tab = 'profil';
+      }
+      return asli.tab.call(this, tab);
+    };
+  }
+  if (typeof asli.hub === 'function') {
+    window.showStudentHub = function () {
+      /* Jangan memakai profil akun sebelumnya pada perangkat yang sama. */
+      window._siswaProfilCache = null;
+      window.sipTerapkanGerbangBelajarSiswa_();
+      return asli.hub.apply(this, arguments);
+    };
+  }
+
+  /* ---------- Tampilan foto + ikon default ---------- */
+  window.sipProfilFotoCandidates_ = function (url) {
+    var list = typeof asli.kandidat === 'function' ? asli.kandidat(url) : (url ? [url] : []);
+    var m = String(url || '').match(/\/d\/([a-zA-Z0-9_-]+)/) || String(url || '').match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (m && String(url).indexOf('data:') !== 0) list.unshift('https://lh3.googleusercontent.com/d/' + m[1] + '=w1000');
+    return list.filter(function (x, i) { return x && list.indexOf(x) === i; });
+  };
+  function pasangDefault(img) {
+    if (!img) return;
+    img.onerror = null; img.onload = null;
+    img.src = DEF; img.dataset.sipDefault = '1';
+    img.classList.remove('hidden');
+    img.alt = 'Foto belum diunggah';
+  }
+  window.sipBindFotoImg_ = function (img, url) {
+    if (!img) return;
+    var srcs = window.sipProfilFotoCandidates_(url), i = 0;
+    if (!srcs.length) return pasangDefault(img);
+    img.dataset.sipDefault = '';
+    img.alt = 'Foto profil';
+    img.onload = function () { img.classList.remove('hidden'); };
+    img.onerror = function () { i += 1; if (i < srcs.length) img.src = srcs[i]; else pasangDefault(img); };
+    img.src = srcs[0];
+  };
+  window.sipSetSiswaFotoUI_ = function (url) {
+    if (typeof asli.foto === 'function') asli.foto.apply(this, arguments);
+    if (url) return;
+    var pend = window._sipProfilFotoPending, prev = el('pf-foto-preview'), head = el('siswa-eb-head-foto');
+    if (pend && pend.dataUrl && prev) { prev.src = pend.dataUrl; prev.dataset.sipDefault = ''; prev.classList.remove('hidden'); }
+    else pasangDefault(prev);
+    pasangDefault(head);
+    ['pf-foto-ph', 'siswa-eb-head-foto-ph'].forEach(function (id) { var n = el(id); if (n) n.classList.add('hidden'); });
+  };
+
+  /* ---------- Pengolahan foto: crop 3×4, tajam, < 1 MB ---------- */
+  function potong(src, iw, ih, lebar) {
+    var cw, ch, cx, cy;
+    if (iw / ih > 0.75) { ch = ih; cw = ih * 0.75; cx = (iw - cw) / 2; cy = 0; }
+    else { cw = iw; ch = iw / 0.75; cx = 0; cy = Math.max(0, (ih - ch) * 0.3); } // sedikit ke atas: wajah tidak terpotong
+    var w = Math.max(MIN_LEBAR, Math.min(lebar, Math.round(cw))), h = Math.round(w * 4 / 3);
+    /* Perkecil bertahap (maks. setengah per langkah) agar detail tidak pecah. */
+    var cur = src, sx = cx, sy = cy, sw = cw, sh = ch;
+    while (sw > w * 2) {
+      var tw = Math.round(sw / 2), th = Math.round(sh / 2), t = document.createElement('canvas');
+      t.width = tw; t.height = th;
+      var tc = t.getContext('2d'); tc.imageSmoothingEnabled = true; tc.imageSmoothingQuality = 'high';
+      tc.drawImage(cur, sx, sy, sw, sh, 0, 0, tw, th);
+      cur = t; sx = 0; sy = 0; sw = tw; sh = th;
+    }
+    var c = document.createElement('canvas'); c.width = w; c.height = h;
+    var ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h); // hanya untuk PNG transparan, bukan pengganti latar
+    ctx.drawImage(cur, sx, sy, sw, sh, 0, 0, w, h);
+    return c;
+  }
+  function blobKe(canvas, q) {
+    return new Promise(function (ok) {
+      if (canvas.toBlob) return canvas.toBlob(function (b) { ok(b); }, 'image/jpeg', q);
+      var du = canvas.toDataURL('image/jpeg', q), bin = atob(du.split(',')[1]), arr = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      ok(new Blob([arr], { type: 'image/jpeg' }));
+    });
+  }
+  function keDataUrl(b) {
+    return new Promise(function (ok, no) { var r = new FileReader(); r.onload = function () { ok(r.result); }; r.onerror = function () { no(new Error('Foto tidak dapat dibaca.')); }; r.readAsDataURL(b); });
+  }
+  /* Kompres wajib: kualitas diturunkan bertahap, lalu ukuran bila perlu. */
+  async function kompres(src, iw, ih) {
+    var lebar = LEBAR;
+    for (var putaran = 0; putaran < 8; putaran++) {
+      var canvas = potong(src, iw, ih, lebar);
+      for (var q = 0.92; q >= 0.5; q -= 0.06) {
+        var b = await blobKe(canvas, q);
+        if (!b) throw new Error('Gagal mengompres foto.');
+        if (b.size <= TARGET) {
+          var du = await keDataUrl(b);
+          if (Math.floor(du.split(',')[1].length * 3 / 4) >= BATAS) continue;
+          return { dataUrl: du, bytes: b.size, lebar: canvas.width, tinggi: canvas.height, kualitas: Math.round(q * 100) };
+        }
+      }
+      lebar = Math.round(lebar * 0.85);
+      if (lebar < MIN_LEBAR) break;
+    }
+    throw new Error('Foto tidak dapat dikompres di bawah 1 MB. Gunakan foto lain.');
+  }
+  window.sipProfilKompresFoto_ = kompres;
+  async function prosesSumber(src, iw, ih, tutup) {
+    try {
+      if (iw < 120 || ih < 160) throw new Error('Resolusi terlalu kecil (minimal 120×160 piksel).');
+      pesan('Memotong 3×4 dan mengompres foto…');
+      var r = await kompres(src, iw, ih);
+      window._sipProfilFotoPending = { dataUrl: r.dataUrl, name: 'foto-profil.jpg', type: 'image/jpeg', bytes: r.bytes };
+      window.sipSetSiswaFotoUI_(r.dataUrl);
+      pesan('Foto dipotong pas frame 3×4 (' + r.lebar + '×' + r.tinggi + ' px) dan dikompres ' + Math.max(1, Math.round(r.bytes / 1024)) + ' KB (di bawah 1 MB). Menyimpan ke folder foto…');
+      if (typeof window.sipAutoSimpanFotoProfil_ === 'function') window.sipAutoSimpanFotoProfil_(el('pf-foto-msg'));
+      return r;
+    } catch (err) {
+      window._sipProfilFotoPending = null;
+      pesan(err.message);
+      if (window.Swal) Swal.fire('Foto ditolak', err.message, 'error');
+      return null;
+    } finally { if (tutup && src && src.close) try { src.close(); } catch (e) {} }
+  }
+  window.sipProfilPickFoto_ = function (inp) {
+    window._sipProfilFotoPending = null;
+    if (!inp || !inp.files || !inp.files[0]) return;
+    var file = inp.files[0];
+    inp.value = '';
+    if (!/^image\//i.test(file.type) && !/\.(jpe?g|png|webp|heic|heif)$/i.test(file.name || ''))
+      return Swal.fire('Foto ditolak', 'Pilih berkas gambar (JPG/PNG/WEBP).', 'error');
+    if (file.size > 25 * 1024 * 1024) return Swal.fire('Foto ditolak', 'File asli terlalu besar (maks. 25 MB sebelum dikompres).', 'error');
+    pesan('Membaca foto…');
+    window.sipLoadImageFile_(file, function (src, iw, ih, isBmp) { prosesSumber(src, iw, ih, isBmp); },
+      function (t) { pesan(t); Swal.fire('Foto ditolak', t, 'error'); });
+  };
+
+  /* ---------- Kamera ---------- */
+  function hentikan() { if (S.stream) { S.stream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} }); S.stream = null; } }
+  function cadangan() {
+    var inp = el('pf-foto-kamera');
+    if (inp) inp.click();
+    else Swal.fire('Kamera tidak tersedia', 'Gunakan tombol Pilih dari galeri.', 'info');
+  }
+  async function nyalakan(video) {
+    hentikan();
+    S.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: S.hadap, width: { ideal: 1280 }, height: { ideal: 1706 } } });
+    video.srcObject = S.stream;
+    video.classList.toggle('sip-cermin', S.hadap === 'user');
+    await video.play().catch(function () {});
+  }
+  window.sipProfilBukaKamera_ = async function () {
+    if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) || window.isSecureContext === false) return cadangan();
+    var gagal = null;
+    var res = await Swal.fire({
+      title: 'Ambil foto profil',
+      html: '<div class="sip-kam-wrap"><video id="sip-kam-video" playsinline autoplay muted></video><div class="sip-kam-bingkai" aria-hidden="true"></div></div>' +
+        '<p class="sip-kam-tip">Posisikan wajah di dalam bingkai 3×4, cahaya dari depan, latar polos.</p>',
+      showCancelButton: true, showDenyButton: true, confirmButtonText: '📸 Ambil foto', denyButtonText: '🔄 Ganti kamera', cancelButtonText: 'Batal',
+      allowOutsideClick: false, width: 460,
+      didOpen: function () {
+        nyalakan(el('sip-kam-video')).catch(function (e) { gagal = e; Swal.close(); });
+      },
+      preDeny: function () {
+        S.hadap = S.hadap === 'user' ? 'environment' : 'user';
+        nyalakan(el('sip-kam-video')).catch(function () { S.hadap = 'user'; });
+        return false;
+      },
+      preConfirm: function () {
+        var v = el('sip-kam-video');
+        if (!v || !v.videoWidth) { Swal.showValidationMessage('Kamera belum siap. Tunggu sebentar.'); return false; }
+        var c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight;
+        c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+        return c;
+      },
+      willClose: hentikan
+    });
+    hentikan();
+    if (gagal) {
+      await Swal.fire({ icon: 'info', title: 'Kamera tidak dapat dibuka', text: 'Izin kamera ditolak atau tidak tersedia di mode ini. Membuka kamera bawaan HP sebagai cadangan.', timer: 2600, showConfirmButton: false });
+      return cadangan();
+    }
+    if (res && res.isConfirmed && res.value) return prosesSumber(res.value, res.value.width, res.value.height, false);
+  };
+
+  /* ---------- Formulir: tombol kamera, teks petunjuk, info folder ---------- */
+  function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  if (typeof asli.form === 'function') {
+    window.profilFormHtml_ = function (p) {
+      var html = String(asli.form.apply(this, arguments) || '');
+      html = html.replace(/Latar merah <b>tidak perlu<\/b>[^<]*/, 'Latar <b>polos & terang</b> dianjurkan; warna foto <b>tidak diubah</b>.')
+        .replace(/Frame <b>3×4<\/b>, dari galeri HP\./, 'Frame <b>3×4</b> dari <b>kamera</b> atau galeri — otomatis dipotong pas frame dan <b>wajib dikompres di bawah 1 MB</b>.');
+      var galeri = '<label class="inline-flex items-center px-3 py-2 rounded-lg bg-[#1b3a6b] text-white text-xs font-bold cursor-pointer"><i class="fas fa-images mr-1"></i> Pilih dari galeri';
+      if (html.indexOf(galeri) >= 0) {
+        html = html.replace(galeri, '<button type="button" id="pf-foto-kamera-btn" onclick="sipProfilBukaKamera_()" class="inline-flex items-center px-3 py-2 mr-2 mb-1 rounded-lg bg-teal-600 text-white text-xs font-bold"><i class="fas fa-camera mr-1"></i> Ambil dari kamera</button>' +
+          '<input id="pf-foto-kamera" type="file" accept="image/*" capture="user" class="sr-only-foto" tabindex="-1" aria-hidden="true" onchange="sipProfilPickFoto_(this)">' + galeri);
+      }
+      if (p && p.folderNama) {
+        html = html.replace(/(<p id="pf-foto-msg"[^>]*>[\s\S]*?<\/p>)/, '$1<p class="sip-pf-folder"><i class="fas fa-folder-open mr-1"></i>Folder Drive: ' + esc(p.folderKelas || p.kelas || '') + ' › ' + esc(p.folderNama) + '</p>');
+      }
+      html = html.replace('Foto belum wajib. Bisa diunggah nanti.', 'Foto belum wajib. Ikon default tampil sampai foto diunggah.');
+      return html;
+    };
+  }
+
+  /* ---------- Simpan profil tidak lagi bergantung pada foto ---------- */
+  window.sipCommitProfilFotoThen_ = function (payload, onOk) {
+    var pend = window._sipProfilFotoPending;
+    if (!pend) return onOk(payload);
+    var selesai = false;
+    function lanjut(m) {
+      if (selesai) return; selesai = true;
+      S.ulangFoto = true;
+      pesan('Foto belum terunggah (' + (m || 'gagal') + '). Profil tetap disimpan; foto dicoba lagi otomatis.');
+      onOk(payload);
+    }
+    google.script.run.withSuccessHandler(function (res) {
+      if (!res || !res.success) return lanjut(res && res.message);
+      if (selesai) return; selesai = true;
+      payload.fotoUrl = res.fotoUrl;
+      var inp = el('pf-fotoUrl'); if (inp) inp.value = res.fotoUrl || '';
+      window._sipProfilFotoPending = null;
+      onOk(payload);
+    }).withFailureHandler(function (err) { lanjut(String((err && err.message) || err)); })
+      .uploadProfilFoto(pend.dataUrl, pend.name, payload.nomorAbsen || '', currentUser.userID, currentUser.token, payload.userID || currentUser.userID);
+  };
+
+  var css = document.createElement('style'); css.id = 'sipintar-profil-siswa-css';
+  css.textContent = '.sip-pf-frame{background:#e2e8f0!important}.sip-pf-frame img{object-fit:cover!important;object-position:center top!important;background:#e2e8f0!important;image-rendering:auto}' +
+    '.sip-pf-frame.sip-pf-frame-head{width:42px!important;height:56px!important;background:#0b3a1a!important}.sip-pf-frame .sip-pf-ph{color:#475569!important}' +
+    '#siswa-mod-belajar.sip-belajar-terkunci,#siswa-mod-belajar[hidden]{display:none!important}' +
+    '.sip-pf-folder{font-size:11px;color:#0f766e;margin-top:4px;word-break:break-word}' +
+    '.sip-kam-wrap{position:relative;width:100%;max-width:360px;margin:0 auto;aspect-ratio:3/4;background:#0f172a;border-radius:12px;overflow:hidden}' +
+    '.sip-kam-wrap video{width:100%;height:100%;object-fit:cover;display:block}.sip-kam-wrap video.sip-cermin{transform:scaleX(-1)}' +
+    '.sip-kam-bingkai{position:absolute;inset:8%;border:2px dashed rgba(255,255,255,.85);border-radius:10px;pointer-events:none}' +
+    '.sip-kam-tip{font-size:12px;color:#475569;margin-top:8px}';
+  document.head.appendChild(css);
+  window.sipTerapkanGerbangBelajarSiswa_();
+})();
+
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5069997ad8ffd41',t:'MTc5Mjk4NzcwOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 <!-- Lisensi MathJax tertanam:
 
                                  Apache License
