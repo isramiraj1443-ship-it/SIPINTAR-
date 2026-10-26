@@ -64,7 +64,7 @@
   /* --- Aksi berat/lama → utamakan jalur LANGSUNG ke GAS (tanpa proxy),
          karena proxy Vercel punya batas waktu ± 60 detik. --- */
   var SLOW_ACTIONS = [
-    'generateQuestionsAI', 'generateQuestionImageAI', 'buatSoalDariKisiAI', 'perbaikiSoalKognitifAI', 'verifikasiLevelKognitifAI',
+    'generateQuestionsAI', 'generateQuestionImageAI', 'buatSoalDariKisiAI', 'perbaikiSoalKognitifAI', 'verifikasiLevelKognitifAI', 'uploadGambarJawaban', 'rilisKisiDariBankSoal',
     'buatKisiKisi', 'generateExamRecapPDF', 'generateStudentDetailPDF',
     'exportKartuUjianToFolder', 'exportBelajarPdfA4', 'exportJurnalPdfA4',
     'exportBankSoalFile', 'unduhKisiKisi', 'unduhKisiKisiSiswa',
@@ -78,7 +78,7 @@
 
   /* --- Aksi yang dilarang diulang-otomatis (efek samping permanen) --- */
   var NEVER_RETRY = ['submitExam', 'syncAnswers', 'logViolation', 'saveEssayGrade',
-    'saveImportedQuestions', 'saveAIQuestions', 'kumpulPenugasanSiswa', 'perbaikiSoalKognitifAI', 'simpanPaketMateri', 'verifikasiLevelKognitifAI'];
+    'saveImportedQuestions', 'saveAIQuestions', 'kumpulPenugasanSiswa', 'perbaikiSoalKognitifAI', 'simpanPaketMateri', 'verifikasiLevelKognitifAI', 'uploadGambarJawaban', 'rilisKisiDariBankSoal'];
 
   var STORE_KEY = 'sipintar_api_channel_v1';
   var MEM = { channel: null, at: 0, probe: null, probes: 0 };
