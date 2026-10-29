@@ -3,7 +3,9 @@
    Dipakai api-client.js pada browser yang tidak mendukung Proxy. */
 window.SIPINTAR_API_ACTIONS = [
   'addQuestion',
+  'aturTerbitPerangkingan',
   'buatKisiKisi',
+  'buatPerangkinganUjian',
   'buatSoalDariKisiAI',
   'bulkResetStudents',
   'bulkUnlockStudents',
@@ -70,6 +72,7 @@ window.SIPINTAR_API_ACTIONS = [
   'getPaketMateri',
   'getPapanPeringkatSiswa',
   'getPenugasan',
+  'getPerangkinganUjian',
   'getPosisiGambarSoal',
   'getQuestionDiagnostics',
   'getQuestionsByExam',
@@ -116,6 +119,7 @@ window.SIPINTAR_API_ACTIONS = [
   'listKumpulPenugasan',
   'listMateriPembelajaran',
   'listPenugasan',
+  'listPerangkinganSiswa',
   'listSiswaKelas',
   'listSoalUntukTautan',
   'listStudentProfiles',
