@@ -22363,6 +22363,7 @@ function sipSisipTandaGambar_() {
 
       items.forEach(function (it) {
         var kartu = el('div', 'sip-nilai-kartu');
+        if (it.examId) kartu.setAttribute('data-exam-id', String(it.examId));   /* dipakai tombol Peringkat resmi */
         var kiri = el('div');
         kiri.style.minWidth = '10rem';
         kiri.innerHTML =
@@ -26069,7 +26070,463 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
 })();
 
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a51e3c21debcfd2c',t:'MTc5MzIzNTUzOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+  <!-- PERANGKINGAN RESMI HASIL & NILAI PER MATA UJIAN · sumber: web/perangkingan-hasil.js -->
+  <script id="sipintar-perangkingan-hasil">
+/* PERANGKINGAN RESMI HASIL & NILAI v1.0.0 — 29 Oktober 2026. Tambahan murni.
+   Admin (menu Hasil & Nilai): tombol "🏆 Perangkingan" di samping "Koreksi & Isi Nilai".
+     → periksa kelengkapan koreksi/validasi → pratinjau urutan → simpan & terbitkan.
+     Tabel peringkat: filter kelas, cari nama, unduh Excel, cetak/PDF, terbitkan/tarik.
+   Siswa: papan peringkat mendapat tab "Hasil resmi" (peringkat ujian yang sudah
+     disahkan Admin, hanya untuk ujian yang ia kerjakan) di samping tab
+     "Sedang berlangsung" (papan live yang sudah ada), plus tombol Peringkat pada
+     kartu Nilai Saya. Tidak mengubah fungsi/menu bawaan. */
+(function () {
+  'use strict';
+  if (window.SIPINTAR_PERANGKINGAN_VERSI) return;
+  window.SIPINTAR_PERANGKINGAN_VERSI = '1.0.0';
+
+  function sesi() { var cu = window.currentUser; return cu && cu.userID && cu.token ? cu : null; }
+  function peran() { var s = sesi(); return String((s && s.role) || '').toLowerCase(); }
+  function panggil(aksi, args) {
+    return new Promise(function (ok, gagal) {
+      var r = window.google && window.google.script && window.google.script.run;
+      if (!r) { gagal(new Error('Mesin API belum siap. Muat ulang halaman.')); return; }
+      try { var c = r.withSuccessHandler(ok).withFailureHandler(gagal); c[aksi].apply(c, args || []); } catch (e) { gagal(e); }
+    });
+  }
+  function esc(t) {
+    return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function el(tag, kelas, isi) { var d = document.createElement(tag); if (kelas) d.className = kelas; if (isi != null) d.innerHTML = isi; return d; }
+  function pesanGagal(e) { return (e && e.message) ? e.message : String(e || 'Terjadi kesalahan.'); }
+  function medali(n) { return n === 1 ? '&#129351;' : n === 2 ? '&#129352;' : n === 3 ? '&#129353;' : esc(n); }
+  function namaBerkas(s) { return String(s || 'Peringkat').replace(/[,;\/|]+/g, ' ').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') || 'Peringkat'; }
+
+  function pasangGaya() {
+    if (document.getElementById('sip-rank-gaya')) return;
+    var css = ''
+      + '#btn-perangkingan{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:.625rem 1rem;border-radius:.75rem;font-size:.875rem;font-weight:700;display:inline-flex;align-items:center;gap:.5rem;box-shadow:0 10px 15px -3px rgba(245,158,11,.3)}'
+      + '#btn-perangkingan:hover{filter:brightness(1.07)}#btn-perangkingan[hidden]{display:none!important}'
+      + '#sip-rank-status{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px;border-radius:14px;border:1px solid #fde68a;background:#fffbeb;color:#78350f;font-size:.8rem;margin-bottom:12px}'
+      + '#sip-rank-status b{color:#92400e}#sip-rank-status .ket{flex:1 1 16rem}'
+      + '#sip-rank-status button,.sip-rk-aksi button{border-radius:10px;padding:6px 11px;font-weight:700;font-size:.76rem;border:1px solid #fcd34d;background:#fff;color:#92400e;cursor:pointer}'
+      + '.sip-rk-lapis{position:fixed;inset:0;z-index:9997;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:12px}'
+      + '.sip-rk-jendela{background:#fff;color:#0f172a;width:100%;max-width:980px;max-height:92vh;display:flex;flex-direction:column;border-radius:18px;box-shadow:0 25px 50px rgba(0,0,0,.35);overflow:hidden}'
+      + '.sip-rk-kepala{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 18px;border-bottom:1px solid #e2e8f0;background:linear-gradient(135deg,#fffbeb,#fff)}'
+      + '.sip-rk-kepala h3{margin:0;font-size:1.02rem;font-weight:900;color:#78350f}.sip-rk-kepala small{display:block;color:#64748b;font-weight:600}'
+      + '.sip-rk-isi{padding:14px 18px;overflow:auto}'
+      + '.sip-rk-tutup{border:1px solid #cbd5e1;background:#fff;border-radius:10px;padding:4px 11px;font-weight:900;cursor:pointer}'
+      + '.sip-rk-ringkas{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}'
+      + '.sip-rk-ringkas div{flex:1 1 8rem;border:1px solid #e2e8f0;border-radius:12px;padding:8px 11px;background:#f8fafc}'
+      + '.sip-rk-ringkas small{display:block;font-size:.66rem;text-transform:uppercase;letter-spacing:.08em;color:#64748b}.sip-rk-ringkas b{font-size:1.25rem}'
+      + '.sip-rk-blok{border:1px solid #fecaca;background:#fef2f2;color:#7f1d1d;border-radius:12px;padding:10px 13px;font-size:.82rem;margin-bottom:12px}'
+      + '.sip-rk-blok ul{margin:6px 0 0 18px;list-style:disc}.sip-rk-blok li{margin:3px 0}'
+      + '.sip-rk-info{border:1px solid #bfdbfe;background:#eff6ff;color:#1e3a8a;border-radius:12px;padding:9px 12px;font-size:.78rem;margin-bottom:10px}'
+      + '.sip-rk-warn{border:1px solid #fde68a;background:#fffbeb;color:#78350f;border-radius:12px;padding:9px 12px;font-size:.78rem;margin-bottom:10px}'
+      + '.sip-rk-alat{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}'
+      + '.sip-rk-alat select,.sip-rk-alat input{border:1px solid #cbd5e1;border-radius:10px;padding:6px 10px;font-size:.8rem}'
+      + '.sip-rk-tabel{width:100%;border-collapse:collapse;font-size:.8rem}'
+      + '.sip-rk-tabel th{position:sticky;top:0;background:#f1f5f9;text-align:left;padding:7px 8px;font-size:.66rem;text-transform:uppercase;letter-spacing:.07em;color:#475569;border-bottom:1px solid #cbd5e1}'
+      + '.sip-rk-tabel td{padding:7px 8px;border-bottom:1px solid #e2e8f0}.sip-rk-tabel td.num{text-align:right;font-variant-numeric:tabular-nums}'
+      + '.sip-rk-tabel tr.top td{background:#fffbeb}.sip-rk-tabel .no{font-weight:900;width:3rem}'
+      + '.sip-rk-aksi{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;padding:12px 18px;border-top:1px solid #e2e8f0;background:#f8fafc}'
+      + '.sip-rk-aksi button.utama{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border-color:#d97706}'
+      + '.sip-rk-aksi button.merah{color:#b91c1c;border-color:#fecaca}'
+      + '.sip-rk-aksi label{margin-right:auto;font-size:.78rem;display:flex;gap:6px;align-items:center;color:#334155}'
+      + '.sip-rk-tidak{margin-top:12px;font-size:.78rem;color:#475569}.sip-rk-tidak summary{cursor:pointer;font-weight:700}'
+      + '.sip-rk-tab{display:flex;gap:6px;margin-bottom:12px;padding:4px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(148,163,184,.25)}'
+      + '.sip-rk-tab button{flex:1;border:0;border-radius:9px;padding:7px 8px;font-size:.76rem;font-weight:800;cursor:pointer;background:transparent;color:#cbd5e1}'
+      + '.sip-rk-tab button.aktif{background:linear-gradient(135deg,#f5d76e,#d4a017);color:#3d2b00}'
+      + '.sip-pk-resmi{font-size:.62rem;font-weight:900;letter-spacing:.1em;color:#fde68a;background:rgba(245,215,110,.16);border:1px solid rgba(245,215,110,.5);border-radius:999px;padding:2px 8px}'
+      + '@media (max-width:640px){.sip-rk-tabel .opsional{display:none}.sip-rk-isi{padding:12px}}';
+    var s = el('style', null, css); s.id = 'sip-rank-gaya'; document.head.appendChild(s);
+  }
+
+  /* ============================== ADMIN ============================== */
+  function tutupRk() { var m = document.getElementById('sip-rank-modal'); if (m) m.remove(); }
+  function bukaRk(judul, sub) {
+    tutupRk();
+    var lapis = el('div', 'sip-rk-lapis'); lapis.id = 'sip-rank-modal';
+    var j = el('div', 'sip-rk-jendela'); j.setAttribute('role', 'dialog'); j.setAttribute('aria-modal', 'true');
+    var k = el('div', 'sip-rk-kepala', '<div><h3>' + esc(judul) + '</h3><small>' + esc(sub || '') + '</small></div>');
+    var t = el('button', 'sip-rk-tutup', '&times;'); t.type = 'button'; t.setAttribute('aria-label', 'Tutup'); t.onclick = tutupRk; k.appendChild(t);
+    var isi = el('div', 'sip-rk-isi', '<div style="padding:24px;text-align:center;color:#64748b">Memeriksa Hasil &amp; Nilai…</div>');
+    var aksi = el('div', 'sip-rk-aksi');
+    j.appendChild(k); j.appendChild(isi); j.appendChild(aksi); lapis.appendChild(j);
+    lapis.addEventListener('click', function (e) { if (e.target === lapis) tutupRk(); });
+    document.body.appendChild(lapis);
+    return { isi: isi, aksi: aksi, kepala: k };
+  }
+  function tombol(teks, kelas, fn) { var b = el('button', kelas || null, teks); b.type = 'button'; b.onclick = fn; return b; }
+
+  function ujianTerpilih() { var s = document.getElementById('select-result-exam'); return s ? String(s.value || '') : ''; }
+  function namaUjian(eid) {
+    var s = document.getElementById('select-result-exam'), o = s && s.options[s.selectedIndex];
+    return (o && o.value === eid ? o.textContent : '') || eid;
+  }
+
+  /* Tabel peringkat + filter kelas + cari (dipakai pratinjau & tersimpan). */
+  function tabelPeringkat(data) {
+    var w = el('div');
+    var kelas = []; data.forEach(function (r) { if (r.kelas && kelas.indexOf(r.kelas) < 0) kelas.push(r.kelas); }); kelas.sort();
+    var alat = el('div', 'sip-rk-alat');
+    var pilih = el('select'); pilih.setAttribute('aria-label', 'Filter kelas'); pilih.id = 'sip-rk-kelas';
+    pilih.innerHTML = '<option value="">Semua kelas (' + data.length + ')</option>' + kelas.map(function (k) {
+      return '<option value="' + esc(k) + '">Kelas ' + esc(k) + ' (' + data.filter(function (r) { return r.kelas === k; }).length + ')</option>'; }).join('');
+    var cari = el('input'); cari.type = 'search'; cari.placeholder = 'Cari nama…'; cari.id = 'sip-rk-cari';
+    alat.appendChild(pilih); alat.appendChild(cari); w.appendChild(alat);
+    var tabel = el('table', 'sip-rk-tabel'); tabel.id = 'sip-rk-tabel';
+    tabel.innerHTML = '<thead><tr><th>Peringkat</th><th>Nama</th><th>Kelas</th><th class="num">Nilai</th><th class="num">Peringkat Kelas</th><th class="opsional">Waktu Pengerjaan</th><th class="opsional">Dikumpulkan</th></tr></thead>';
+    var tb = el('tbody'); tabel.appendChild(tb); w.appendChild(tabel);
+    function gambar() {
+      var k = pilih.value, q = cari.value.trim().toLowerCase(), n = 0;
+      tb.innerHTML = '';
+      data.forEach(function (r) {
+        if (k && r.kelas !== k) return;
+        if (q && String(r.nama).toLowerCase().indexOf(q) < 0) return;
+        n++;
+        var tr = el('tr', r.peringkat <= 3 ? 'top' : null);
+        tr.innerHTML = '<td class="no">' + (r.peringkat <= 3 ? medali(r.peringkat) + ' ' : '') + esc(r.peringkat) + '</td><td>' + esc(r.nama) + '</td><td>' + esc(r.kelas) + '</td><td class="num"><b>' + esc(r.nilai) + '</b></td>' +
+          '<td class="num">' + esc(r.peringkatKelas) + '</td><td class="opsional">' + esc(r.waktu || '-') + '</td><td class="opsional">' + esc(r.dikumpulkan || '-') + '</td>';
+        tb.appendChild(tr);
+      });
+      if (!n) tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">Tidak ada data.</td></tr>';
+    }
+    pilih.onchange = gambar; cari.oninput = gambar; gambar();
+    w.saring = function () { var k = pilih.value; return data.filter(function (r) { return !k || r.kelas === k; }); };
+    w.kelasDipilih = function () { return pilih.value; };
+    return w;
+  }
+  function daftarTidakMasuk(arr) {
+    if (!arr || !arr.length) return null;
+    var d = el('details', 'sip-rk-tidak');
+    d.innerHTML = '<summary>Tidak masuk peringkat (' + arr.length + ')</summary><ul style="margin:6px 0 0 18px;list-style:disc">' +
+      arr.map(function (x) { return '<li>' + esc(x.nama) + (x.kelas ? ' (' + esc(x.kelas) + ')' : '') + ' — ' + esc(x.alasan) + '</li>'; }).join('') + '</ul>';
+    return d;
+  }
+  function tabelHtmlUnduh(judul, data) {
+    var baris = data.map(function (r) {
+      return '<tr><td>' + esc(r.peringkat) + '</td><td>' + esc(r.nama) + '</td><td>' + esc(r.kelas) + '</td><td>' + esc(r.nilai) + '</td><td>' + esc(r.peringkatKelas) + '</td><td>' + esc(r.waktu || '') + '</td><td>' + esc(r.dikumpulkan || '') + '</td></tr>';
+    }).join('');
+    return '<table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse;font-family:Arial;font-size:11pt"><caption style="font-weight:bold;font-size:13pt;margin-bottom:6px">' + esc(judul) + '</caption>' +
+      '<thead><tr style="background:#fde68a"><th>Peringkat</th><th>Nama</th><th>Kelas</th><th>Nilai</th><th>Peringkat Kelas</th><th>Waktu Pengerjaan</th><th>Dikumpulkan</th></tr></thead><tbody>' + baris + '</tbody></table>';
+  }
+  function unduhExcel(judul, data) {
+    var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body>' + tabelHtmlUnduh(judul, data) + '<\/body><\/html>';
+    var blob = new Blob(['\ufeff' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = namaBerkas(judul) + '.xls';
+    document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  }
+  function cetak(judul, data) {
+    var w = null; try { w = window.open('', '_blank'); } catch (e) {}
+    if (!w) { alert('Jendela cetak diblokir browser. Izinkan pop-up lalu coba lagi.'); return; }
+    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>' + esc(judul) + '</title><style>body{font-family:Arial,sans-serif;padding:18px}table{width:100%}th,td{text-align:left}td:nth-child(1),td:nth-child(4),td:nth-child(5){text-align:center}</style></head><body>' +
+      tabelHtmlUnduh(judul, data) + '<p style="font-size:9pt;color:#555;margin-top:10px">Urutan: nilai tertinggi → waktu pengerjaan tersingkat → nama. Nilai sama = peringkat sama. Dicetak ' + esc(new Date().toLocaleString('id-ID')) + '.</p><\/body><\/html>');
+    w.document.close(); w.focus(); setTimeout(function () { try { w.print(); } catch (e) {} }, 300);
+  }
+  function judulUnduh(res, wTabel) {
+    var k = wTabel && wTabel.kelasDipilih ? wTabel.kelasDipilih() : '';
+    return 'Peringkat ' + (res.mapel || 'Ujian') + (res.kelas ? ' ' + res.kelas : '') + (k ? ' - Kelas ' + k : '');
+  }
+
+  /* Baris tabel Hasil & Nilai yang validasinya masih usulan otomatis "Valid". */
+  function usulanValid(eid, eidServer) {
+    var data = [];
+    try { data = (typeof allResultsData !== 'undefined' && Array.isArray(allResultsData)) ? allResultsData : []; } catch (e) { data = []; }
+    if (ujianTerpilih() !== eid) return [];
+    return data.filter(function (r) {
+      var st = String(r.status || '').toLowerCase().trim();
+      return r && r.responseId && String(r.examId || eidServer) === String(eidServer || eid) && !r.validasi && r.autoValidasi === 'Valid' && /^(completed|selesai|waktu habis)$/.test(st);
+    }).map(function (r) { return { rid: String(r.responseId), sid: String(r.studentId || r.userID || ''), nama: String(r.name || r.studentId || ''), cat: r.validasiCatatan || '' }; });
+  }
+  function simpanUsulan(eid, usul, kemajuan) {
+    var gagalArr = [], i = 0;
+    return new Promise(function (selesai) {
+      (function lanjut() {
+        if (i >= usul.length) { selesai(gagalArr); return; }
+        var u = usul[i++]; kemajuan(i);
+        panggil('setHasilValidasi', [u.rid, eid, u.sid, 'Valid', u.cat, sesi().userID, sesi().token]).then(function (r) {
+          if (!r || !r.success) gagalArr.push(u.nama);
+          else try { allResultsData.forEach(function (x) { if (String(x.responseId) === u.rid) x.validasi = 'Valid'; }); } catch (e) {}
+          lanjut();
+        }, function () { gagalArr.push(u.nama); lanjut(); });
+      })();
+    });
+  }
+
+  function tampilPratinjau(eid) {
+    var m = bukaRk('🏆 Perangkingan Hasil Ujian', namaUjian(eid));
+    panggil('buatPerangkinganUjian', [eid, { mode: 'pratinjau' }, sesi().userID, sesi().token]).then(function (res) {
+      if (!res || !res.success) { m.isi.innerHTML = '<div class="sip-rk-blok">' + esc((res && res.message) || 'Gagal memeriksa data.') + '</div>'; m.aksi.appendChild(tombol('Tutup', null, tutupRk)); return; }
+      m.kepala.querySelector('small').textContent = res.mapel + (res.kelas ? ' · ' + res.kelas : '') + (res.berjalan ? ' · ujian masih berjalan' : '');
+      m.isi.innerHTML = '';
+      m.isi.appendChild(el('div', 'sip-rk-ringkas', '<div><small>Respons siswa</small><b>' + esc(res.jumlahRespons) + '</b></div><div><small>Siap diperingkat</small><b>' + esc(res.jumlahPeserta) + '</b></div>' +
+        '<div><small>Perlu diselesaikan</small><b style="color:' + (res.jumlahMasalah ? '#b91c1c' : '#047857') + '">' + esc(res.jumlahMasalah) + '</b></div><div><small>Tidak masuk</small><b>' + esc((res.tidakMasuk || []).length) + '</b></div>'));
+      if (!res.siap) {
+        m.isi.appendChild(el('div', 'sip-rk-blok', '<b>' + esc(res.message) + '</b>' + (res.masalah && res.masalah.length ? '<ul>' + res.masalah.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '') +
+          '<div style="margin-top:8px">Langkah: isi nilai lewat <b>Koreksi &amp; Isi Nilai</b>, lalu atur kolom <b>Validasi</b> tiap siswa (Valid / Tidak Valid) di tabel Hasil &amp; Nilai. Pilihan yang masih bertuliskan kecil <i>"Usulan dari pekerjaan &amp; nilai"</i> belum tersimpan — pilih ulang statusnya. Setelah semua beres, klik Perangkingan lagi.</div>'));
+        var tm0 = daftarTidakMasuk(res.tidakMasuk); if (tm0) m.isi.appendChild(tm0);
+        var usul = usulanValid(eid, res.examId);
+        if (usul.length && res.masalah.some(function (x) { return /belum divalidasi/.test(x); })) {
+          m.isi.appendChild(el('div', 'sip-rk-warn', '💡 ' + usul.length + ' jawaban menampilkan pilihan <b>Valid</b> sebagai <i>usulan</i> (tulisan kecil "Usulan dari pekerjaan &amp; nilai") — usulan itu belum tersimpan. ' +
+            'Anda bisa memilihnya satu per satu di tabel, atau menyimpan semua usulan Valid sekaligus setelah memeriksanya.'));
+          var tbUsul = tombol('✔ Simpan usulan "Valid" (' + usul.length + ' siswa)', 'utama', function () {
+            if (!confirm('Simpan status Valid untuk ' + usul.length + ' jawaban berikut?\n\n' + usul.map(function (u) { return '• ' + u.nama; }).slice(0, 25).join('\n') + (usul.length > 25 ? '\n…' : '') + '\n\nPastikan Anda sudah memeriksa jawabannya.')) return;
+            tbUsul.disabled = true;
+            simpanUsulan(eid, usul, function (n) { tbUsul.textContent = 'Menyimpan… ' + n + '/' + usul.length; }).then(function (gagalArr) {
+              try { if (typeof window.loadResultsTable === 'function' && ujianTerpilih() === eid) window.loadResultsTable(eid); } catch (e) {}
+              if (gagalArr.length) alert('Sebagian gagal disimpan: ' + gagalArr.join(', '));
+              tampilPratinjau(eid);
+            });
+          });
+          m.aksi.appendChild(tbUsul);
+        }
+        m.aksi.appendChild(tombol('↻ Periksa ulang', null, function () { tampilPratinjau(eid); }));
+        m.aksi.appendChild(tombol('Tutup', null, tutupRk));
+        return;
+      }
+      m.isi.appendChild(el('div', 'sip-rk-info', '✔ Seluruh jawaban sudah dinilai dan divalidasi. ' + esc(res.aturan)));
+      if (!res.showResult) m.isi.appendChild(el('div', 'sip-rk-warn', '⚠ Pengaturan ujian ini menyembunyikan hasil dari siswa. Jika peringkat diterbitkan, siswa peserta akan melihat nilai pada daftar peringkat.'));
+      var wt = tabelPeringkat(res.data || []); m.isi.appendChild(wt);
+      var tm = daftarTidakMasuk(res.tidakMasuk); if (tm) m.isi.appendChild(tm);
+      var lab = el('label', null, '<input type="checkbox" id="sip-rk-terbit" checked> Tampilkan ke siswa yang mengerjakan ujian ini');
+      m.aksi.appendChild(lab);
+      if (!res.showResult) {
+        var lab2 = el('label', null, '<input type="checkbox" id="sip-rk-setuju"> Saya setuju nilai tampil pada peringkat');
+        lab2.style.marginRight = '0'; m.aksi.appendChild(lab2);
+      }
+      m.aksi.appendChild(tombol('⬇ Excel', null, function () { unduhExcel(judulUnduh(res, wt), wt.saring()); }));
+      m.aksi.appendChild(tombol('🖨 Cetak / PDF', null, function () { cetak(judulUnduh(res, wt), wt.saring()); }));
+      var simpan = tombol('💾 Simpan Perangkingan', 'utama', function () {
+        var terbit = !!(document.getElementById('sip-rk-terbit') || {}).checked, setuju = !!(document.getElementById('sip-rk-setuju') || {}).checked;
+        if (terbit && !res.showResult && !setuju) { alert('Centang persetujuan bahwa nilai akan tampil, atau hilangkan centang "Tampilkan ke siswa".'); return; }
+        simpan.disabled = true; simpan.textContent = 'Menyimpan…';
+        panggil('buatPerangkinganUjian', [eid, { mode: 'simpan', terbit: terbit, setujuTampilNilai: setuju, sourceHash: res.sourceHash }, sesi().userID, sesi().token]).then(function (r) {
+          if (!r || !r.success) { simpan.disabled = false; simpan.textContent = '💾 Simpan Perangkingan'; alert((r && r.message) || 'Gagal menyimpan.'); return; }
+          _status.eid = ''; perbaruiStatus(true);
+          tampilTersimpan(eid, r.message);
+        }, function (e) { simpan.disabled = false; simpan.textContent = '💾 Simpan Perangkingan'; alert(pesanGagal(e)); });
+      });
+      m.aksi.appendChild(simpan);
+    }, function (e) { m.isi.innerHTML = '<div class="sip-rk-blok">' + esc(pesanGagal(e)) + '</div>'; m.aksi.appendChild(tombol('Tutup', null, tutupRk)); });
+  }
+
+  function tampilTersimpan(eid, pesan) {
+    var m = bukaRk('🏆 Peringkat Resmi', namaUjian(eid));
+    panggil('getPerangkinganUjian', [eid, sesi().userID, sesi().token]).then(function (res) {
+      m.isi.innerHTML = '';
+      if (!res || !res.success || !res.ada) {
+        m.isi.appendChild(el('div', 'sip-rk-info', esc((res && res.message) || 'Perangkingan belum dibuat.')));
+        m.aksi.appendChild(tombol('🏆 Buat Perangkingan', 'utama', function () { tampilPratinjau(eid); }));
+        m.aksi.appendChild(tombol('Tutup', null, tutupRk));
+        return;
+      }
+      m.kepala.querySelector('small').textContent = res.mapel + (res.kelas ? ' · ' + res.kelas : '') + ' · disimpan ' + (res.dibuatPada || '-');
+      if (pesan) m.isi.appendChild(el('div', 'sip-rk-info', '✔ ' + esc(pesan)));
+      if (res.usang) m.isi.appendChild(el('div', 'sip-rk-warn', '⚠ ' + esc(res.message || 'Perlu diperbarui.')));
+      m.isi.appendChild(el('div', 'sip-rk-ringkas', '<div><small>Peserta diperingkat</small><b>' + esc(res.jumlahPeserta) + '</b></div><div><small>Status siswa</small><b style="font-size:1rem">' +
+        (res.terbit ? (res.usang ? '⏸ Ditahan (perlu diperbarui)' : '✅ Terbit') : '🔒 Belum terbit') + '</b></div>'));
+      var wt = tabelPeringkat(res.data || []); m.isi.appendChild(wt);
+      var tm = daftarTidakMasuk(res.tidakMasuk); if (tm) m.isi.appendChild(tm);
+      m.aksi.appendChild(tombol('⬇ Excel', null, function () { unduhExcel(judulUnduh(res, wt), wt.saring()); }));
+      m.aksi.appendChild(tombol('🖨 Cetak / PDF', null, function () { cetak(judulUnduh(res, wt), wt.saring()); }));
+      m.aksi.appendChild(tombol('↻ Perangkingan ulang', null, function () { tampilPratinjau(eid); }));
+      var tbTerbit = tombol(res.terbit ? 'Tarik dari siswa' : '📢 Terbitkan ke siswa', res.terbit ? 'merah' : 'utama', function () {
+        if (res.terbit && !confirm('Tarik peringkat ini? Siswa tidak lagi bisa melihatnya.')) return;
+        tbTerbit.disabled = true;
+        panggil('aturTerbitPerangkingan', [eid, !res.terbit, sesi().userID, sesi().token]).then(function (r) {
+          if (!r || !r.success) { tbTerbit.disabled = false; alert((r && r.message) || 'Gagal.'); return; }
+          _status.eid = ''; perbaruiStatus(true); tampilTersimpan(eid, r.message);
+        }, function (e) { tbTerbit.disabled = false; alert(pesanGagal(e)); });
+      });
+      m.aksi.appendChild(tbTerbit);
+      m.aksi.appendChild(tombol('Tutup', null, tutupRk));
+    }, function (e) { m.isi.innerHTML = '<div class="sip-rk-blok">' + esc(pesanGagal(e)) + '</div>'; m.aksi.appendChild(tombol('Tutup', null, tutupRk)); });
+  }
+  window.sipBukaPerangkingan = function (eid) { eid = eid || ujianTerpilih(); if (eid) tampilPratinjau(eid); };
+
+  var _status = { eid: '', minta: 0 };
+  function perbaruiStatus(paksa) {
+    var eid = ujianTerpilih(), wrap = document.getElementById('res-table-wrapper');
+    var bar = document.getElementById('sip-rank-status');
+    if (!eid || !wrap) { if (bar) bar.remove(); _status.eid = ''; return; }
+    if (!paksa && _status.eid === eid && bar) return;
+    _status.eid = eid;
+    if (!bar) { bar = el('div'); bar.id = 'sip-rank-status'; wrap.insertBefore(bar, wrap.firstChild); }
+    bar.innerHTML = '<span class="ket">🏆 Memeriksa peringkat resmi…</span>';
+    var no = ++_status.minta;
+    panggil('getPerangkinganUjian', [eid, sesi().userID, sesi().token]).then(function (res) {
+      if (no !== _status.minta || !document.getElementById('sip-rank-status')) return;
+      var ket;
+      if (!res || !res.success) ket = 'Peringkat resmi: ' + esc((res && res.message) || 'tidak dapat dibaca');
+      else if (!res.ada) ket = '<b>Peringkat resmi belum dibuat.</b> Setelah semua jawaban dinilai &amp; divalidasi, klik <b>Perangkingan</b>.';
+      else ket = '<b>Peringkat resmi</b> disimpan ' + esc(res.dibuatPada || '-') + ' · ' + esc(res.jumlahPeserta) + ' siswa · ' +
+        (res.usang ? '<b style="color:#b91c1c">perlu diperbarui (nilai/validasi berubah)</b>' : res.terbit ? 'tampil untuk siswa peserta' : 'belum diterbitkan ke siswa');
+      bar.innerHTML = '<span class="ket">' + ket + '</span>';
+      if (res && res.success && res.ada) bar.appendChild(tombol('Lihat peringkat', null, function () { tampilTersimpan(eid); }));
+      bar.appendChild(tombol('🏆 Perangkingan', null, function () { tampilPratinjau(eid); }));
+    }, function () { if (bar) bar.innerHTML = '<span class="ket">Peringkat resmi belum dapat diperiksa.</span>'; });
+  }
+
+  function pasangAdmin() {
+    if (peran() !== 'admin') return;
+    var acuan = document.getElementById('btn-regrade-exam');
+    if (acuan && !document.getElementById('btn-perangkingan')) {
+      var b = el('button', null, '<span aria-hidden="true">🏆</span> Perangkingan');
+      b.type = 'button'; b.id = 'btn-perangkingan'; b.title = 'Urutkan nilai siswa setelah seluruh jawaban divalidasi';
+      b.onclick = function () { var eid = ujianTerpilih(); if (!eid) { alert('Pilih ujian terlebih dahulu.'); return; } tampilPratinjau(eid); };
+      acuan.parentNode.insertBefore(b, acuan);
+    }
+    var tb = document.getElementById('btn-perangkingan');
+    if (tb) tb.hidden = !ujianTerpilih();
+    var wrap = document.getElementById('res-table-wrapper');
+    if (wrap && !wrap.classList.contains('hidden')) perbaruiStatus(false);
+  }
+
+  /* ============================== SISWA ============================== */
+  var _daftar = { at: 0, items: null, janji: null };
+  function daftarResmi(paksa) {
+    if (!paksa && _daftar.items && Date.now() - _daftar.at < 60000) return Promise.resolve(_daftar.items);
+    if (_daftar.janji) return _daftar.janji;
+    var s = sesi(); if (!s) return Promise.resolve([]);
+    _daftar.janji = panggil('listPerangkinganSiswa', [s.userID, s.token]).then(function (r) {
+      _daftar.janji = null; _daftar.at = Date.now(); _daftar.items = (r && r.success && r.items) || [];
+      if (peran() !== 'siswa') _daftar.items = _daftar.items.filter(function (x) { return x.terbit; });
+      return _daftar.items;
+    }, function () { _daftar.janji = null; return []; });
+    return _daftar.janji;
+  }
+  function modalSiswa() {
+    var m = document.getElementById('sip-modal'), isi;
+    if (m) { isi = m.querySelector('.isi'); var h = m.querySelector('h3'); if (h) h.textContent = 'Peringkat Resmi Hasil Ujian'; isi.innerHTML = ''; return isi; }
+    var lapis = el('div', 'sip-tb-lapis'); lapis.id = 'sip-modal';
+    var j = el('div', 'sip-jendela'), k = el('div', 'kepala', '<h3>Peringkat Resmi Hasil Ujian</h3>');
+    var t = el('button', 'sip-tutup', '&times;'); t.setAttribute('aria-label', 'Tutup'); t.onclick = function () { lapis.remove(); }; k.appendChild(t);
+    isi = el('div', 'isi'); j.appendChild(k); j.appendChild(isi); lapis.appendChild(j);
+    lapis.addEventListener('click', function (e) { if (e.target === lapis) lapis.remove(); });
+    document.body.appendChild(lapis);
+    return isi;
+  }
+  function barTab(aktif) {
+    var bar = el('div', 'sip-rk-tab'); bar.setAttribute('role', 'tablist'); bar.id = 'sip-rk-tab';
+    var a = el('button', aktif === 'live' ? 'aktif' : null, '● Sedang berlangsung'); a.type = 'button'; a.setAttribute('data-rk-tab', 'live');
+    a.onclick = function () { if (typeof window.sipBukaPapanPeringkat === 'function') window.sipBukaPapanPeringkat('kelas', ''); };
+    var b = el('button', aktif === 'resmi' ? 'aktif' : null, '🏆 Hasil resmi'); b.type = 'button'; b.setAttribute('data-rk-tab', 'resmi');
+    b.onclick = function () { bukaResmi(''); };
+    bar.appendChild(a); bar.appendChild(b);
+    return bar;
+  }
+  var _resmi = { eid: '', mode: 'kelas' };
+  function bukaResmi(eid, mode) {
+    if (mode) _resmi.mode = mode;
+    var isi = modalSiswa();
+    isi.appendChild(barTab('resmi'));
+    var badan = el('div', 'sip-peringkat sip-rk-resmi', '<div class="sip-kosong">Memuat peringkat resmi…</div>'); isi.appendChild(badan);
+    daftarResmi(true).then(function (items) {
+      if (!items.length) {
+        badan.innerHTML = '<div class="sip-pk-kosong"><div style="font-size:2rem">&#127942;</div><b>Belum ada peringkat resmi</b><p>Peringkat resmi muncul setelah Admin selesai memvalidasi hasil ujian yang kamu kerjakan dan menerbitkannya.</p></div>';
+        return;
+      }
+      var pilih = eid && items.some(function (x) { return x.examId === eid; }) ? eid : (_resmi.eid && items.some(function (x) { return x.examId === _resmi.eid; }) ? _resmi.eid : items[items.length - 1].examId);
+      _resmi.eid = pilih;
+      badan.innerHTML = '';
+      if (items.length > 1) {
+        var tab = el('div', 'sip-filters sip-pk-ujian');
+        items.forEach(function (u) {
+          var b = el('button', u.examId === pilih ? 'aktif' : null, esc(u.mapel) + ' <small>' + esc(u.kelas) + '</small>'); b.type = 'button';
+          b.setAttribute('data-rk-ujian', u.examId); b.onclick = function () { bukaResmi(u.examId); }; tab.appendChild(b);
+        });
+        badan.appendChild(tab);
+      }
+      var wadah = el('div', null, '<div class="sip-kosong">Memuat…</div>'); badan.appendChild(wadah);
+      panggil('getPerangkinganUjian', [pilih, sesi().userID, sesi().token]).then(function (res) { gambarResmi(wadah, res); }, function (e) { wadah.innerHTML = ''; wadah.appendChild(el('div', 'sip-kosong', esc('Gagal memuat: ' + pesanGagal(e)))); });
+    });
+  }
+  function gambarResmi(w, res) {
+    w.innerHTML = '';
+    if (!res || !res.success || !res.ada) { w.appendChild(el('div', 'sip-pk-info', esc((res && res.message) || 'Peringkat belum tersedia.'))); return; }
+    w.appendChild(el('div', 'sip-pk-judul', '<span class="sip-pk-resmi">&#127942; HASIL RESMI</span> <b>' + esc(res.mapel) + '</b>' + (res.kelas ? ' · ' + esc(res.kelas) : '') +
+      '<small>Disahkan ' + esc(res.dibuatPada || '-') + ' · ' + esc(res.jumlahPeserta) + ' peserta</small>'));
+    var data = res.data || [], saya = data.filter(function (r) { return r.saya; })[0];
+    var kelasSaya = saya ? saya.kelas : '';
+    var mode = kelasSaya ? _resmi.mode : 'semua';
+    if (kelasSaya) {
+      var f = el('div', 'sip-filters');
+      [['Kelas saya', 'kelas'], ['Semua peserta', 'semua']].forEach(function (x) {
+        var b = el('button', mode === x[1] ? 'aktif' : null, x[0]); b.type = 'button'; b.setAttribute('data-rk-mode', x[1]);
+        b.onclick = function () { _resmi.mode = x[1]; gambarResmi(w, res); }; f.appendChild(b);
+      });
+      w.appendChild(f);
+    }
+    if (saya) {
+      w.appendChild(el('div', 'sip-pk-saya', '<div><small>Peringkatmu</small><b>#' + esc(saya.peringkat) + '</b><span>dari ' + esc(data.length) + ' peserta</span></div>' +
+        '<div><small>Di kelas ' + esc(saya.kelas) + '</small><b>#' + esc(saya.peringkatKelas) + '</b></div><div><small>Nilaimu</small><b>' + esc(saya.nilai) + '</b></div>'));
+    } else if (res.catatanSaya) w.appendChild(el('div', 'sip-pk-info', esc(res.catatanSaya)));
+    var tampil = mode === 'kelas' ? data.filter(function (r) { return r.kelas === kelasSaya; }) : data;
+    var t = el('table', 'sip-tabel-peringkat');
+    t.innerHTML = '<thead><tr><th>#</th><th>Nama</th><th>Kelas</th><th style="text-align:right">Nilai</th><th style="text-align:right">Waktu</th></tr></thead>';
+    var tb = el('tbody');
+    tampil.forEach(function (r) {
+      var no = mode === 'kelas' ? r.peringkatKelas : r.peringkat, tr = el('tr', r.saya ? 'sip-saya' : null);
+      tr.innerHTML = '<td class="sip-pk-no">' + medali(no) + '</td><td>' + esc(r.nama) + (r.saya ? ' <span style="font-size:.66rem">(saya)</span>' : '') + '</td><td>' + esc(r.kelas || '-') + '</td>' +
+        '<td style="text-align:right;font-weight:900">' + esc(r.nilai) + '</td><td style="text-align:right;color:#94a3b8;white-space:nowrap">' + esc(r.waktu || '-') + '</td>';
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb); w.appendChild(t);
+    w.appendChild(el('div', 'sip-pk-kaki', '<span>' + esc(res.aturan || '') + (mode === 'kelas' ? ' Nomor = peringkat di kelasmu.' : '') + '</span>'));
+  }
+  window.sipBukaPeringkatResmi = bukaResmi;
+
+  /* Sisipkan tab di papan peringkat live (dibuat oleh papan-siswa.js). */
+  function pasangTabLive() {
+    var m = document.getElementById('sip-modal');
+    if (!m || m.querySelector('#sip-rk-tab')) return;
+    var isi = m.querySelector('.isi'), live = isi && isi.querySelector('.sip-peringkat');
+    var judul = (m.querySelector('h3') || {}).textContent || '';
+    if (!isi || (!live && !/peringkat/i.test(judul))) return;
+    isi.insertBefore(barTab('live'), isi.firstChild);
+  }
+  /* Tombol Peringkat pada kartu "Nilai Saya" bila ada peringkat resmi. */
+  function pasangKartuNilai() {
+    var panel = document.getElementById('sip-nilai-saya');
+    if (!panel || panel.getAttribute('data-sip-terisi') !== '1' || panel.getAttribute('data-sip-rk') === '1') return;
+    panel.setAttribute('data-sip-rk', '1');
+    daftarResmi(false).then(function (items) {
+      var ada = {}; items.forEach(function (x) { ada[x.examId] = true; });
+      var kartu = panel.querySelectorAll('.sip-nilai-kartu[data-exam-id]');
+      Array.prototype.forEach.call(kartu, function (k) {
+        var eid = k.getAttribute('data-exam-id');
+        if (!ada[eid] || k.querySelector('.sip-rk-kartu')) return;
+        var b = el('button', 'sip-tb-emas sip-rk-kartu', '&#127942; Peringkat'); b.type = 'button';
+        b.onclick = function () { bukaResmi(eid); };
+        var kanan = k.lastElementChild || k; kanan.appendChild(b);
+      });
+    });
+  }
+
+  function pasangSemua() {
+    if (!sesi()) return;
+    pasangGaya();
+    try { pasangAdmin(); } catch (e) {}
+    try { pasangTabLive(); } catch (e) {}
+    try { if (peran() === 'siswa') pasangKartuNilai(); } catch (e) {}
+  }
+  function mulai() {
+    pasangSemua();
+    try {
+      var tunda = null;
+      new MutationObserver(function () { if (tunda) return; tunda = setTimeout(function () { tunda = null; pasangSemua(); }, 250); })
+        .observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    } catch (e) {}
+    document.addEventListener('change', function (e) { if (e.target && e.target.id === 'select-result-exam') setTimeout(function () { pasangAdmin(); perbaruiStatus(false); }, 50); }, true);
+    setInterval(pasangSemua, 3000);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mulai); else mulai();
+})();
+
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a51edafad8ffc8d1',t:'MTc5MzI0MjA0NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 <!-- Lisensi MathJax tertanam:
 
                                  Apache License
