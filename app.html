@@ -26526,7 +26526,341 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
 })();
 
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a51edafad8ffc8d1',t:'MTc5MzI0MjA0NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+  <!-- UNGGAH PENUGASAN TANPA BATAS UKURAN KE FOLDER SISWA · sumber: web/penugasan-unggah.js -->
+  <script id="sipintar-penugasan-unggah">
+/* PENUGASAN UNGGAH v1.0.0 — 2 November 2026. Tambahan murni.
+   Siswa: form pengumpulan baru — banyak foto/PDF sekaligus, tanpa batas ukuran
+   (dikirim bertahap 2 MB per potongan dengan bilah kemajuan), tombol kamera,
+   nama berkas otomatis "Nama Siswa-Judul Penugasan", dan folder tujuan
+   ditampilkan sebelum mengirim.
+   Admin: tombol "Periksa lokasi berkas" di halaman Pengumpulan penugasan untuk
+   memindahkan berkas yang terlanjur berada di luar folder siswanya (hanya yang
+   dipilih Admin; tidak ada yang dihapus). */
+(function () {
+  'use strict';
+  if (window.SIPINTAR_TUGAS_UNGGAH_VERSI) return;
+  window.SIPINTAR_TUGAS_UNGGAH_VERSI = '1.0.0';
+  var POTONG = 2 * 1024 * 1024;
+  var DITERIMA = /\.(jpe?g|png|webp|heic|heif|gif|bmp|pdf|docx?|txt)$/i;
+
+  function sesi() { var cu = window.currentUser; return cu && cu.userID && cu.token ? cu : null; }
+  function panggil(aksi, args) {
+    return new Promise(function (ok, gagal) {
+      var r = window.google && window.google.script && window.google.script.run;
+      if (!r) { gagal(new Error('Mesin API belum siap. Muat ulang halaman.')); return; }
+      try { var c = r.withSuccessHandler(ok).withFailureHandler(gagal); c[aksi].apply(c, args || []); } catch (e) { gagal(e); }
+    });
+  }
+  function esc(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+  function el(tag, kelas, isi) { var d = document.createElement(tag); if (kelas) d.className = kelas; if (isi != null) d.innerHTML = isi; return d; }
+  function pesan(e) { return (e && e.message) ? e.message : String(e || 'Terjadi kesalahan.'); }
+  function ukuran(n) { n = Number(n) || 0; return n >= 1048576 ? (Math.round(n / 104857.6) / 10) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+  function swal(o) { if (window.Swal && Swal.fire) { o.didOpen = function (pop) { try { pop.parentNode.style.zIndex = '1400'; } catch (e) {} }; return Swal.fire(o); } alert((o.title || '') + '\n' + (o.text || '').replace(/<[^>]+>/g, '')); return Promise.resolve({}); }
+
+  function pasangGaya() {
+    if (document.getElementById('sip-tgs-gaya')) return;
+    var css = ''
+      + '#sip-kumpul-modal .sip-tgs-tujuan{border:1px solid #bbf7d0;background:#f0fdf4;color:#14532d;border-radius:12px;padding:9px 12px;font-size:.76rem;margin:8px 0}'
+      + '#sip-kumpul-modal .sip-tgs-tujuan b{color:#166534;word-break:break-word}'
+      + '.sip-tgs-daftar{list-style:none;margin:6px 0;padding:0}.sip-tgs-daftar li{display:flex;align-items:center;gap:8px;justify-content:space-between;border:1px solid #e2e8f0;border-radius:10px;padding:6px 9px;margin-bottom:5px;font-size:.74rem;background:#fff}'
+      + '.sip-tgs-daftar li span.n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;color:#0f172a}'
+      + '.sip-tgs-daftar li small{color:#64748b;white-space:nowrap}.sip-tgs-daftar li a{color:#4338ca;font-weight:800;text-decoration:underline;white-space:nowrap}'
+      + '.sip-tgs-daftar li button{border:0;background:#fee2e2;color:#b91c1c;border-radius:8px;padding:2px 8px;font-weight:900;cursor:pointer}'
+      + '.sip-tgs-pilih{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}.sip-tgs-pilih label{flex:1 1 9rem;display:flex;align-items:center;justify-content:center;gap:6px;border:1.5px dashed #94a3b8;border-radius:12px;padding:10px;font-size:.78rem;font-weight:800;color:#334155;cursor:pointer;background:#f8fafc}'
+      + '.sip-tgs-pilih input{position:absolute;width:1px;height:1px;opacity:0}'
+      + '.sip-tgs-bar{height:8px;border-radius:999px;background:#e2e8f0;overflow:hidden;margin-top:4px}.sip-tgs-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#10b981,#059669);transition:width .2s}'
+      + '.sip-tgs-lapis{position:fixed;inset:0;z-index:9997;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:12px}'
+      + '.sip-tgs-jendela{background:#fff;color:#0f172a;width:100%;max-width:1040px;max-height:92vh;display:flex;flex-direction:column;border-radius:18px;box-shadow:0 25px 50px rgba(0,0,0,.35);overflow:hidden}'
+      + '.sip-tgs-kepala{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid #e2e8f0}.sip-tgs-kepala h3{margin:0;font-weight:900}'
+      + '.sip-tgs-isi{padding:14px 18px;overflow:auto;font-size:.8rem}.sip-tgs-aksi{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;align-items:center;padding:12px 18px;border-top:1px solid #e2e8f0;background:#f8fafc}'
+      + '.sip-tgs-aksi button,.sip-tgs-kepala button{border:1px solid #cbd5e1;background:#fff;border-radius:10px;padding:6px 12px;font-weight:800;font-size:.78rem;cursor:pointer}'
+      + '.sip-tgs-aksi button.utama{background:#059669;color:#fff;border-color:#047857}.sip-tgs-aksi label{margin-right:auto;display:flex;gap:6px;align-items:center}'
+      + '.sip-tgs-tabel{width:100%;border-collapse:collapse;font-size:.74rem}.sip-tgs-tabel th{position:sticky;top:0;background:#f1f5f9;text-align:left;padding:6px;font-size:.64rem;text-transform:uppercase;color:#475569}'
+      + '.sip-tgs-tabel td{padding:6px;border-bottom:1px solid #e2e8f0;vertical-align:top}.sip-tgs-tabel .salah{color:#b91c1c}.sip-tgs-tabel .benar{color:#047857;font-weight:700}'
+      + '#sip-tgs-periksa-btn{border:1px solid #fcd34d;background:#fffbeb;color:#92400e;border-radius:12px;padding:8px 12px;font-weight:800;font-size:.76rem;cursor:pointer}';
+    var s = el('style', null, css); s.id = 'sip-tgs-gaya'; document.head.appendChild(s);
+  }
+
+  /* ============================== SISWA ============================== */
+  var _pilihan = [];
+  function tutup() { if (typeof window.sipTutupKumpulTugas_ === 'function') window.sipTutupKumpulTugas_(); else { var m = document.getElementById('sip-kumpul-modal'); if (m) m.remove(); } }
+  function bukaKumpul(tugasId) {
+    var s = sesi(); if (!s) return;
+    pasangGaya(); tutup(); _pilihan = [];
+    var wrap = el('div'); wrap.id = 'sip-kumpul-modal';
+    wrap.style.cssText = 'position:fixed;inset:0;z-index:1210;background:rgba(15,23,42,.55);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:20px 12px;';
+    wrap.innerHTML = '<div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-5 my-4"><p class="text-sm text-slate-500">Memuat form pengumpulan…</p></div>';
+    wrap.addEventListener('click', function (ev) { if (ev.target === wrap) tutup(); });
+    document.body.appendChild(wrap);
+    var kotak = wrap.firstChild;
+    panggil('getKumpulSaya', [tugasId, s.userID, s.token]).then(function (res) {
+      if (!res || !res.success) { kotak.innerHTML = '<p class="text-rose-600 text-sm">' + esc((res && res.message) || 'Gagal memuat') + '</p><button type="button" class="mt-3 px-3 py-2 rounded-lg border text-xs font-bold" data-tgs-tutup>Tutup</button>'; kotak.querySelector('[data-tgs-tutup]').onclick = tutup; return; }
+      gambarKumpul(kotak, res, tugasId);
+    }, function (e) { kotak.innerHTML = '<p class="text-rose-600 text-sm">' + esc(pesan(e)) + '</p>'; });
+  }
+  function gambarKumpul(kotak, res, tugasId) {
+    var t = res.tugas || {}, k = res.kumpul || null, st = k ? String(k.status || 'Terkirim') : 'Belum mengumpulkan', locked = k && String(k.status || '') === 'Valid';
+    var berkas = res.berkas || [];
+    if (!berkas.length && k && k.fileUrl) berkas = [{ fileName: k.fileName || 'Berkas terkirim', fileUrl: k.fileUrl, ukuranTeks: '' }];
+    var id = t.id || tugasId;
+    kotak.innerHTML =
+      '<div class="flex items-start justify-between gap-2 mb-2"><div>' +
+      '<p class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Pengumpulan penugasan</p>' +
+      '<h3 class="font-black text-slate-800">' + esc(t.judul || '') + '</h3>' +
+      '<p class="text-xs text-slate-500 mt-1">Batas: <b>' + esc(t.deadline || 'Tidak ditentukan') + '</b></p>' +
+      '<p class="text-xs mt-1">Status: <b>' + esc(st) + '</b>' + (k && k.nilai !== '' && k.nilai != null ? ' · Nilai: <b>' + esc(k.nilai) + '</b>' : '') + '</p>' +
+      (k && k.catatan ? '<p class="text-xs text-slate-600 mt-1">Catatan: ' + esc(k.catatan) + '</p>' : '') +
+      '</div><button type="button" class="px-3 py-1.5 rounded-lg border text-xs font-bold" data-tgs-tutup>Tutup</button></div>' +
+      '<div class="sip-tgs-tujuan" id="sip-tgs-tujuan">📁 Disimpan otomatis ke folder: <b>' + esc(res.tujuan || '-') + '</b><br>📝 Nama berkas: <b>' + esc(res.namaBerkasContoh || 'Nama-Judul') + '</b>.jpg / .pdf' +
+      (res.tujuanPesan ? '<br><span style="color:#b91c1c">' + esc(res.tujuanPesan) + '</span>' : '') + '</div>' +
+      '<p class="text-xs font-bold text-slate-600 mt-2">Berkas terkirim (' + berkas.length + ')</p>' +
+      (berkas.length ? '<ul class="sip-tgs-daftar" id="sip-tgs-terkirim">' + berkas.map(function (b) {
+        return '<li><span class="n" title="' + esc(b.fileName) + '">' + esc(b.fileName) + '</span><small>' + esc(b.ukuranTeks || '') + '</small>' + (b.fileUrl ? '<a href="' + esc(b.fileUrl) + '" target="_blank" rel="noopener">Lihat</a>' : '') + '</li>'; }).join('') + '</ul>'
+        : '<p class="text-xs text-slate-400" id="sip-tgs-terkirim">Belum ada berkas.</p>') +
+      (locked ? '<p class="text-sm text-emerald-700 font-bold mt-2">Sudah divalidasi. Pengumpulan terkunci.</p>' :
+        '<label class="block text-xs font-bold text-slate-600 mt-3 mb-1">Jawaban (teks, opsional bila ada berkas)<textarea id="sip-kumpul-teks" rows="3" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 text-sm">' + esc((k && k.jawabanTeks) || '') + '</textarea></label>' +
+        '<p class="text-xs font-bold text-slate-600 mt-2">Tambah berkas — foto (JPG/JPEG/PNG) atau PDF, boleh beberapa, tanpa batas ukuran</p>' +
+        '<div class="sip-tgs-pilih"><label>📎 Pilih berkas<input id="sip-tgs-file" type="file" multiple accept="image/*,.jpg,.jpeg,.png,.webp,.heic,.pdf,application/pdf,.doc,.docx,.txt"></label>' +
+        '<label>📷 Ambil foto<input id="sip-tgs-kamera" type="file" accept="image/*" capture="environment"></label></div>' +
+        '<ul class="sip-tgs-daftar" id="sip-tgs-antre"></ul>' +
+        '<div id="sip-tgs-progres" style="display:none;font-size:.74rem;color:#334155"><span id="sip-tgs-progres-teks"></span><div class="sip-tgs-bar"><i id="sip-tgs-progres-bar"></i></div></div>' +
+        '<button type="button" id="sip-tgs-kirim" class="mt-3 w-full px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold"><i class="fas fa-paper-plane mr-1"></i> Kirim pengumpulan</button>');
+    kotak.querySelector('[data-tgs-tutup]').onclick = tutup;
+    if (locked) return;
+    function tambah(files) {
+      Array.prototype.forEach.call(files || [], function (f) {
+        if (!DITERIMA.test(f.name) && !/^image\//.test(f.type) && f.type !== 'application/pdf') { swal({ icon: 'warning', title: 'Jenis tidak didukung', text: f.name + ' — unggah foto (JPG/JPEG/PNG) atau PDF.' }); return; }
+        if (!f.size) { swal({ icon: 'warning', title: 'Berkas kosong', text: f.name }); return; }
+        _pilihan.push(f);
+      });
+      gambarAntre();
+    }
+    var inp = kotak.querySelector('#sip-tgs-file'), kam = kotak.querySelector('#sip-tgs-kamera');
+    inp.onchange = function () { tambah(inp.files); inp.value = ''; };
+    kam.onchange = function () { tambah(kam.files); kam.value = ''; };
+    kotak.querySelector('#sip-tgs-kirim').onclick = function () { kirim(id, kotak); };
+  }
+  function gambarAntre() {
+    var ul = document.getElementById('sip-tgs-antre'); if (!ul) return;
+    ul.innerHTML = '';
+    _pilihan.forEach(function (f, i) {
+      var li = el('li', null, '<span class="n" title="' + esc(f.name) + '">' + esc(f.name) + '</span><small>' + ukuran(f.size) + '</small>');
+      var b = el('button', null, '×'); b.type = 'button'; b.title = 'Batalkan'; b.onclick = function () { _pilihan.splice(i, 1); gambarAntre(); };
+      li.appendChild(b); ul.appendChild(li);
+    });
+  }
+  function bacaBase64(blob) {
+    return new Promise(function (ok, gagal) {
+      var r = new FileReader();
+      r.onload = function () { var s = String(r.result || ''); ok(s.slice(s.indexOf(',') + 1)); };
+      r.onerror = function () { gagal(new Error('Tidak dapat membaca berkas.')); };
+      r.readAsDataURL(blob);
+    });
+  }
+  function progres(teks, persen) {
+    var p = document.getElementById('sip-tgs-progres'); if (!p) return;
+    p.style.display = 'block';
+    document.getElementById('sip-tgs-progres-teks').textContent = teks;
+    document.getElementById('sip-tgs-progres-bar').style.width = Math.max(0, Math.min(100, persen)) + '%';
+  }
+  function kirimPotongan(uploadId, f, offset, ulang) {
+    var s = sesi();
+    return bacaBase64(f.slice(offset, Math.min(f.size, offset + POTONG))).then(function (b64) {
+      return panggil('kirimPotonganTugas', [uploadId, offset, b64, s.userID, s.token]);
+    }).then(function (r) {
+      if (!r || !r.success) throw new Error((r && r.message) || 'Potongan gagal dikirim.');
+      return r;
+    }).catch(function (e) {
+      if ((ulang || 0) >= 3 || /kedaluwarsa|bukan milik|tidak didukung|terkunci/.test(pesan(e))) throw e;
+      return new Promise(function (t) { setTimeout(t, 1500 * ((ulang || 0) + 1)); }).then(function () { return kirimPotongan(uploadId, f, offset, (ulang || 0) + 1); });
+    });
+  }
+  function unggahSatu(tugasId, f, ke, jumlah) {
+    var s = sesi();
+    progres('Menyiapkan ' + ke + '/' + jumlah + ': ' + f.name, 0);
+    return panggil('mulaiUnggahTugas', [tugasId, { nama: f.name, mime: f.type || '', ukuran: f.size }, s.userID, s.token]).then(function (m) {
+      if (!m || !m.success) throw new Error((m && m.message) || 'Unggahan ditolak.');
+      var offset = 0;
+      function lanjut() {
+        return kirimPotongan(m.uploadId, f, offset).then(function (r) {
+          offset = Number(r.diterima) || (offset + POTONG);
+          progres('Mengunggah ' + ke + '/' + jumlah + ': ' + f.name + ' — ' + Math.round(offset * 100 / f.size) + '%', offset * 100 / f.size);
+          if (r.hasil) return r.hasil;
+          if (offset >= f.size) throw new Error('Server belum mengonfirmasi berkas.');
+          return lanjut();
+        });
+      }
+      return lanjut();
+    });
+  }
+  function kirim(tugasId, kotak) {
+    var s = sesi(), teksEl = document.getElementById('sip-kumpul-teks'), teks = teksEl ? String(teksEl.value || '') : '';
+    var sudah = document.querySelectorAll('#sip-tgs-terkirim li').length;
+    if (!teks.trim() && !_pilihan.length && !sudah) { swal({ icon: 'info', title: 'Lengkapi', text: 'Isi jawaban teks atau pilih berkas.' }); return; }
+    var tb = document.getElementById('sip-tgs-kirim'); tb.disabled = true; tb.textContent = 'Mengirim…';
+    var antre = _pilihan.slice(), hasil = [], gagal = [];
+    var rantai = Promise.resolve();
+    antre.forEach(function (f, i) {
+      rantai = rantai.then(function () {
+        return unggahSatu(tugasId, f, i + 1, antre.length).then(function (h) { hasil.push(h); }, function (e) { gagal.push(f.name + ': ' + pesan(e)); });
+      });
+    });
+    rantai.then(function () {
+      if (!hasil.length && antre.length && !teks.trim() && !sudah) throw new Error(gagal.join('\n'));
+      progres('Menyimpan pengumpulan…', 100);
+      return panggil('simpanKumpulTugas', [tugasId, teks, s.userID, s.token]);
+    }).then(function (r) {
+      if (!r || !r.success) throw new Error((r && r.message) || 'Pengumpulan gagal disimpan.');
+      _pilihan = [];
+      var daftar = hasil.map(function (h) { return '• ' + esc(h.fileName); }).join('<br>');
+      swal({ icon: gagal.length ? 'warning' : 'success', title: gagal.length ? 'Sebagian terkirim' : 'Terkirim',
+        html: '<div style="text-align:left;font-size:.85rem">' + (daftar ? '<b>Berkas tersimpan:</b><br>' + daftar + '<br>' : '') + '📁 Folder: <b>' + esc(r.folder || '') + '</b>' +
+          (gagal.length ? '<br><br><b style="color:#b91c1c">Gagal:</b><br>' + gagal.map(esc).join('<br>') : '') + '</div>' });
+      bukaKumpul(tugasId);
+      if (typeof window.sipRenderSiswaBelajar_ === 'function') try { window.sipRenderSiswaBelajar_('tugas'); } catch (e) {}
+    }).catch(function (e) {
+      tb.disabled = false; tb.innerHTML = '<i class="fas fa-paper-plane mr-1"></i> Kirim pengumpulan';
+      swal({ icon: 'error', title: 'Gagal', text: pesan(e) });
+    });
+  }
+  window.sipOpenKumpulTugas_ = bukaKumpul;
+  window.sipKirimKumpulTugas_ = function (tugasId) { var tb = document.getElementById('sip-tgs-kirim'); if (tb) tb.click(); else bukaKumpul(tugasId); };
+
+  /* ============================== ADMIN ============================== */
+  function peran() { var s = sesi(); return String((s && s.role) || '').toLowerCase(); }
+  function tutupPeriksa() { var m = document.getElementById('sip-tgs-periksa'); if (m) m.remove(); }
+  function bukaPeriksa(tugasId) {
+    pasangGaya(); tutupPeriksa();
+    var lapis = el('div', 'sip-tgs-lapis'); lapis.id = 'sip-tgs-periksa';
+    var j = el('div', 'sip-tgs-jendela');
+    var kepala = el('div', 'sip-tgs-kepala', '<div><h3>🗂 Periksa lokasi berkas pengumpulan</h3><small style="color:#64748b">Berkas yang tidak berada di folder Kelas › Absen - Nama siswanya, atau namanya belum "Nama Siswa-Judul Penugasan".</small></div>');
+    var tt = el('button', null, '×'); tt.type = 'button'; tt.onclick = tutupPeriksa; kepala.appendChild(tt);
+    var isi = el('div', 'sip-tgs-isi'), aksi = el('div', 'sip-tgs-aksi');
+    j.appendChild(kepala); j.appendChild(isi); j.appendChild(aksi); lapis.appendChild(j); document.body.appendChild(lapis);
+    isi.innerHTML = '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">' +
+      '<label><input type="radio" name="sip-tgs-cakupan" value="ini" ' + (tugasId ? 'checked' : 'disabled') + '> Penugasan ini</label>' +
+      '<label><input type="radio" name="sip-tgs-cakupan" value="semua" ' + (tugasId ? '' : 'checked') + '> Semua penugasan</label>' +
+      '<label><input type="checkbox" id="sip-tgs-gantinama" checked> Samakan nama berkas menjadi "Nama Siswa-Judul Penugasan"</label></div>' +
+      '<div id="sip-tgs-hasil" style="margin-top:12px;color:#64748b">Klik <b>Periksa</b> untuk memulai. Pemeriksaan hanya membaca; tidak ada yang dipindah sebelum Anda memilih.</div>';
+    var tbPeriksa = el('button', 'utama', '🔍 Periksa'); tbPeriksa.type = 'button';
+    aksi.appendChild(tbPeriksa);
+    tbPeriksa.onclick = function () { jalankanPeriksa(tugasId, isi, aksi); };
+  }
+  function opsiDasar(tugasId) {
+    var c = document.querySelector('input[name="sip-tgs-cakupan"]:checked'), g = document.getElementById('sip-tgs-gantinama');
+    return { tugasId: c && c.value === 'ini' ? tugasId : '', gantiNama: !g || g.checked };
+  }
+  function jalankanPeriksa(tugasId, isi, aksi) {
+    var s = sesi(), dasar = opsiDasar(tugasId), hasilEl = document.getElementById('sip-tgs-hasil'), items = [], total = 0;
+    hasilEl.innerHTML = 'Memeriksa berkas…';
+    function langkah(mulai) {
+      return panggil('periksaLokasiBerkasTugas', [{ mode: 'pratinjau', tugasId: dasar.tugasId, gantiNama: dasar.gantiNama, mulai: mulai }, s.userID, s.token]).then(function (r) {
+        if (!r || !r.success) throw new Error((r && r.message) || 'Pemeriksaan gagal.');
+        items = items.concat(r.items || []); total = r.total;
+        hasilEl.innerHTML = 'Memeriksa… ' + Math.min(total, (r.lanjut || total)) + ' / ' + total + ' berkas';
+        return r.lanjut != null ? langkah(r.lanjut) : null;
+      });
+    }
+    langkah(0).then(function () { gambarPeriksa(tugasId, items, total, aksi); }, function (e) { hasilEl.innerHTML = '<span style="color:#b91c1c">' + esc(pesan(e)) + '</span>'; });
+  }
+  function gambarPeriksa(tugasId, items, total, aksi) {
+    var hasilEl = document.getElementById('sip-tgs-hasil'), dasar = opsiDasar(tugasId);
+    var bisa = items.filter(function (x) { return !x.galat || x.namaBerkas; });
+    if (!items.length) { hasilEl.innerHTML = '<b style="color:#047857">✔ Semua ' + total + ' berkas sudah berada di folder siswanya' + (dasar.gantiNama ? ' dan bernama sesuai aturan' : '') + '.</b>'; return; }
+    hasilEl.innerHTML = '<p style="margin-bottom:8px"><b>' + items.length + '</b> dari ' + total + ' berkas perlu dirapikan. Pilih yang akan dipindah/dinamai ulang:</p>' +
+      '<div style="overflow:auto;max-height:52vh"><table class="sip-tgs-tabel" id="sip-tgs-tabel"><thead><tr><th><input type="checkbox" id="sip-tgs-semua" checked></th><th>Siswa</th><th>Penugasan</th><th>Berkas sekarang</th><th>Lokasi sekarang</th><th>Seharusnya</th><th>Nama baru</th></tr></thead><tbody>' +
+      items.map(function (x, i) {
+        var dapat = !x.galat && (x.perluPindah || x.perluNama);
+        return '<tr><td>' + (dapat ? '<input type="checkbox" data-tgs-id="' + esc(x.fileId) + '" checked>' : '') + '</td><td>' + esc(x.nama || '-') + '<br><small>' + esc(x.kelas || '') + (x.absen ? ' · absen ' + esc(x.absen) : '') + '</small></td>' +
+          '<td>' + esc(x.judul) + '</td><td>' + (x.url ? '<a href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.namaBerkas || x.fileId) + '</a>' : esc(x.namaBerkas || x.fileId)) + '</td>' +
+          '<td class="' + (x.perluPindah ? 'salah' : 'benar') + '">' + esc(x.lokasi || '-') + '</td><td>' + esc(x.tujuan || '-') + (x.galat ? '<br><span class="salah">' + esc(x.galat) + '</span>' : '') + '</td>' +
+          '<td>' + (x.perluNama ? esc(x.namaBaru) : '<span class="benar">sudah sesuai</span>') + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+    var semua = document.getElementById('sip-tgs-semua');
+    semua.onchange = function () { Array.prototype.forEach.call(document.querySelectorAll('[data-tgs-id]'), function (c) { c.checked = semua.checked; }); };
+    aksi.innerHTML = '';
+    var tbUlang = el('button', null, '↻ Periksa ulang'); tbUlang.type = 'button'; tbUlang.onclick = function () { jalankanPeriksa(tugasId, document.querySelector('#sip-tgs-periksa .sip-tgs-isi'), aksi); };
+    var tbRapi = el('button', 'utama', '📦 Pindahkan & rapikan yang dipilih'); tbRapi.type = 'button';
+    tbRapi.onclick = function () {
+      var ids = Array.prototype.filter.call(document.querySelectorAll('[data-tgs-id]'), function (c) { return c.checked; }).map(function (c) { return c.getAttribute('data-tgs-id'); });
+      if (!ids.length) { alert('Belum ada berkas yang dipilih.'); return; }
+      if (!confirm('Pindahkan ' + ids.length + ' berkas ke folder siswanya masing-masing' + (dasar.gantiNama ? ' dan samakan namanya' : '') + '?\n\nTidak ada berkas yang dihapus.')) return;
+      tbRapi.disabled = true;
+      rapikan(ids, dasar, function (n) { tbRapi.textContent = 'Memproses ' + n + '/' + ids.length + '…'; }).then(function (r) {
+        hasilEl.innerHTML = '<p style="color:#047857;font-weight:800">✔ ' + r.ok + ' berkas dipindah/ditata.' + (r.gagal.length ? '</p><p style="color:#b91c1c">Gagal: ' + r.gagal.map(esc).join('; ') : '') + '</p><p>Klik Periksa ulang untuk memastikan.</p>';
+        aksi.innerHTML = ''; aksi.appendChild(tbUlang);
+        if (window._sipKumpulTugasId && typeof window.sipRenderKumpulAdmin_ === 'function' && document.getElementById('sip-kumpul-admin-box')) try { window.sipRenderKumpulAdmin_(window._sipKumpulTugasId); } catch (e) {}
+      });
+    };
+    aksi.appendChild(tbUlang); aksi.appendChild(tbRapi);
+  }
+  function rapikan(ids, dasar, kemajuan) {
+    var s = sesi(), ok = 0, gagal = [], i = 0;
+    function batch() {
+      if (i >= ids.length) return Promise.resolve({ ok: ok, gagal: gagal });
+      var bag = ids.slice(i, i + 25); i += bag.length; kemajuan(i);
+      return panggil('periksaLokasiBerkasTugas', [{ mode: 'perbaiki', tugasId: dasar.tugasId, gantiNama: dasar.gantiNama, ids: bag }, s.userID, s.token]).then(function (r) {
+        if (!r || !r.success) { gagal.push((r && r.message) || 'gagal'); return batch(); }
+        (r.items || []).forEach(function (x) { if (x.diperbaiki) ok++; else if (x.galat) gagal.push((x.namaBerkas || x.fileId) + ': ' + x.galat); });
+        return batch();
+      }, function (e) { gagal.push(pesan(e)); return batch(); });
+    }
+    return batch();
+  }
+  window.sipBukaPeriksaBerkasTugas = bukaPeriksa;
+  /* Kolom Berkas: tampilkan jumlah berkas (tautan folder siswa) + tiap berkas. */
+  function lengkapiTabelAdmin(box) {
+    var tabel = box.querySelector('table'), id = window._sipKumpulTugasId || window._sipTgsAdminId, s = sesi();
+    if (!tabel || tabel.getAttribute('data-tgs') || !id || !s) return;
+    tabel.setAttribute('data-tgs', '1');
+    panggil('listKumpulPenugasan', [id, s.userID, s.token]).then(function (res) {
+      if (!res || !res.success || !document.body.contains(tabel)) return;
+      var baris = tabel.querySelectorAll('tbody tr');
+      (res.items || []).forEach(function (it, i) {
+        var tr = baris[i], b = it.berkas || [];
+        if (!tr || !tr.children[3] || !b.length) return;
+        var folder = b[b.length - 1].folderId ? 'https://drive.google.com/drive/folders/' + b[b.length - 1].folderId : '';
+        tr.children[3].innerHTML = (folder ? '<a class="text-indigo-700 font-bold underline" href="' + esc(folder) + '" target="_blank" rel="noopener">📁 ' + b.length + ' berkas</a>' : '<b>' + b.length + ' berkas</b>') +
+          '<div style="margin-top:3px;display:flex;flex-direction:column;gap:2px;max-width:16rem">' + b.map(function (x) {
+            return '<a href="' + esc(x.fileUrl) + '" target="_blank" rel="noopener" title="' + esc(x.fileName) + '" style="font-size:10px;color:#475569;text-decoration:underline;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(x.fileName) + '</a>';
+          }).join('') + '</div>';
+      });
+    }, function () {});
+  }
+  function pasangAdmin() {
+    if (peran() !== 'admin' && peran() !== 'guru') return;
+    var box = document.getElementById('sip-kumpul-admin-box');
+    if (box) lengkapiTabelAdmin(box);
+    if (peran() !== 'admin') return;
+    if (!box || document.getElementById('sip-tgs-periksa-btn')) return;
+    var b = el('button', null, '🗂 Periksa lokasi berkas'); b.type = 'button'; b.id = 'sip-tgs-periksa-btn';
+    b.title = 'Cari berkas yang berada di luar folder siswanya lalu rapikan';
+    b.onclick = function () { bukaPeriksa(window._sipKumpulTugasId || window._sipTgsAdminId || ''); };
+    var wadah = el('div', null); wadah.style.cssText = 'display:flex;justify-content:flex-end;margin-bottom:8px'; wadah.appendChild(b);
+    box.parentNode.insertBefore(wadah, box);
+  }
+
+  function mulai() {
+    pasangGaya();
+    window.sipOpenKumpulTugas_ = bukaKumpul;
+    var asliRender = window.sipRenderKumpulAdmin_;
+    if (typeof asliRender === 'function' && !asliRender._sipTgs) {
+      window.sipRenderKumpulAdmin_ = function (tugasId) { window._sipTgsAdminId = tugasId; return asliRender.apply(this, arguments); };
+      window.sipRenderKumpulAdmin_._sipTgs = true;
+    }
+    try {
+      var tunda = null;
+      new MutationObserver(function () { if (tunda) return; tunda = setTimeout(function () { tunda = null; pasangAdmin(); }, 250); })
+        .observe(document.body, { childList: true, subtree: true });
+    } catch (e) {}
+    pasangAdmin();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mulai); else mulai();
+})();
+
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5406ee7ddce0ce9',t:'MTc5MzU5NDEzMw=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5406ee7ddce0ce9',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 <!-- Lisensi MathJax tertanam:
 
                                  Apache License
