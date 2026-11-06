@@ -26540,7 +26540,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
 (function () {
   'use strict';
   if (window.SIPINTAR_TUGAS_UNGGAH_VERSI) return;
-  window.SIPINTAR_TUGAS_UNGGAH_VERSI = '1.0.0';
+  window.SIPINTAR_TUGAS_UNGGAH_VERSI = '1.1.0';
   var POTONG = 2 * 1024 * 1024;
   var DITERIMA = /\.(jpe?g|png|webp|heic|heif|gif|bmp|pdf|docx?|txt)$/i;
 
@@ -26554,7 +26554,27 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
   }
   function esc(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
   function el(tag, kelas, isi) { var d = document.createElement(tag); if (kelas) d.className = kelas; if (isi != null) d.innerHTML = isi; return d; }
-  function pesan(e) { return (e && e.message) ? e.message : String(e || 'Terjadi kesalahan.'); }
+  function pesanMentah(e) { return (e && e.message) ? e.message : String(e || 'Terjadi kesalahan.'); }
+  /* Pesan teknis → bahasa yang dipahami siswa/guru. */
+  function pesan(e) {
+    var m = pesanMentah(e);
+    if (/tidak terdaftar di API/i.test(m)) return 'Server SIPINTAR yang terhubung masih versi lama sehingga belum mengenal fitur unggah ini. Beri tahu Admin: perbarui deployment Apps Script / GAS_WEB_APP_URL di Vercel. (' + m.slice(0, 60) + '…)';
+    if (/Failed to fetch|NetworkError|HTTP 5\d\d|tidak merespons|timeout|AbortError/i.test(m)) return 'Koneksi ke server terputus. Periksa internet lalu kirim ulang. (' + m + ')';
+    return m;
+  }
+  function sementara(e) { return /sibuk|Failed to fetch|NetworkError|HTTP 5\d\d|tidak merespons|timeout|AbortError|Rate|Service invoked too many|Lock|Unexpected error/i.test(pesanMentah(e)); }
+  function tunda(ms) { return new Promise(function (t) { setTimeout(t, ms); }); }
+  /* Panggilan dengan ulang otomatis untuk gangguan sementara (server sibuk / jaringan). */
+  function panggilUlang(aksi, args, ke) {
+    ke = ke || 0;
+    return panggil(aksi, args).then(function (r) {
+      if (r && r.success === false && ke < 4 && sementara(r.message)) return tunda(2000 * (ke + 1)).then(function () { return panggilUlang(aksi, args, ke + 1); });
+      return r;
+    }, function (e) {
+      if (ke < 4 && sementara(e)) return tunda(2000 * (ke + 1)).then(function () { return panggilUlang(aksi, args, ke + 1); });
+      throw e;
+    });
+  }
   function ukuran(n) { n = Number(n) || 0; return n >= 1048576 ? (Math.round(n / 104857.6) / 10) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
   function swal(o) { if (window.Swal && Swal.fire) { o.didOpen = function (pop) { try { pop.parentNode.style.zIndex = '1400'; } catch (e) {} }; return Swal.fire(o); } alert((o.title || '') + '\n' + (o.text || '').replace(/<[^>]+>/g, '')); return Promise.resolve({}); }
 
@@ -26594,7 +26614,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     wrap.addEventListener('click', function (ev) { if (ev.target === wrap) tutup(); });
     document.body.appendChild(wrap);
     var kotak = wrap.firstChild;
-    panggil('getKumpulSaya', [tugasId, s.userID, s.token]).then(function (res) {
+    panggilUlang('getKumpulSaya', [tugasId, s.userID, s.token]).then(function (res) {
       if (!res || !res.success) { kotak.innerHTML = '<p class="text-rose-600 text-sm">' + esc((res && res.message) || 'Gagal memuat') + '</p><button type="button" class="mt-3 px-3 py-2 rounded-lg border text-xs font-bold" data-tgs-tutup>Tutup</button>'; kotak.querySelector('[data-tgs-tutup]').onclick = tutup; return; }
       gambarKumpul(kotak, res, tugasId);
     }, function (e) { kotak.innerHTML = '<p class="text-rose-600 text-sm">' + esc(pesan(e)) + '</p>'; });
@@ -26664,27 +26684,31 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     document.getElementById('sip-tgs-progres-teks').textContent = teks;
     document.getElementById('sip-tgs-progres-bar').style.width = Math.max(0, Math.min(100, persen)) + '%';
   }
-  function kirimPotongan(uploadId, f, offset, ulang) {
-    var s = sesi();
-    return bacaBase64(f.slice(offset, Math.min(f.size, offset + POTONG))).then(function (b64) {
+  function kirimPotongan(uploadId, f, offset, ulang, potong) {
+    var s = sesi(); potong = potong || POTONG;
+    return bacaBase64(f.slice(offset, Math.min(f.size, offset + potong))).then(function (b64) {
       return panggil('kirimPotonganTugas', [uploadId, offset, b64, s.userID, s.token]);
     }).then(function (r) {
       if (!r || !r.success) throw new Error((r && r.message) || 'Potongan gagal dikirim.');
       return r;
     }).catch(function (e) {
-      if ((ulang || 0) >= 3 || /kedaluwarsa|bukan milik|tidak didukung|terkunci/.test(pesan(e))) throw e;
-      return new Promise(function (t) { setTimeout(t, 1500 * ((ulang || 0) + 1)); }).then(function () { return kirimPotongan(uploadId, f, offset, (ulang || 0) + 1); });
+      if ((ulang || 0) >= 4 || /kedaluwarsa|bukan milik|tidak didukung|terkunci|tidak terdaftar|Urutan potongan|tidak sesuai/.test(pesanMentah(e))) throw e;
+      return tunda(2000 * ((ulang || 0) + 1)).then(function () { return kirimPotongan(uploadId, f, offset, (ulang || 0) + 1, potong); });
     });
   }
   function unggahSatu(tugasId, f, ke, jumlah) {
     var s = sesi();
     progres('Menyiapkan ' + ke + '/' + jumlah + ': ' + f.name, 0);
-    return panggil('mulaiUnggahTugas', [tugasId, { nama: f.name, mime: f.type || '', ukuran: f.size }, s.userID, s.token]).then(function (m) {
+    return panggilUlang('mulaiUnggahTugas', [tugasId, { nama: f.name, mime: f.type || '', ukuran: f.size }, s.userID, s.token]).then(function (m) {
       if (!m || !m.success) throw new Error((m && m.message) || 'Unggahan ditolak.');
-      var offset = 0;
+      var offset = 0, potong = Number(m.potongan) || POTONG, tungguKe = 0;
       function lanjut() {
-        return kirimPotongan(m.uploadId, f, offset).then(function (r) {
-          offset = Number(r.diterima) || (offset + POTONG);
+        return kirimPotongan(m.uploadId, f, offset, 0, potong).then(function (r) {
+          if (r.menunggu) {   /* potongan terakhir masih diproses server → tunggu, kirim ulang (tidak ganda) */
+            if (++tungguKe > 60) throw new Error('Server terlalu lama menyimpan berkas. Muat ulang form untuk melihat apakah berkas sudah masuk.');
+            return tunda(3000).then(lanjut);
+          }
+          offset = Number(r.diterima) || (offset + potong);
           progres('Mengunggah ' + ke + '/' + jumlah + ': ' + f.name + ' — ' + Math.round(offset * 100 / f.size) + '%', offset * 100 / f.size);
           if (r.hasil) return r.hasil;
           if (offset >= f.size) throw new Error('Server belum mengonfirmasi berkas.');
@@ -26709,7 +26733,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     rantai.then(function () {
       if (!hasil.length && antre.length && !teks.trim() && !sudah) throw new Error(gagal.join('\n'));
       progres('Menyimpan pengumpulan…', 100);
-      return panggil('simpanKumpulTugas', [tugasId, teks, s.userID, s.token]);
+      return panggilUlang('simpanKumpulTugas', [tugasId, teks, s.userID, s.token]);
     }).then(function (r) {
       if (!r || !r.success) throw new Error((r && r.message) || 'Pengumpulan gagal disimpan.');
       _pilihan = [];
@@ -26860,7 +26884,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
 })();
 
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5406ee7ddce0ce9',t:'MTc5MzU5NDEzMw=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5406ee7ddce0ce9',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a55fffb189d5ab5b',t:'MTc5MzkyNTEyMg=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a55fffb189d5ab5b',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 <!-- Lisensi MathJax tertanam:
 
                                  Apache License
