@@ -26884,7 +26884,781 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
 })();
 
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a55fffb189d5ab5b',t:'MTc5MzkyNTEyMg=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a55fffb189d5ab5b',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+  <!-- PENGAWAS RUANG DAN TIM PEMBUAT SOAL DARI DEWAN PENGGALANG · sumber: web/petugas-ujian.js -->
+  <script id="sipintar-petugas-ujian">
+/* =============================================================================
+   PETUGAS UJIAN · TAMBAHAN v1.0.0 · 6 November 2026
+   Admin  : menu "Pengawas & Tim Soal" — Ruang per jadwal (Ruang 1..n, peserta,
+            Pengawas dropdown) dan Tim Pembuat Soal per jadwal (checkbox).
+   Petugas: akun Users ber-Role "Dewan Penggalang" yang ditugaskan mendapat
+            Panel Petugas bergaya Admin yang HANYA berisi Monitor Ujian ruangnya
+            dan/atau Bank Soal ujian yang ditugaskan. Tanpa tugas → beranda lama.
+   Tidak mengubah menu, rute, fungsi atau alur yang sudah ada; alur Pengawas lama
+   (Guru) tetap nonaktif. Otorisasi sebenarnya ada di GAS (gas/pengawas-tim.gs).
+   ============================================================================= */
+(function () {
+  'use strict';
+  var VERSI = '1.0.0';
+  var PERAN = /^dewan\s*penggalang$/i;
+  var POLL_MS = 8000;
+  var adm = { data: null, tab: 'ruang', examId: '', ruang: [], tim: [], ubah: false, cari: '' };
+  var ptg = { res: null, view: '', examId: '', ruangId: '', mon: null, filter: 'semua', cari: '', timer: null, sibuk: false, peranAsli: '' };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function aku() { return window.currentUser || null; }
+  function run(nama, args) {
+    return new Promise(function (ok, gagal) {
+      try {
+        var r = window.google && google.script && google.script.run;
+        if (!r) throw new Error('Koneksi server belum siap.');
+        r.withSuccessHandler(ok).withFailureHandler(function (e) { gagal(e instanceof Error ? e : new Error(String(e && e.message || e))); })[nama].apply(r, args || []);
+      } catch (e) { gagal(e); }
+    });
+  }
+  function kred() { var u = aku() || {}; return [u.userID, u.token]; }
+  function pesan(icon, judul, teks) {
+    if (window.Swal && Swal.fire) return Swal.fire({ icon: icon, title: judul, text: teks || '', confirmButtonColor: '#1b3a6b' });
+    try { window.alert(judul + (teks ? '\n' + teks : '')); } catch (e) {}
+    return Promise.resolve({});
+  }
+  function konfirmasi(judul, html, tombol, warna) {
+    if (window.Swal && Swal.fire) {
+      return Swal.fire({ icon: 'warning', title: judul, html: html, showCancelButton: true, confirmButtonText: tombol || 'Ya',
+        cancelButtonText: 'Batal', confirmButtonColor: warna || '#1b3a6b', reverseButtons: true })
+        .then(function (r) { return !!(r && r.isConfirmed); });
+    }
+    return Promise.resolve(window.confirm(judul));
+  }
+  /* "VII E", "7-E", "Kelas 7E" → "7E" (sama dengan GAS). */
+  function kunciKelas(raw) {
+    var s = String(raw == null ? '' : raw).toUpperCase().replace(/KELAS/g, ' ').replace(/[^A-Z0-9]+/g, ' ').trim();
+    var m = s.match(/^(XII|XI|IX|X|VIII|VII|VI|V|IV|III|II|I)\s*([A-Z0-9]{0,3})$/);
+    if (m) return String({ I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10, XI: 11, XII: 12 }[m[1]]) + m[2];
+    return s.replace(/\s+/g, '');
+  }
+  function kelasUjian(ex) {
+    return String(ex && ex.kelas || '').split(',').map(function (k) { return kunciKelas(k); }).filter(Boolean);
+  }
+  function normNama(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); }
+
+  /* ------------------------------------------------------------------ gaya */
+  function pasangGaya() {
+    if ($('sip-ptg-gaya')) return;
+    var st = document.createElement('style');
+    st.id = 'sip-ptg-gaya';
+    st.textContent = [
+      '.sip-ptg{font-size:14px;color:#1e293b}',
+      '.sip-ptg *{box-sizing:border-box}',
+      '.sip-ptg-kartu{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:16px;box-shadow:0 1px 2px rgba(15,23,42,.05);margin-bottom:12px}',
+      '.sip-ptg-kepala{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}',
+      '.sip-ptg-kepala h2{font-size:18px;font-weight:800;margin:0;display:flex;gap:8px;align-items:center}',
+      '.sip-ptg-sub{font-size:12px;color:#64748b;margin-top:2px}',
+      '.sip-ptg-tab{display:inline-flex;background:#f1f5f9;border-radius:12px;padding:3px;gap:3px}',
+      '.sip-ptg-tab button{border:0;background:transparent;padding:7px 12px;border-radius:9px;font-weight:700;font-size:13px;color:#475569;cursor:pointer}',
+      '.sip-ptg-tab button[aria-selected="true"]{background:#1b3a6b;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.15)}',
+      '.sip-ptg-baris{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}',
+      '.sip-ptg-baris label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#64748b}',
+      '.sip-ptg select,.sip-ptg input[type=text],.sip-ptg input[type=search]{border:1px solid #cbd5e1;border-radius:10px;padding:7px 10px;font-size:13px;background:#fff;color:#0f172a;min-width:0}',
+      '.sip-ptg-pilih-ujian{flex:1 1 280px;max-width:520px}',
+      '.sip-ptg-btn{border:0;border-radius:10px;padding:7px 12px;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;gap:6px;align-items:center;background:#e2e8f0;color:#0f172a}',
+      '.sip-ptg-btn:disabled{opacity:.5;cursor:not-allowed}',
+      '.sip-ptg-btn.utama{background:#1b3a6b;color:#fff}.sip-ptg-btn.hijau{background:#059669;color:#fff}.sip-ptg-btn.merah{background:#dc2626;color:#fff}.sip-ptg-btn.kuning{background:#f59e0b;color:#fff}',
+      '.sip-ptg-btn.kecil{padding:4px 9px;font-size:12px;border-radius:8px}',
+      '.sip-ptg-chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:800}',
+      '.sip-ptg-chip.ok{background:#dcfce7;color:#166534}.sip-ptg-chip.kurang{background:#fef3c7;color:#92400e}.sip-ptg-chip.info{background:#e0e7ff;color:#3730a3}.sip-ptg-chip.merah{background:#fee2e2;color:#991b1b}.sip-ptg-chip.abu{background:#f1f5f9;color:#475569}',
+      '.sip-ptg-tabel{width:100%;border-collapse:collapse;font-size:13px}',
+      '.sip-ptg-tabel th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;text-align:left;padding:8px;border-bottom:1px solid #e2e8f0;background:#f8fafc}',
+      '.sip-ptg-tabel td{padding:7px 8px;border-bottom:1px solid #f1f5f9;vertical-align:middle}',
+      '.sip-ptg-gulir{overflow:auto;max-height:60vh;border:1px solid #e2e8f0;border-radius:12px}',
+      '.sip-ptg-kosong{padding:28px;text-align:center;color:#64748b}',
+      '.sip-ptg-catatan{border-radius:12px;padding:10px 12px;font-size:13px;margin-top:10px}',
+      '.sip-ptg-catatan.kuning{background:#fffbeb;border:1px solid #fde68a;color:#92400e}.sip-ptg-catatan.biru{background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a}',
+      '.sip-ptg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px;max-height:52vh;overflow:auto;padding:2px}',
+      '.sip-ptg-cek{display:flex;gap:8px;align-items:flex-start;border:1px solid #e2e8f0;border-radius:10px;padding:7px 9px;cursor:pointer;background:#fff}',
+      '.sip-ptg-cek:hover{border-color:#94a3b8}.sip-ptg-cek input{margin-top:3px}',
+      '.sip-ptg-cek.dipilih{border-color:#1b3a6b;background:#eef2ff}',
+      '.sip-ptg-cek small{display:block;color:#64748b;font-size:11px}',
+      '.sip-ptg-modal{position:fixed;inset:0;z-index:1300;display:flex;align-items:center;justify-content:center;padding:12px}',
+      '.sip-ptg-modal[hidden]{display:none}',
+      '.sip-ptg-latar{position:absolute;inset:0;background:rgba(15,23,42,.55)}',
+      '.sip-ptg-kotak{position:relative;background:#fff;border-radius:18px;width:min(860px,100%);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25)}',
+      '.sip-ptg-kotak header,.sip-ptg-kotak footer{padding:12px 16px;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}',
+      '.sip-ptg-kotak header{border-bottom:1px solid #e2e8f0}.sip-ptg-kotak footer{border-top:1px solid #e2e8f0}',
+      '.sip-ptg-kotak .isi{padding:12px 16px;overflow:auto}',
+      '.sip-ptg-hitung{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:12px}',
+      '.sip-ptg-hitung button{border:1px solid #e2e8f0;border-radius:12px;background:#fff;padding:8px;text-align:left;cursor:pointer}',
+      '.sip-ptg-hitung button b{display:block;font-size:20px;line-height:1.1}',
+      '.sip-ptg-hitung button span{font-size:11px;color:#64748b;font-weight:700}',
+      '.sip-ptg-hitung button[aria-pressed="true"]{outline:2px solid #1b3a6b}',
+      '@media (max-width:640px){.sip-ptg-hitung{grid-template-columns:repeat(3,minmax(0,1fr))}}',
+      /* Panel petugas (gaya admin) */
+      '.sip-ptg-panel{position:fixed;inset:0;z-index:1200;display:flex;background:#f1f5f9}',
+      /* Dialog konfirmasi/pesan harus di atas panel layar penuh (hanya saat panel terbuka). */
+      'body.sip-ptg-panel-buka .swal2-container{z-index:1300 !important}',
+      '.sip-ptg-panel[hidden]{display:none}',
+      '.sip-ptg-side{width:240px;background:linear-gradient(180deg,#1b3a6b,#0f2447);color:#fff;display:flex;flex-direction:column;padding:16px 12px;gap:6px;flex-shrink:0}',
+      '.sip-ptg-side .merek{display:flex;gap:10px;align-items:center;padding:4px 6px 12px;border-bottom:1px solid rgba(255,255,255,.15);margin-bottom:8px}',
+      '.sip-ptg-side .merek i{font-size:22px;color:#fbbf24}',
+      '.sip-ptg-side .merek b{display:block;font-size:15px}.sip-ptg-side .merek small{display:block;font-size:11px;color:#bfdbfe}',
+      '.sip-ptg-nav{border:0;background:transparent;color:#dbeafe;text-align:left;padding:10px 12px;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;display:flex;gap:10px;align-items:center}',
+      '.sip-ptg-nav:hover{background:rgba(255,255,255,.08)}.sip-ptg-nav.aktif{background:#fff;color:#1b3a6b}',
+      '.sip-ptg-side .bawah{margin-top:auto;display:flex;flex-direction:column;gap:4px}',
+      '.sip-ptg-main{flex:1;display:flex;flex-direction:column;min-width:0}',
+      '.sip-ptg-atas{background:#fff;border-bottom:1px solid #e2e8f0;padding:12px 16px;display:flex;gap:10px;align-items:center}',
+      '.sip-ptg-atas h1{font-size:17px;font-weight:800;margin:0;flex:1}',
+      '.sip-ptg-menu{display:none;border:0;background:#f1f5f9;border-radius:10px;padding:8px 10px;cursor:pointer}',
+      '#sip-ptg-konten{flex:1;overflow:auto;padding:16px}',
+      '@media (max-width:860px){.sip-ptg-side{position:fixed;inset:0 auto 0 0;z-index:2;transform:translateX(-100%);transition:transform .2s}.sip-ptg-panel.buka-menu .sip-ptg-side{transform:none}.sip-ptg-menu{display:inline-block}}',
+      /* Bank Soal di panel Tim: hanya isi manual/Excel; fitur Admin lain disembunyikan */
+      '#sip-ptg-panel.mode-tim [onclick*="form-import-q"],#sip-ptg-panel.mode-tim [onclick*="initCopyForm"],#sip-ptg-panel.mode-tim [onclick*="form-batch-q"],',
+      '#sip-ptg-panel.mode-tim [onclick*="showBatchForm"],#sip-ptg-panel.mode-tim [onclick*="openQuestionDiagnostics"],#sip-ptg-panel.mode-tim [onclick*="openRandomConfigModal"],',
+      '#sip-ptg-panel.mode-tim [onclick*="triggerImport"],#sip-ptg-panel.mode-tim [onclick*="processExcelImport"],#sip-ptg-panel.mode-tim [onclick*="downloadTemplateExcel"],#sip-ptg-panel.mode-tim [onclick*="handleCopyQuestions"],',
+      '#sip-ptg-panel.mode-tim #form-import-q,#sip-ptg-panel.mode-tim #form-copy-q,#sip-ptg-panel.mode-tim #form-batch-q,',
+      '#sip-ptg-panel.mode-tim [data-sip-kisi-langsung],#sip-ptg-panel.mode-tim [id^="sip-kisi-langsung"],#sip-ptg-panel.mode-tim [id^="sip-paket"],',
+      '#sip-ptg-panel.mode-tim [data-paket-open],#sip-ptg-panel.mode-tim [data-sip-ai],#sip-ptg-panel.mode-tim .sip-ai-tombol,#sip-ptg-panel.mode-tim [id^="sip-soal-ai"]{display:none!important}'
+    ].join('\n');
+    document.head.appendChild(st);
+  }
+
+  /* ================================================================== ADMIN */
+  function pasangMenuAdmin() {
+    var acuan = $('menu-exams');
+    if (!acuan) return;
+    var item = $('menu-petugas-ujian');
+    if (!item) {
+      item = document.createElement('div');
+      item.id = 'menu-petugas-ujian';
+      item.className = 'sidebar-item hidden';
+      item.setAttribute('data-sip-petugas', VERSI);
+      item.innerHTML = '<i class="fas fa-user-shield"></i> <span class="sidebar-text font-medium">Pengawas &amp; Tim Soal</span>';
+      item.addEventListener('click', function () { bukaAdmin(item); });
+      acuan.parentNode.insertBefore(item, acuan.nextSibling);
+    }
+    var u = aku();
+    item.classList.toggle('hidden', !(u && u.role === 'Admin'));
+  }
+
+  function bukaAdmin(el) {
+    var u = aku();
+    if (!u || u.role !== 'Admin') return;
+    document.querySelectorAll('.sidebar-item').forEach(function (i) { i.classList.remove('active'); });
+    if (el) el.classList.add('active');
+    try { if (typeof window.stopMonitorPolling === 'function') window.stopMonitorPolling(); } catch (e) {}
+    var title = $('admin-header-title');
+    if (title) title.innerText = 'Pengawas & Tim Pembuat Soal';
+    if (window.innerWidth < 768) {
+      var sb = $('admin-sidebar'), ov = $('mobile-overlay');
+      if (sb) sb.classList.add('-translate-x-full');
+      if (ov) ov.classList.add('hidden');
+    }
+    var c = $('admin-content');
+    if (!c) return;
+    c.innerHTML = '<div class="sip-ptg" id="sip-ptg-admin"><div class="sip-ptg-kartu sip-ptg-kosong"><i class="fas fa-circle-notch fa-spin"></i> Memuat data petugas…</div></div>';
+    muatAdmin();
+  }
+  window.sipBukaPetugasAdmin = function () { bukaAdmin($('menu-petugas-ujian')); };
+
+  function muatAdmin(pertahankan) {
+    return run('getPetugasUjianAdmin', kred()).then(function (res) {
+      var akar = $('sip-ptg-admin');
+      if (!akar) return;
+      if (!res || !res.success) {
+        akar.innerHTML = '<div class="sip-ptg-kartu sip-ptg-kosong" style="color:#b91c1c">' + esc(res && res.message || 'Gagal memuat.') + '</div>';
+        return;
+      }
+      adm.data = res;
+      if (!pertahankan || !adm.examId || !cariUjian(adm.examId)) {
+        var pertama = res.exams.filter(function (e) { return !e.sudahSelesai; }).slice(-1)[0] || res.exams[0];
+        adm.examId = pertama ? pertama.id : '';
+      }
+      ambilDraf();
+      gambarAdmin();
+    }, function (e) {
+      var akar = $('sip-ptg-admin');
+      if (akar) akar.innerHTML = '<div class="sip-ptg-kartu sip-ptg-kosong" style="color:#b91c1c">Gagal: ' + esc(e.message) + '</div>';
+    });
+  }
+  function cariUjian(id) { return (adm.data && adm.data.exams || []).filter(function (e) { return e.id === id; })[0] || null; }
+  function ambilDraf() {
+    var d = adm.data || {};
+    adm.ruang = JSON.parse(JSON.stringify((d.ruang || {})[adm.examId] || []));
+    adm.tim = ((d.tim || {})[adm.examId] || []).slice();
+    adm.ubah = false;
+  }
+  function namaSiswa() {
+    var m = {};
+    (adm.data && adm.data.siswa || []).forEach(function (s) { m[s.id] = s; });
+    return m;
+  }
+  function labelUjian(e) {
+    return (e.mapel || '-') + ' · ' + (e.kelas || '-') + ' · ' + (e.mulaiTeks && e.mulaiTeks !== '-' ? e.mulaiTeks : 'tanpa tanggal') +
+      (e.lengkap ? '' : ' — belum lengkap') + (e.sudahSelesai ? ' (selesai)' : '');
+  }
+
+  function gambarAdmin() {
+    var akar = $('sip-ptg-admin'), d = adm.data;
+    if (!akar || !d) return;
+    var ex = cariUjian(adm.examId);
+    var opsi = d.exams.map(function (e) {
+      return '<option value="' + esc(e.id) + '"' + (e.id === adm.examId ? ' selected' : '') + '>' + esc(labelUjian(e)) + '</option>';
+    }).join('');
+    var status = !ex ? '' : (ex.lengkap
+      ? '<span class="sip-ptg-chip ok"><i class="fas fa-check"></i> Jadwal lengkap</span>'
+      : '<span class="sip-ptg-chip kurang"><i class="fas fa-triangle-exclamation"></i> Kurang: ' + esc(ex.kurang.join(', ')) + '</span>') +
+      (ex && ex.live ? ' <span class="sip-ptg-chip merah"><i class="fas fa-circle"></i> Berlangsung</span>' : '');
+    akar.innerHTML =
+      '<div class="sip-ptg-kartu">' +
+        '<div class="sip-ptg-kepala"><div><h2><i class="fas fa-user-shield" style="color:#1b3a6b"></i> Pengawas &amp; Tim Pembuat Soal</h2>' +
+        '<div class="sip-ptg-sub">Petugas dipilih dari akun <b>Dewan Penggalang</b> (' + d.dewan.length + ' akun aktif). Pembagian ruang dan tim berlaku per jadwal ujian.</div></div>' +
+        '<div class="sip-ptg-tab" role="tablist">' +
+          '<button type="button" role="tab" data-tab="ruang" aria-selected="' + (adm.tab === 'ruang') + '"><i class="fas fa-door-open"></i> Ruang &amp; Pengawas</button>' +
+          '<button type="button" role="tab" data-tab="tim" aria-selected="' + (adm.tab === 'tim') + '"><i class="fas fa-pen-ruler"></i> Tim Pembuat Soal</button>' +
+        '</div></div>' +
+        (d.catatan ? '<div class="sip-ptg-catatan kuning">' + esc(d.catatan) + '</div>' : '') +
+        '<div class="sip-ptg-baris"><label for="sip-ptg-exam">Jadwal ujian</label>' +
+          (d.exams.length ? '<select id="sip-ptg-exam" class="sip-ptg-pilih-ujian">' + opsi + '</select>' : '<span class="sip-ptg-sub">Belum ada jadwal ujian.</span>') +
+          '<span id="sip-ptg-status-ujian">' + status + '</span></div>' +
+      '</div>' +
+      '<div class="sip-ptg-kartu" id="sip-ptg-isi"></div>';
+    akar.querySelectorAll('[data-tab]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (adm.tab === b.getAttribute('data-tab')) return;
+        adm.tab = b.getAttribute('data-tab');
+        gambarAdmin();
+      });
+    });
+    var sel = $('sip-ptg-exam');
+    if (sel) sel.addEventListener('change', function () {
+      var baru = sel.value;
+      var lanjut = adm.ubah ? konfirmasi('Perubahan belum disimpan', 'Pindah jadwal akan membuang perubahan yang belum disimpan.', 'Buang & pindah', '#dc2626') : Promise.resolve(true);
+      lanjut.then(function (ya) {
+        if (!ya) { sel.value = adm.examId; return; }
+        adm.examId = baru; ambilDraf(); gambarAdmin();
+      });
+    });
+    if (!ex) { $('sip-ptg-isi').innerHTML = '<div class="sip-ptg-kosong">Pilih atau buat jadwal ujian terlebih dahulu di menu Jadwal Ujian.</div>'; return; }
+    if (adm.tab === 'tim') gambarTim(ex); else gambarRuang(ex);
+  }
+
+  /* ---------------------------------------------------------- tab ruang */
+  function opsiPengawas(pilih) {
+    return '<option value="">— pilih pengawas —</option>' + (adm.data.dewan || []).map(function (u) {
+      return '<option value="' + esc(u.id) + '"' + (u.id === pilih ? ' selected' : '') + '>' + esc(u.nama) + '</option>';
+    }).join('');
+  }
+  function pesertaUjian(ex) {
+    var k = kelasUjian(ex);
+    return (adm.data.siswa || []).filter(function (s) { return k.indexOf(kunciKelas(s.kelas)) >= 0; });
+  }
+  function petaRuangSiswa() {
+    var m = {};
+    adm.ruang.forEach(function (r, i) { (r.peserta || []).forEach(function (id) { m[id] = i; }); });
+    return m;
+  }
+  function tandaiUbah() {
+    adm.ubah = true;
+    var t = $('sip-ptg-simpan-ruang') || $('sip-ptg-simpan-tim');
+    if (t) t.classList.add('kuning');
+    var n = $('sip-ptg-belum-simpan');
+    if (n) n.hidden = false;
+  }
+
+  function gambarRuang(ex) {
+    var isi = $('sip-ptg-isi');
+    var peta = petaRuangSiswa(), kandidat = pesertaUjian(ex);
+    var belum = kandidat.filter(function (s) { return peta[s.id] === undefined; });
+    var totalMasuk = adm.ruang.reduce(function (a, r) { return a + (r.peserta || []).length; }, 0);
+    var pengawasGanda = {};
+    adm.ruang.forEach(function (r) { if (r.pengawas) pengawasGanda[r.pengawas] = (pengawasGanda[r.pengawas] || 0) + 1; });
+    var salin = (adm.data.exams || []).filter(function (e) { return e.id !== ex.id && (adm.data.ruang || {})[e.id] && adm.data.ruang[e.id].length; });
+    var baris = adm.ruang.map(function (r, i) {
+      var n = (r.peserta || []).length;
+      return '<tr data-i="' + i + '">' +
+        '<td style="width:36px;color:#64748b;font-weight:700">' + (i + 1) + '</td>' +
+        '<td><input type="text" class="sip-ptg-nama-ruang" value="' + esc(r.nama) + '" maxlength="40" aria-label="Nama ruang ' + (i + 1) + '" style="width:100%;max-width:180px"></td>' +
+        '<td><select class="sip-ptg-pengawas" aria-label="Pengawas ' + esc(r.nama) + '" style="width:100%;max-width:240px">' + opsiPengawas(r.pengawas) + '</select>' +
+          (r.pengawas && pengawasGanda[r.pengawas] > 1 ? ' <span class="sip-ptg-chip kurang" title="Satu pengawas memegang lebih dari satu ruang">2+ ruang</span>' : '') +
+          (!r.pengawas ? ' <span class="sip-ptg-chip abu">belum ada</span>' : '') + '</td>' +
+        '<td><span class="sip-ptg-chip ' + (n ? 'info' : 'abu') + '">' + n + ' siswa</span> ' +
+          '<button type="button" class="sip-ptg-btn kecil sip-ptg-atur"><i class="fas fa-users"></i> Atur peserta</button></td>' +
+        '<td style="width:40px;text-align:right"><button type="button" class="sip-ptg-btn kecil sip-ptg-hapus-ruang" title="Hapus ' + esc(r.nama) + '" aria-label="Hapus ' + esc(r.nama) + '"><i class="fas fa-trash" style="color:#dc2626"></i></button></td>' +
+        '</tr>';
+    }).join('');
+    isi.innerHTML =
+      '<div class="sip-ptg-kepala">' +
+        '<div><b>Ruang ujian</b> <span class="sip-ptg-sub">— ' + adm.ruang.length + ' ruang · ' + totalMasuk + ' siswa terbagi · ' +
+          belum.length + ' siswa kelas ' + esc(ex.kelas) + ' belum masuk ruang</span></div>' +
+        '<div class="sip-ptg-baris" style="margin-top:0">' +
+          '<button type="button" class="sip-ptg-btn" id="sip-ptg-tambah-ruang"><i class="fas fa-plus"></i> Tambah Ruang</button>' +
+          '<button type="button" class="sip-ptg-btn" id="sip-ptg-bagi"' + (adm.ruang.length && belum.length ? '' : ' disabled') + ' title="Membagi rata siswa yang belum masuk ruang"><i class="fas fa-shuffle"></i> Bagi rata</button>' +
+          (salin.length ? '<select id="sip-ptg-salin" aria-label="Salin pembagian ruang dari jadwal lain"><option value="">Salin dari jadwal…</option>' +
+            salin.map(function (e) { return '<option value="' + esc(e.id) + '">' + esc(e.mapel + ' · ' + e.kelas + ' · ' + e.mulaiTeks) + '</option>'; }).join('') + '</select>' : '') +
+          '<button type="button" class="sip-ptg-btn utama" id="sip-ptg-simpan-ruang"><i class="fas fa-floppy-disk"></i> Simpan</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="sip-ptg-catatan kuning" id="sip-ptg-belum-simpan"' + (adm.ubah ? '' : ' hidden') + '><i class="fas fa-circle-info"></i> Ada perubahan yang belum disimpan.</div>' +
+      (adm.ruang.length
+        ? '<div class="sip-ptg-gulir" style="margin-top:10px"><table class="sip-ptg-tabel"><thead><tr><th>#</th><th>Nama ruang</th><th>Pengawas (Dewan Penggalang)</th><th>Peserta</th><th></th></tr></thead><tbody>' + baris + '</tbody></table></div>'
+        : '<div class="sip-ptg-kosong"><i class="fas fa-door-closed" style="font-size:26px;color:#94a3b8"></i><p style="margin-top:8px">Belum ada ruang. Klik <b>Tambah Ruang</b> untuk membuat Ruang 1.</p></div>') +
+      '<div class="sip-ptg-catatan biru"><i class="fas fa-shield-halved"></i> Pengawas hanya melihat <b>Monitor Ujian</b> ruangnya: <b>Lanjutkan</b> siswa yang terkunci dan <b>Ulang</b> ujian yang belum selesai, ' +
+        'hanya saat jadwal berlangsung (60 menit sebelum mulai s.d. 30 menit setelah batas akhir). Nilai siswa tidak ditampilkan.</div>';
+
+    $('sip-ptg-tambah-ruang').addEventListener('click', function () {
+      var n = adm.ruang.length + 1, id = 'R' + n;
+      while (adm.ruang.some(function (r) { return r.id === id; })) id += 'x';
+      adm.ruang.push({ id: id, nama: 'Ruang ' + n, pengawas: '', peserta: [] });
+      tandaiUbah(); gambarRuang(ex);
+    });
+    $('sip-ptg-bagi').addEventListener('click', function () {
+      var urut = belum.slice().sort(function (a, b) { return String(a.kelas).localeCompare(String(b.kelas)) || String(a.nama).localeCompare(String(b.nama)); });
+      var k = adm.ruang.length;
+      /* Isi ruang yang paling sedikit lebih dulu agar rata. */
+      urut.forEach(function (s) {
+        var min = 0;
+        for (var j = 1; j < k; j++) if ((adm.ruang[j].peserta || []).length < (adm.ruang[min].peserta || []).length) min = j;
+        adm.ruang[min].peserta.push(s.id);
+      });
+      tandaiUbah(); gambarRuang(ex);
+    });
+    var sl = $('sip-ptg-salin');
+    if (sl) sl.addEventListener('change', function () {
+      var dari = sl.value; if (!dari) return;
+      konfirmasi('Salin pembagian ruang?', 'Ruang, pengawas dan peserta dari jadwal terpilih akan menggantikan draf jadwal ini (belum tersimpan sampai Anda klik Simpan).', 'Salin').then(function (ya) {
+        if (!ya) { sl.value = ''; return; }
+        adm.ruang = JSON.parse(JSON.stringify(adm.data.ruang[dari] || []));
+        tandaiUbah(); gambarRuang(ex);
+      });
+    });
+    $('sip-ptg-simpan-ruang').addEventListener('click', function () { simpanRuang(ex); });
+    isi.querySelectorAll('tr[data-i]').forEach(function (tr) {
+      var i = +tr.getAttribute('data-i'), r = adm.ruang[i];
+      tr.querySelector('.sip-ptg-nama-ruang').addEventListener('input', function (e) { r.nama = e.target.value; tandaiUbah(); });
+      tr.querySelector('.sip-ptg-pengawas').addEventListener('change', function (e) { r.pengawas = e.target.value; tandaiUbah(); gambarRuang(ex); });
+      tr.querySelector('.sip-ptg-atur').addEventListener('click', function () { bukaPeserta(ex, i); });
+      tr.querySelector('.sip-ptg-hapus-ruang').addEventListener('click', function () {
+        var n = (r.peserta || []).length;
+        (n ? konfirmasi('Hapus ' + esc(r.nama) + '?', n + ' siswa di ruang ini akan menjadi belum masuk ruang.', 'Hapus', '#dc2626') : Promise.resolve(true)).then(function (ya) {
+          if (!ya) return;
+          adm.ruang.splice(i, 1); tandaiUbah(); gambarRuang(ex);
+        });
+      });
+    });
+  }
+
+  function simpanRuang(ex) {
+    var tanpa = adm.ruang.filter(function (r) { return !r.pengawas; }).map(function (r) { return r.nama; });
+    var kosong = adm.ruang.filter(function (r) { return !(r.peserta || []).length; }).map(function (r) { return r.nama; });
+    var catatan = (tanpa.length ? '<p>Belum ada pengawas: <b>' + esc(tanpa.join(', ')) + '</b></p>' : '') +
+      (kosong.length ? '<p>Belum ada peserta: <b>' + esc(kosong.join(', ')) + '</b></p>' : '');
+    (catatan ? konfirmasi('Simpan tetap?', catatan, 'Simpan') : Promise.resolve(true)).then(function (ya) {
+      if (!ya) return;
+      var b = $('sip-ptg-simpan-ruang');
+      if (b) { b.disabled = true; b.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Menyimpan…'; }
+      var data = adm.ruang.map(function (r) { return { id: r.id, nama: String(r.nama || '').trim(), pengawas: r.pengawas || '', peserta: (r.peserta || []).slice() }; });
+      run('simpanRuangUjian', [{ examId: ex.id, ruang: data }].concat(kred())).then(function (res) {
+        if (!res || !res.success) { pesan('error', 'Gagal menyimpan', res && res.message); if (b) { b.disabled = false; b.innerHTML = '<i class="fas fa-floppy-disk"></i> Simpan'; } return; }
+        adm.data.ruang[ex.id] = res.ruang;
+        ambilDraf(); gambarAdmin();
+        pesan('success', 'Tersimpan', res.message);
+      }, function (e) { pesan('error', 'Gagal menyimpan', e.message); if (b) { b.disabled = false; b.innerHTML = '<i class="fas fa-floppy-disk"></i> Simpan'; } });
+    });
+  }
+
+  /* ---------------------------------------------------------- modal peserta */
+  function modal() {
+    var m = $('sip-ptg-modal');
+    if (!m) {
+      m = document.createElement('div');
+      m.id = 'sip-ptg-modal';
+      m.className = 'sip-ptg-modal sip-ptg';
+      m.hidden = true;
+      m.setAttribute('role', 'dialog');
+      m.setAttribute('aria-modal', 'true');
+      document.body.appendChild(m);
+    }
+    return m;
+  }
+  function bukaPeserta(ex, idx) {
+    var r = adm.ruang[idx], m = modal(), semua = adm.data.siswa || [];
+    var kelasUj = kelasUjian(ex);
+    var daftarKelas = [];
+    semua.forEach(function (s) { if (s.kelas && daftarKelas.indexOf(s.kelas) < 0) daftarKelas.push(s.kelas); });
+    daftarKelas.sort();
+    var f = { kelas: '__ujian', cari: '' };
+    function terlihat() {
+      var c = normNama(f.cari);
+      return semua.filter(function (s) {
+        if (f.kelas === '__ujian' && kelasUj.indexOf(kunciKelas(s.kelas)) < 0) return false;
+        if (f.kelas !== '__ujian' && f.kelas !== '__semua' && s.kelas !== f.kelas) return false;
+        return !c || normNama(s.nama + ' ' + s.id).indexOf(c) >= 0;
+      }).sort(function (a, b) { return String(a.kelas).localeCompare(String(b.kelas)) || String(a.nama).localeCompare(String(b.nama)); });
+    }
+    function gambar() {
+      var peta = petaRuangSiswa(), list = terlihat(), dipilih = r.peserta.length;
+      var grid = list.map(function (s) {
+        var di = peta[s.id], milik = di === idx, lain = di !== undefined && !milik;
+        return '<label class="sip-ptg-cek' + (milik ? ' dipilih' : '') + '"><input type="checkbox" data-id="' + esc(s.id) + '"' + (milik ? ' checked' : '') + '>' +
+          '<span><b>' + esc(s.nama) + '</b><small>' + esc(s.kelas) + (lain ? ' · <span style="color:#b45309">di ' + esc(adm.ruang[di].nama) + ' (centang = pindah)</span>' : '') + '</small></span></label>';
+      }).join('');
+      m.querySelector('.isi').innerHTML = list.length ? '<div class="sip-ptg-grid">' + grid + '</div>' : '<div class="sip-ptg-kosong">Tidak ada siswa yang cocok.</div>';
+      m.querySelector('#sip-ptg-jml').textContent = dipilih + ' siswa di ' + r.nama + ' · ' + list.length + ' terlihat';
+      m.querySelectorAll('.isi input[type=checkbox]').forEach(function (cb) {
+        cb.addEventListener('change', function () { setel(cb.getAttribute('data-id'), cb.checked); gambar(); });
+      });
+    }
+    function setel(id, ya) {
+      adm.ruang.forEach(function (x, j) { if (j !== idx) x.peserta = (x.peserta || []).filter(function (p) { return p !== id; }); });
+      r.peserta = (r.peserta || []).filter(function (p) { return p !== id; });
+      if (ya) r.peserta.push(id);
+      tandaiUbah();
+    }
+    m.innerHTML = '<div class="sip-ptg-latar" data-tutup></div><div class="sip-ptg-kotak">' +
+      '<header><div><b style="font-size:16px"><i class="fas fa-users" style="color:#1b3a6b"></i> Peserta ' + esc(r.nama) + '</b>' +
+      '<div class="sip-ptg-sub">' + esc(ex.mapel + ' · ' + ex.kelas) + ' — satu siswa hanya di satu ruang</div></div>' +
+      '<button type="button" class="sip-ptg-btn kecil" data-tutup aria-label="Tutup"><i class="fas fa-xmark"></i></button></header>' +
+      '<div style="padding:10px 16px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
+        '<select id="sip-ptg-f-kelas" aria-label="Filter kelas"><option value="__ujian">Kelas ujian (' + esc(ex.kelas) + ')</option><option value="__semua">Semua kelas</option>' +
+          daftarKelas.map(function (k) { return '<option value="' + esc(k) + '">' + esc(k) + '</option>'; }).join('') + '</select>' +
+        '<input type="search" id="sip-ptg-f-cari" placeholder="Cari nama / ID…" style="flex:1;min-width:160px">' +
+        '<button type="button" class="sip-ptg-btn kecil" id="sip-ptg-pilih-semua"><i class="fas fa-check-double"></i> Pilih semua terlihat</button>' +
+        '<button type="button" class="sip-ptg-btn kecil" id="sip-ptg-kosongkan"><i class="fas fa-eraser"></i> Kosongkan terlihat</button>' +
+      '</div>' +
+      '<div class="isi"></div>' +
+      '<footer><span class="sip-ptg-sub" id="sip-ptg-jml"></span><button type="button" class="sip-ptg-btn utama" data-tutup>Selesai</button></footer></div>';
+    m.hidden = false;
+    m.querySelectorAll('[data-tutup]').forEach(function (b) { b.addEventListener('click', function () { m.hidden = true; gambarRuang(ex); }); });
+    m.querySelector('#sip-ptg-f-kelas').addEventListener('change', function (e) { f.kelas = e.target.value; gambar(); });
+    m.querySelector('#sip-ptg-f-cari').addEventListener('input', function (e) { f.cari = e.target.value; gambar(); });
+    m.querySelector('#sip-ptg-pilih-semua').addEventListener('click', function () { terlihat().forEach(function (s) { setel(s.id, true); }); gambar(); });
+    m.querySelector('#sip-ptg-kosongkan').addEventListener('click', function () { terlihat().forEach(function (s) { if (r.peserta.indexOf(s.id) >= 0) setel(s.id, false); }); gambar(); });
+    gambar();
+  }
+
+  /* ---------------------------------------------------------- tab tim */
+  function gambarTim(ex) {
+    var isi = $('sip-ptg-isi'), dewan = adm.data.dewan || [];
+    var kelasUj = kelasUjian(ex), pesertaNama = {};
+    (adm.data.siswa || []).forEach(function (s) { if (kelasUj.indexOf(kunciKelas(s.kelas)) >= 0) pesertaNama[normNama(s.nama)] = s.kelas; });
+    var c = normNama(adm.cari);
+    var list = dewan.filter(function (u) { return !c || normNama(u.nama + ' ' + u.id).indexOf(c) >= 0; });
+    var nonaktif = !ex.lengkap;
+    var grid = list.map(function (u) {
+      var on = adm.tim.indexOf(u.id) >= 0, bentrok = pesertaNama[normNama(u.nama)];
+      return '<label class="sip-ptg-cek' + (on ? ' dipilih' : '') + '"><input type="checkbox" data-id="' + esc(u.id) + '"' + (on ? ' checked' : '') + (nonaktif ? ' disabled' : '') + '>' +
+        '<span><b>' + esc(u.nama) + '</b><small>' + esc(u.id) + (bentrok ? ' · <span style="color:#b91c1c">⚠ nama sama dengan peserta ' + esc(bentrok) + '</span>' : '') + '</small></span></label>';
+    }).join('');
+    isi.innerHTML =
+      '<div class="sip-ptg-kepala"><div><b>Tim Pembuat Soal</b> <span class="sip-ptg-sub">— ' + adm.tim.length + ' dipilih dari ' + dewan.length + ' Dewan Penggalang</span></div>' +
+        '<div class="sip-ptg-baris" style="margin-top:0">' +
+          '<input type="search" id="sip-ptg-cari-tim" placeholder="Cari nama…" value="' + esc(adm.cari) + '">' +
+          '<button type="button" class="sip-ptg-btn" id="sip-ptg-tim-semua"' + (nonaktif ? ' disabled' : '') + '><i class="fas fa-check-double"></i> Pilih semua terlihat</button>' +
+          '<button type="button" class="sip-ptg-btn" id="sip-ptg-tim-kosong"' + (nonaktif ? ' disabled' : '') + '><i class="fas fa-eraser"></i> Kosongkan</button>' +
+          '<button type="button" class="sip-ptg-btn utama" id="sip-ptg-simpan-tim"' + (nonaktif && !adm.tim.length ? ' disabled' : '') + '><i class="fas fa-floppy-disk"></i> Simpan Tim</button>' +
+        '</div></div>' +
+      '<div class="sip-ptg-catatan kuning" id="sip-ptg-belum-simpan"' + (adm.ubah ? '' : ' hidden') + '><i class="fas fa-circle-info"></i> Ada perubahan yang belum disimpan.</div>' +
+      (nonaktif ? '<div class="sip-ptg-catatan kuning"><i class="fas fa-triangle-exclamation"></i> Jadwal belum lengkap: <b>' + esc(ex.kurang.join(', ')) +
+        '</b>. Lengkapi di menu <b>Jadwal Ujian</b>; Tim Pembuat Soal baru dapat ditugaskan setelah jadwal lengkap.</div>' : '') +
+      (list.length ? '<div class="sip-ptg-grid" style="margin-top:10px">' + grid + '</div>' : '<div class="sip-ptg-kosong">Tidak ada akun Dewan Penggalang yang cocok.</div>') +
+      '<div class="sip-ptg-catatan biru"><i class="fas fa-lock"></i> Anggota tim hanya dapat membuka <b>Bank Soal ujian ini</b>, setelah jadwal lengkap, dan aksesnya <b>berakhir saat ujian dimulai</b>' +
+        (ex.mulaiTeks && ex.mulaiTeks !== '-' ? ' (' + esc(ex.mulaiTeks) + ')' : '') + '. Aturan Bank Soal (materi/bab wajib, jenis soal, pemeriksaan kisi-kisi) tetap berlaku. PIN ujian tidak ditampilkan kepada tim.</div>';
+    var cari = $('sip-ptg-cari-tim');
+    cari.addEventListener('input', function () { adm.cari = cari.value; var pos = cari.selectionStart; gambarTim(ex); var n = $('sip-ptg-cari-tim'); n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) {} });
+    isi.querySelectorAll('.sip-ptg-grid input[type=checkbox]').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        var id = cb.getAttribute('data-id');
+        adm.tim = adm.tim.filter(function (x) { return x !== id; });
+        if (cb.checked) adm.tim.push(id);
+        tandaiUbah(); gambarTim(ex);
+      });
+    });
+    $('sip-ptg-tim-semua').addEventListener('click', function () { list.forEach(function (u) { if (adm.tim.indexOf(u.id) < 0) adm.tim.push(u.id); }); tandaiUbah(); gambarTim(ex); });
+    $('sip-ptg-tim-kosong').addEventListener('click', function () { adm.tim = []; tandaiUbah(); gambarTim(ex); });
+    $('sip-ptg-simpan-tim').addEventListener('click', function () {
+      var b = $('sip-ptg-simpan-tim');
+      b.disabled = true; b.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Menyimpan…';
+      run('simpanTimSoal', [{ examId: ex.id, anggota: adm.tim.slice() }].concat(kred())).then(function (res) {
+        if (!res || !res.success) { pesan('error', 'Gagal menyimpan', res && res.message); gambarTim(ex); return; }
+        adm.data.tim[ex.id] = res.anggota;
+        ambilDraf(); gambarAdmin();
+        pesan('success', 'Tersimpan', res.message);
+      }, function (e) { pesan('error', 'Gagal menyimpan', e.message); gambarTim(ex); });
+    });
+  }
+
+  /* ================================================================== PANEL PETUGAS */
+  function panel() {
+    var p = $('sip-ptg-panel');
+    if (!p) {
+      p = document.createElement('div');
+      p.id = 'sip-ptg-panel';
+      p.className = 'sip-ptg-panel sip-ptg';
+      p.hidden = true;
+      document.body.appendChild(p);
+    }
+    return p;
+  }
+  function memuat(ya) {
+    var id = 'sip-ptg-memuat', n = $(id);
+    if (ya && !n) {
+      n = document.createElement('div');
+      n.id = id;
+      n.className = 'sip-ptg-panel sip-ptg';
+      n.style.cssText = 'align-items:center;justify-content:center;z-index:1250';
+      n.innerHTML = '<div class="sip-ptg-kartu" style="text-align:center"><i class="fas fa-circle-notch fa-spin" style="font-size:24px;color:#1b3a6b"></i><p style="margin-top:8px">Memeriksa tugas petugas…</p></div>';
+      document.body.appendChild(n);
+    } else if (!ya && n) n.parentNode.removeChild(n);
+  }
+  function berhentiPoll() { if (ptg.timer) { clearInterval(ptg.timer); ptg.timer = null; } }
+  function pulihkanPeran() {
+    var u = aku();
+    if (u && ptg.peranAsli) { u.role = ptg.peranAsli; delete u._sipPeranTampilan; }
+    ptg.peranAsli = '';
+    var p = $('sip-ptg-panel');
+    if (p) p.classList.remove('mode-tim');
+  }
+
+  function bukaPanel(res, hubAsli) {
+    ptg.res = res; ptg.hubAsli = hubAsli;
+    var p = panel(), u = aku() || {};
+    var adaMon = (res.pengawas || []).length > 0, adaTim = (res.tim || []).length > 0;
+    p.innerHTML =
+      '<aside class="sip-ptg-side">' +
+        '<div class="merek"><i class="fas fa-user-shield"></i><div><b>Panel Petugas</b><small>' + esc(res.nama || u.username || '') + '</small><small>Dewan Penggalang</small></div></div>' +
+        (adaMon ? '<button type="button" class="sip-ptg-nav" data-view="monitor"><i class="fas fa-desktop"></i> Monitor Ujian</button>' : '') +
+        (adaTim ? '<button type="button" class="sip-ptg-nav" data-view="bank"><i class="fas fa-book"></i> Bank Soal</button>' : '') +
+        '<div class="bawah">' +
+          '<button type="button" class="sip-ptg-nav" data-view="beranda"><i class="fas fa-house"></i> Beranda</button>' +
+          '<button type="button" class="sip-ptg-nav" data-view="keluar"><i class="fas fa-right-from-bracket"></i> Keluar</button>' +
+        '</div>' +
+      '</aside>' +
+      '<main class="sip-ptg-main"><div class="sip-ptg-atas"><button type="button" class="sip-ptg-menu" aria-label="Menu"><i class="fas fa-bars"></i></button>' +
+        '<h1 id="sip-ptg-judul">Panel Petugas</h1></div><div id="sip-ptg-konten"></div></main>';
+    p.hidden = false;
+    try { document.body.style.overflow = 'hidden'; document.body.classList.add('sip-ptg-panel-buka'); } catch (e) {}
+    p.querySelector('.sip-ptg-menu').addEventListener('click', function () { p.classList.toggle('buka-menu'); });
+    p.querySelectorAll('[data-view]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        p.classList.remove('buka-menu');
+        var v = b.getAttribute('data-view');
+        if (v === 'keluar') { if (typeof window.logout === 'function') window.logout(); return; }
+        if (v === 'beranda') { tutupPanel(); window._sipPtgLewati = true; try { (ptg.hubAsli || function () {})('dash'); } finally { window._sipPtgLewati = false; } return; }
+        tampil(v);
+      });
+    });
+    tampil(adaMon ? 'monitor' : 'bank');
+  }
+  function tutupPanel() {
+    berhentiPoll(); pulihkanPeran();
+    var p = $('sip-ptg-panel');
+    if (p) { p.hidden = true; p.innerHTML = ''; }
+    try { document.body.style.overflow = ''; document.body.classList.remove('sip-ptg-panel-buka'); } catch (e) {}
+  }
+  window.sipTutupPanelPetugas = tutupPanel;
+
+  function tampil(v) {
+    var p = $('sip-ptg-panel');
+    if (!p) return;
+    berhentiPoll();
+    if (v !== 'bank') pulihkanPeran();
+    ptg.view = v;
+    p.querySelectorAll('[data-view]').forEach(function (b) { b.classList.toggle('aktif', b.getAttribute('data-view') === v); });
+    var judul = $('sip-ptg-judul');
+    if (v === 'monitor') { judul.textContent = 'Monitor Ujian'; gambarMonitorKerangka(); }
+    else if (v === 'bank') { judul.textContent = 'Bank Soal — Tim Pembuat Soal'; gambarBank(); }
+  }
+
+  /* ---------------------------------------------------------- monitor */
+  var STATUS = {
+    belumLogin: { label: 'Belum login', warna: 'abu' }, sudahLogin: { label: 'Sudah login', warna: 'info' },
+    mengerjakan: { label: 'Mengerjakan', warna: 'ok' }, selesai: { label: 'Selesai', warna: 'abu' }, curang: { label: 'Terkunci', warna: 'merah' }
+  };
+  function tugasPengawas() { return (ptg.res && ptg.res.pengawas) || []; }
+  function gambarMonitorKerangka() {
+    var k = $('sip-ptg-konten'), tugas = tugasPengawas();
+    if (!tugas.length) { k.innerHTML = '<div class="sip-ptg-kartu sip-ptg-kosong">Anda belum ditugaskan sebagai pengawas ruang.</div>'; return; }
+    if (!ptg.examId || !tugas.some(function (t) { return t.examId === ptg.examId; })) { ptg.examId = tugas[0].examId; ptg.ruangId = ''; }
+    var t = tugas.filter(function (x) { return x.examId === ptg.examId; })[0];
+    if (!ptg.ruangId || !t.ruang.some(function (r) { return r.id === ptg.ruangId; })) ptg.ruangId = t.ruang[0].id;
+    k.innerHTML =
+      '<div class="sip-ptg-kartu">' +
+        '<div class="sip-ptg-kepala"><div><h2><i class="fas fa-desktop" style="color:#1b3a6b"></i> Monitor Ujian Ruang</h2>' +
+          '<div class="sip-ptg-sub">Hanya peserta ruang yang Anda awasi. Diperbarui otomatis tiap ' + (POLL_MS / 1000) + ' detik.</div></div>' +
+          '<div class="sip-ptg-baris" style="margin-top:0"><span class="sip-ptg-sub" id="sip-ptg-waktu"></span>' +
+          '<button type="button" class="sip-ptg-btn" id="sip-ptg-segarkan"><i class="fas fa-sync-alt"></i> Refresh</button></div></div>' +
+        '<div class="sip-ptg-baris"><label for="sip-ptg-m-exam">Jadwal</label><select id="sip-ptg-m-exam" class="sip-ptg-pilih-ujian">' +
+          tugas.map(function (x) { return '<option value="' + esc(x.examId) + '"' + (x.examId === ptg.examId ? ' selected' : '') + '>' + esc(x.mapel + ' · ' + x.kelas + ' · ' + x.mulaiTeks + (x.live ? ' — berlangsung' : '')) + '</option>'; }).join('') +
+          '</select><label for="sip-ptg-m-ruang">Ruang</label><select id="sip-ptg-m-ruang">' +
+          t.ruang.map(function (r) { return '<option value="' + esc(r.id) + '"' + (r.id === ptg.ruangId ? ' selected' : '') + '>' + esc(r.nama) + ' (' + r.jumlah + ')</option>'; }).join('') +
+          '</select></div>' +
+        '<div id="sip-ptg-m-info"></div>' +
+        '<div class="sip-ptg-hitung" id="sip-ptg-hitung"></div>' +
+      '</div>' +
+      '<div class="sip-ptg-kartu"><div class="sip-ptg-baris" style="margin-top:0"><input type="search" id="sip-ptg-m-cari" placeholder="Cari nama siswa…" value="' + esc(ptg.cari) + '" style="flex:1;min-width:180px"></div>' +
+        '<div id="sip-ptg-m-tabel" style="margin-top:10px"><div class="sip-ptg-kosong"><i class="fas fa-circle-notch fa-spin"></i> Mengambil data monitor…</div></div></div>';
+    $('sip-ptg-m-exam').addEventListener('change', function (e) { ptg.examId = e.target.value; ptg.ruangId = ''; ptg.mon = null; gambarMonitorKerangka(); });
+    $('sip-ptg-m-ruang').addEventListener('change', function (e) { ptg.ruangId = e.target.value; ptg.mon = null; muatMonitor(false); });
+    $('sip-ptg-segarkan').addEventListener('click', function () { muatMonitor(false); });
+    $('sip-ptg-m-cari').addEventListener('input', function (e) { ptg.cari = e.target.value; gambarTabelMonitor(); });
+    muatMonitor(false);
+    ptg.timer = setInterval(function () {
+      var p = $('sip-ptg-panel');
+      if (!p || p.hidden || ptg.view !== 'monitor' || document.hidden) return;
+      muatMonitor(true);
+    }, POLL_MS);
+  }
+  function muatMonitor(diam) {
+    if (diam && ptg.sibuk) return;
+    ptg.sibuk = true;
+    var eid = ptg.examId, rid = ptg.ruangId;
+    run('getMonitorRuang', [eid, rid].concat(kred())).then(function (res) {
+      ptg.sibuk = false;
+      if (eid !== ptg.examId || rid !== ptg.ruangId || ptg.view !== 'monitor') return;
+      if (!res || !res.success) {
+        if (!diam) { var tb = $('sip-ptg-m-tabel'); if (tb) tb.innerHTML = '<div class="sip-ptg-kosong" style="color:#b91c1c">' + esc(res && res.message || 'Gagal memuat') + '</div>'; }
+        return;
+      }
+      ptg.mon = res;
+      gambarInfoMonitor(); gambarTabelMonitor();
+    }, function (e) {
+      ptg.sibuk = false;
+      if (!diam) { var tb = $('sip-ptg-m-tabel'); if (tb) tb.innerHTML = '<div class="sip-ptg-kosong" style="color:#b91c1c">Gagal: ' + esc(e.message) + '</div>'; }
+    });
+  }
+  function gambarInfoMonitor() {
+    var m = ptg.mon; if (!m) return;
+    var w = $('sip-ptg-waktu'); if (w) w.textContent = 'Update: ' + m.waktu;
+    var info = $('sip-ptg-m-info');
+    if (info) info.innerHTML = '<div class="sip-ptg-baris"><span class="sip-ptg-chip info"><i class="fas fa-door-open"></i> ' + esc(m.ruang.nama) + '</span>' +
+      '<span class="sip-ptg-chip abu"><i class="fas fa-clock"></i> ' + esc(m.exam.mulaiTeks) + ' – ' + esc(m.exam.selesaiTeks) + '</span>' +
+      (m.exam.live ? '<span class="sip-ptg-chip merah"><i class="fas fa-circle"></i> Berlangsung</span>' : '') + '</div>' +
+      (m.bolehAksi ? '' : '<div class="sip-ptg-catatan kuning"><i class="fas fa-lock"></i> Tombol Lanjutkan/Ulang aktif saat jadwal berlangsung (60 menit sebelum mulai s.d. 30 menit setelah batas akhir).</div>');
+    var h = $('sip-ptg-hitung');
+    if (h) {
+      var urut = ['belumLogin', 'sudahLogin', 'mengerjakan', 'selesai', 'curang'];
+      h.innerHTML = urut.map(function (k) {
+        return '<button type="button" data-f="' + k + '" aria-pressed="' + (ptg.filter === k) + '"><b>' + (m.jumlah[k] || 0) + '</b><span>' + STATUS[k].label + '</span></button>';
+      }).join('');
+      h.querySelectorAll('[data-f]').forEach(function (b) {
+        b.addEventListener('click', function () { var f = b.getAttribute('data-f'); ptg.filter = ptg.filter === f ? 'semua' : f; gambarInfoMonitor(); gambarTabelMonitor(); });
+      });
+    }
+  }
+  function gambarTabelMonitor() {
+    var m = ptg.mon, tb = $('sip-ptg-m-tabel');
+    if (!m || !tb) return;
+    var c = normNama(ptg.cari);
+    var rows = m.data.filter(function (r) { return (ptg.filter === 'semua' || r.status === ptg.filter) && (!c || normNama(r.nama).indexOf(c) >= 0); });
+    if (!rows.length) { tb.innerHTML = '<div class="sip-ptg-kosong">' + (m.data.length ? 'Tidak ada siswa pada filter ini.' : 'Ruang ini belum memiliki peserta.') + '</div>'; return; }
+    tb.innerHTML = '<div class="sip-ptg-gulir"><table class="sip-ptg-tabel"><thead><tr><th>No</th><th>Nama</th><th>Kelas</th><th>Status</th><th>Mulai</th><th>Kirim</th><th>Pelanggaran</th><th style="text-align:right">Tindakan</th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        var s = STATUS[r.status] || STATUS.belumLogin;
+        var bisaLanjut = m.bolehAksi && r.responseId && r.status === 'curang';
+        var bisaUlang = m.bolehAksi && r.responseId && (r.status === 'curang' || r.status === 'mengerjakan');
+        return '<tr><td>' + r.no + '</td><td><b>' + esc(r.nama) + '</b></td><td>' + esc(r.kelas) + '</td>' +
+          '<td><span class="sip-ptg-chip ' + s.warna + '">' + s.label + '</span></td><td>' + esc(r.mulai) + '</td><td>' + esc(r.kirim) + '</td>' +
+          '<td>' + (r.pelanggaran ? '<span class="sip-ptg-chip kurang" title="' + esc(r.detail) + '">' + r.pelanggaran + '×</span>' : '-') + '</td>' +
+          '<td style="text-align:right;white-space:nowrap">' +
+            (bisaLanjut ? '<button type="button" class="sip-ptg-btn kecil hijau" data-aksi="lanjut" data-rid="' + esc(r.responseId) + '" data-nama="' + esc(r.nama) + '"><i class="fas fa-play"></i> Lanjutkan</button> ' : '') +
+            (bisaUlang ? '<button type="button" class="sip-ptg-btn kecil merah" data-aksi="ulang" data-rid="' + esc(r.responseId) + '" data-nama="' + esc(r.nama) + '"><i class="fas fa-rotate-left"></i> Ulang</button>' : '') +
+            (!bisaLanjut && !bisaUlang ? '<span class="sip-ptg-sub">-</span>' : '') +
+          '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+    tb.querySelectorAll('[data-aksi]').forEach(function (b) { b.addEventListener('click', function () { aksi(b); }); });
+  }
+  function aksi(b) {
+    var jenis = b.getAttribute('data-aksi'), rid = b.getAttribute('data-rid'), nama = b.getAttribute('data-nama');
+    var teks = jenis === 'lanjut'
+      ? 'Buka kunci <b>' + esc(nama) + '</b> agar dapat login ulang dan <b>melanjutkan</b> ujian. Jawaban tidak dihapus.'
+      : '<b>' + esc(nama) + '</b> akan <b>mengulang dari awal</b>. Data pengerjaan ujian ini dihapus sesuai aturan reset yang berlaku.';
+    konfirmasi(jenis === 'lanjut' ? 'Lanjutkan ujian?' : 'Ulang ujian?', teks, jenis === 'lanjut' ? 'Ya, lanjutkan' : 'Ya, ulang', jenis === 'lanjut' ? '#059669' : '#dc2626').then(function (ya) {
+      if (!ya) return;
+      b.disabled = true;
+      run('aksiMonitorRuang', [{ examId: ptg.examId, ruangId: ptg.ruangId, responseId: rid, aksi: jenis }].concat(kred())).then(function (res) {
+        pesan(res && res.success ? 'success' : 'error', res && res.success ? 'Berhasil' : 'Tidak dapat diproses', res && res.message);
+        muatMonitor(false);
+      }, function (e) { pesan('error', 'Gagal', e.message); muatMonitor(false); });
+    });
+  }
+
+  /* ---------------------------------------------------------- bank soal tim */
+  function gambarBank() {
+    var k = $('sip-ptg-konten'), res = ptg.res || {}, tim = res.tim || [], daftar = res.examList || [];
+    var ringkas = '<div class="sip-ptg-kartu"><div class="sip-ptg-kepala"><div><h2><i class="fas fa-pen-ruler" style="color:#1b3a6b"></i> Tugas Tim Pembuat Soal</h2>' +
+      '<div class="sip-ptg-sub">Hanya Bank Soal ujian yang ditugaskan; akses berakhir saat ujian dimulai.</div></div>' +
+      '<button type="button" class="sip-ptg-btn" id="sip-ptg-bank-segar"><i class="fas fa-sync-alt"></i> Muat ulang tugas</button></div>' +
+      '<div class="sip-ptg-baris">' + tim.map(function (t) {
+        return '<span class="sip-ptg-chip ' + (t.akses ? 'ok' : 'kurang') + '" title="' + esc(t.alasan || 'Terbuka') + '">' + esc(t.mapel + ' · ' + t.kelas + ' · ' + t.mulaiTeks) + (t.akses ? '' : ' — ' + esc(t.alasan)) + '</span>';
+      }).join(' ') + '</div></div>';
+    k.innerHTML = ringkas + '<div id="sip-ptg-bank"></div>';
+    $('sip-ptg-bank-segar').addEventListener('click', function () {
+      run('getPetugasSaya', kred()).then(function (r) { if (r && r.success) { ptg.res = r; gambarBank(); } else pesan('error', 'Gagal', r && r.message); }, function (e) { pesan('error', 'Gagal', e.message); });
+    });
+    var wadah = $('sip-ptg-bank');
+    if (!daftar.length) { pulihkanPeran(); wadah.innerHTML = '<div class="sip-ptg-kartu sip-ptg-kosong">Belum ada Bank Soal yang terbuka untuk Anda saat ini.</div>'; return; }
+    if (typeof window.renderQuestionBank !== 'function') { wadah.innerHTML = '<div class="sip-ptg-kartu sip-ptg-kosong">Modul Bank Soal belum siap. Muat ulang halaman.</div>'; return; }
+    /* Tampilan Bank Soal memakai komponen yang sama dengan Admin. Peran tampilan
+       hanya kosmetik di peramban; server tetap membaca Role dari sheet Users dan
+       membatasi ke ujian yang ditugaskan. */
+    var u = aku();
+    if (u && !ptg.peranAsli) { ptg.peranAsli = u.role; u._sipPeranTampilan = 'Admin'; u.role = 'Admin'; }
+    $('sip-ptg-panel').classList.add('mode-tim');
+    try { cachedExams = daftar.slice(); } catch (e) { try { window.cachedExams = daftar.slice(); } catch (e2) {} }
+    try { window.renderQuestionBank(wadah); }
+    catch (e) { wadah.innerHTML = '<div class="sip-ptg-kartu sip-ptg-kosong" style="color:#b91c1c">Bank Soal gagal tampil: ' + esc(e.message) + '</div>'; }
+    var sub = $('qb-subtitle');
+    if (sub) sub.textContent = 'Tim Pembuat Soal: isi soal untuk ujian yang ditugaskan. Simpan setiap soal; perubahan diperiksa Admin lewat kisi-kisi.';
+  }
+
+  /* ================================================================== KAIT */
+  function kaitHub() {
+    var asli = window.showStudentHub;
+    if (typeof asli !== 'function' || asli.__sipPetugas) return;
+    var fn = function () {
+      var u = aku(), self = this, args = arguments;
+      if (window._sipPtgLewati || !u || !u.userID || !PERAN.test(String(u._sipPeranTampilan ? ptg.peranAsli : u.role || ''))) return asli.apply(self, args);
+      memuat(true);
+      run('getPetugasSaya', [u.userID, u.token]).then(function (res) {
+        memuat(false);
+        if (res && res.success && res.petugas) bukaPanel(res, function (tab) { return asli.call(self, tab); });
+        else asli.apply(self, args);
+      }, function () { memuat(false); asli.apply(self, args); });
+    };
+    fn.__sipPetugas = true;
+    window.showStudentHub = fn;
+  }
+  function kaitAdmin() {
+    var asli = window.initAdminPanel;
+    if (typeof asli !== 'function' || asli.__sipPetugasAdmin) return;
+    var fn = function () {
+      tutupPanel();
+      var hasil = asli.apply(this, arguments);
+      try { pasangMenuAdmin(); } catch (e) {}
+      return hasil;
+    };
+    fn.__sipPetugasAdmin = true;
+    /* Pertahankan penanda pembungkus lain agar tidak dibungkus ganda. */
+    Object.keys(asli).forEach(function (k) { if (!(k in fn)) fn[k] = asli[k]; });
+    window.initAdminPanel = fn;
+  }
+  function mulai() {
+    pasangGaya();
+    pasangMenuAdmin();
+    kaitHub();
+    kaitAdmin();
+  }
+  window.SIPINTAR_PETUGAS_VERSI = VERSI;
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mulai);
+  else mulai();
+})();
+
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5612d383a51d2ac',t:'MTc5MzkzNzQ3Mw=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5612d383a51d2ac',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 <!-- Lisensi MathJax tertanam:
 
                                  Apache License
