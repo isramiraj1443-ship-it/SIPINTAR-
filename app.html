@@ -24451,6 +24451,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
   <!-- KISI-KISI MATERI DAN VALIDASI LEVEL KOGNITIF · sumber: web/kisi-materi-kognitif.js -->
   <script id="sipintar-kisi-materi">
 /* Kisi-kisi materi & kognitif v2.0.0 · tambahan, master UI tidak diubah.
+   6 Nov 2026: cabang katalog Pramuka untuk ujian ber-mapel Pramuka.
    AI hanya atas tindakan Admin; rekomendasi tidak pernah otomatis disetujui. */
 (function () {
   'use strict';
@@ -24500,8 +24501,11 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
       (S.dirty?'Ada perubahan belum disimpan.':'Metadata terakhir telah dimuat/disimpan.')+' Rilis memerlukan persetujuan seluruh soal.';
     if(box)box.dataset.dirty=S.dirty?'1':'0';
   }
+  /* 6 Nov: ujian Pramuka memakai katalog SKU Penggalang (web/cdp-pramuka.js). */
+  function pramuka() { var k=window.SIPINTAR_PRAMUKA_KATALOG; return S.data&&S.data.isPramuka&&k?k:null; }
+  function daftarBab() { var k=pramuka(); return k?k.bab:T.bab; }
   function opsiBab(materi,babId) {
-    return '<option value="">— Pilih bab —</option>'+T.bab.filter(function(b){return b.materi===materi;}).map(function(b){return '<option value="'+e(b.id)+'"'+(b.id===babId?' selected':'')+'>'+e(b.nama)+'</option>';}).join('');
+    return '<option value="">— Pilih bab —</option>'+daftarBab().filter(function(b){return b.materi===materi;}).map(function(b){return '<option value="'+e(b.id)+'"'+(b.id===babId?' selected':'')+'>'+e(b.nama)+'</option>';}).join('');
   }
   function richAman(html) {
     var t=document.createElement('template');t.innerHTML=typeof window.sipMathSourceHTML_==='function'?sipMathSourceHTML_(html):String(html||'');
@@ -24523,8 +24527,8 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     return typeof window._renderSingleQuestionForPreview==='function'?window._renderSingleQuestionForPreview(safe,i):'<div>'+safe.content+'</div>';
   }
   function kartu(r,i) {
-    var math=S.data.isMatematika || !!r.babId;
-    var domain='<select aria-label="Materi soal '+(i+1)+'" data-kisi-edit="materi" data-index="'+i+'"><option value="">— Pilih materi —</option>'+T.materiMatematika.map(function(m){return '<option'+(m===r.materi?' selected':'')+'>'+e(m)+'</option>';}).join('')+'</select>';
+    var pk=pramuka(), math=!!pk || S.data.isMatematika || !!r.babId;
+    var domain='<select aria-label="Materi soal '+(i+1)+'" data-kisi-edit="materi" data-index="'+i+'"><option value="">— Pilih materi —</option>'+(pk?pk.materi:T.materiMatematika).map(function(m){return '<option'+(m===r.materi?' selected':'')+'>'+e(m)+'</option>';}).join('')+'</select>';
     var topic=math?'<label>Materi utama'+domain+'</label><label>Bab / Topik<select aria-label="Bab soal '+(i+1)+'" data-kisi-edit="babId" data-index="'+i+'">'+opsiBab(r.materi,r.babId)+'</select></label>':
       '<label>Materi / Kelompok<input maxlength="100" aria-label="Materi soal '+(i+1)+'" data-kisi-edit="materi" data-index="'+i+'" value="'+e(r.materi)+'"></label><label>Bab / Topik<input maxlength="100" aria-label="Bab soal '+(i+1)+'" data-kisi-edit="bab" data-index="'+i+'" value="'+e(r.bab)+'"></label>';
     var levels='<label>Level Bloom C1–C6<select aria-label="Level C soal '+(i+1)+'" data-kisi-edit="levelC" data-index="'+i+'"><option value="">— Perlu ditentukan —</option>'+Object.keys(T.levelC).map(function(c){return '<option value="'+c+'"'+(c===r.levelC?' selected':'')+'>'+c+' · '+e(T.levelC[c])+'</option>';}).join('')+'</select></label>'+
@@ -24548,7 +24552,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
       if(a==='sipKisiSimpan_()'){b.id='kisi-v2-save';b.textContent='Simpan Metadata & Persetujuan';}
       if(a==="sipKisiUnduh_('doc')"){b.textContent='Word (.docx)';b.setAttribute('onclick',"sipKisiUnduh_('docx')");}
     });
-    var bar=el('kisi-folder-bar');if(bar)bar.innerHTML='<div class="sip-kisi-note">Matematika: <b>'+T.materiMatematika.map(e).join(' · ')+'</b>. Bab dipilih sesuai isi Bank Soal, bukan sekadar nama ujian. Gambar/konteks yang tidak terbaca harus diperiksa manual. <details><summary>Pedoman kognitif dan privasi AI</summary><p>'+e(T.pedoman)+'</p><p>Analisis hanya berjalan setelah Anda menekan tombol AI. Isi soal dan gambar yang dapat dibaca dikirim ke penyedia AI yang dikonfigurasi; menggunakan kuota. Kunci tidak disertakan. Tanpa AI, metadata tetap dapat diisi manual.</p></details></div><div class="sip-kisi-tools"><button type="button" id="kisi-v2-preview">Pratinjau Materi untuk Siswa</button><button type="button" id="kisi-v2-pause" hidden>Jeda setelah batch ini</button><span id="kisi-v2-progress" role="status" aria-live="polite"></span></div>';
+    var bar=el('kisi-folder-bar');if(bar)bar.innerHTML='<div class="sip-kisi-note"><span data-kisi-katalog>Matematika: <b>'+T.materiMatematika.map(e).join(' · ')+'</b></span>. Bab dipilih sesuai isi Bank Soal, bukan sekadar nama ujian. Gambar/konteks yang tidak terbaca harus diperiksa manual. <details><summary>Pedoman kognitif dan privasi AI</summary><p>'+e(T.pedoman)+'</p><p>Analisis hanya berjalan setelah Anda menekan tombol AI. Isi soal dan gambar yang dapat dibaca dikirim ke penyedia AI yang dikonfigurasi; menggunakan kuota. Kunci tidak disertakan. Tanpa AI, metadata tetap dapat diisi manual.</p></details></div><div class="sip-kisi-tools"><button type="button" id="kisi-v2-preview">Pratinjau Materi untuk Siswa</button><button type="button" id="kisi-v2-pause" hidden>Jeda setelah batch ini</button><span id="kisi-v2-progress" role="status" aria-live="polite"></span></div>';
     window.sipKisiUpdateRilisUI_();sibuk(S.busy);
   };
   window.sipKisiMuatExam_=async function() {
@@ -24565,7 +24569,9 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     var box=el('kisi-table');if(!box)return;
     if(!S.data){box.textContent='Pilih ujian untuk memuat metadata kisi-kisi.';return;}
     var open=Array.from(box.querySelectorAll('details[open]')).map(function(n){return n.dataset.kisiDetail;});
-    box.innerHTML=(S.data.butuhPembaruan?'<p class="sip-kisi-warning">Kisi-kisi lama masih disimpan. Untuk mencegah kutipan soal tersebar, rilis lama tidak tersedia bagi siswa sampai diperbarui, diperiksa, disimpan, dan dirilis kembali.</p>':'')+
+    var pk=pramuka(), kat=document.querySelector('[data-kisi-katalog]');
+    if(kat)kat.innerHTML=pk?'Pramuka (SKU Penggalang): <b>'+pk.materi.map(e).join(' · ')+'</b>':'Matematika: <b>'+T.materiMatematika.map(e).join(' · ')+'</b>';
+    box.innerHTML=(pk?'<p class="sip-kisi-note" data-kisi-pramuka>Ujian Pramuka: materi/bab dipilih dari katalog SKU Penggalang — <b>'+pk.materi.map(e).join(' · ')+'</b>. Kisi-kisi hanya dapat dirilis oleh Admin.</p>':'')+(S.data.butuhPembaruan?'<p class="sip-kisi-warning">Kisi-kisi lama masih disimpan. Untuk mencegah kutipan soal tersebar, rilis lama tidak tersedia bagi siswa sampai diperbarui, diperiksa, disimpan, dan dirilis kembali.</p>':'')+
       '<p id="kisi-v2-status" class="sip-kisi-note" role="status"></p><div class="sip-kisi-review">'+items().map(kartu).join('')+'</div>'+
       (!items().length?'<p>Bank Soal ujian ini masih kosong.</p>':'');
     open.forEach(function(i){var d=box.querySelector('[data-kisi-detail="'+i+'"]');if(d)d.open=true;});stats();sibuk(S.busy);
@@ -24574,8 +24580,8 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
   window.sipKisiUbah_=function(i,field,value) {
     var r=items()[i];if(!r||S.busy)return;
     r[field]=value;r.asal='Admin';r.attempted=true;r.disetujui=false;S.dirty=true;
-    if(field==='materi' && (S.data.isMatematika||r.babId)){r.babId='';r.bab='';}
-    if(field==='babId'){var b=T.bab.filter(function(x){return x.id===value;})[0];r.bab=b?b.nama:'';r.materi=b?b.materi:r.materi;}
+    if(field==='materi' && (pramuka()||S.data.isMatematika||r.babId)){r.babId='';r.bab='';}
+    if(field==='babId'){var b=daftarBab().filter(function(x){return x.id===value;})[0];r.bab=b?b.nama:'';r.materi=b?b.materi:r.materi;}
     if(field==='levelC')r.levelL=T.petaCL[value]||'';
     var card=document.querySelector('[data-kisi-row="'+i+'"]');
     if(card){var cb=card.querySelector('[data-kisi-approve]');if(cb)cb.checked=false;
@@ -24688,6 +24694,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
   <!-- MATERI WAJIB, JENIS TETAP DAN PERBAIKAN SOAL AI · sumber: web/bank-soal-materi.js -->
   <script id="sipintar-bank-materi">
 /* Bank Soal Materi v3.1.0 — 23 Oktober 2026 (Terapkan + verifikasi level independen). Tambahan pada editor asli.
+   6 Nov 2026: cabang katalog Pramuka (SKU Penggalang) untuk ujian ber-mapel Pramuka.
    Preferensi hanya jenis/topik/target, bukan isi soal, jawaban atau token. */
 (function(){
  'use strict';
@@ -24707,12 +24714,16 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
  function remember(){if(!admin()||val('input-question-id'))return;var p={type:val('q-type-select'),materi:val('sip-soal-materi'),babId:val('sip-soal-bab-id'),bab:val('sip-soal-bab'),targetC:val('sip-soal-target')};memory[key()]=p;try{localStorage.setItem(key(),JSON.stringify(p));}catch(e){}}
  function examInfo(){try{return (typeof cachedExams!=='undefined'?cachedExams:[]).find(function(e){return String(e.id)===eid();})||{};}catch(e){return {};}}
  function math(){return /matematika|mathematics|\bmath\b|\bmtk\b/i.test(String(examInfo().subject||''));}
- function babOptions(m,id){return '<option value="">— Pilih bab —</option>'+T.bab.filter(function(b){return b.materi===m;}).map(function(b){return '<option value="'+esc(b.id)+'"'+(id===b.id?' selected':'')+'>'+esc(b.nama)+'</option>';}).join('');}
+ /* 6 Nov: ujian Pramuka memakai katalog SKU Penggalang (web/cdp-pramuka.js); Matematika tetap. */
+ function pramuka(){return !math()&&/pramuka/i.test(String(examInfo().subject||''))&&!!window.SIPINTAR_PRAMUKA_KATALOG;}
+ function katalog(){if(math())return {materi:T.materiMatematika,bab:T.bab,nama:'Matematika'};if(pramuka())return {materi:SIPINTAR_PRAMUKA_KATALOG.materi,bab:SIPINTAR_PRAMUKA_KATALOG.bab,nama:'Pramuka'};return null;}
+ function babOptions(m,id){var K=katalog()||{bab:[]};return '<option value="">— Pilih bab —</option>'+K.bab.filter(function(b){return b.materi===m;}).map(function(b){return '<option value="'+esc(b.id)+'"'+(id===b.id?' selected':'')+'>'+esc(b.nama)+'</option>';}).join('');}
  function topicControls(m){
   var box=el('sip-soal-topik');if(!box)return;
-  box.innerHTML=math()?'<label>Materi utama <b>*</b><select required id="sip-soal-materi" name="materi"><option value="">— Pilih materi —</option>'+T.materiMatematika.map(function(t){return '<option'+(t===m.materi?' selected':'')+'>'+esc(t)+'</option>';}).join('')+'</select></label><label>Bab / topik <b>*</b><select required id="sip-soal-bab-id" name="babId">'+babOptions(m.materi,m.babId)+'</select><input type="hidden" id="sip-soal-bab" name="bab" value="'+esc(m.bab||'')+'"></label>':
+  var K=katalog();
+  box.innerHTML=K?'<label>Materi utama'+(K.nama==='Pramuka'?' (Pramuka)':'')+' <b>*</b><select required id="sip-soal-materi" name="materi"><option value="">— Pilih materi —</option>'+K.materi.map(function(t){return '<option'+(t===m.materi?' selected':'')+'>'+esc(t)+'</option>';}).join('')+'</select></label><label>Bab / topik <b>*</b><select required id="sip-soal-bab-id" name="babId">'+babOptions(m.materi,m.babId)+'</select><input type="hidden" id="sip-soal-bab" name="bab" value="'+esc(m.bab||'')+'"></label>':
    '<label>Materi / kelompok <b>*</b><input required maxlength="100" id="sip-soal-materi" name="materi" placeholder="Contoh: Teks Informasi" value="'+esc(m.materi||'')+'"></label><label>Bab / topik <b>*</b><input required maxlength="100" id="sip-soal-bab" name="bab" placeholder="Contoh: Struktur Teks Laporan" value="'+esc(m.bab||'')+'"><input type="hidden" id="sip-soal-bab-id" name="babId" value=""></label>';
-  if(math()){var b=T.bab.find(function(b){return b.id===val('sip-soal-bab-id');});if(b)el('sip-soal-bab').value=b.nama;}
+  if(K){var b=K.bab.find(function(b){return b.id===val('sip-soal-bab-id');});if(b)el('sip-soal-bab').value=b.nama;}
  }
  function setMeta(m,sourceHash){m=m||{};topicControls(m);if(el('sip-soal-target'))el('sip-soal-target').value=m.targetKognitif||m.targetC||'';if(el('sip-soal-source-hash'))el('sip-soal-source-hash').value=sourceHash||'';}
  function restoreType(){if(!admin()||!el('q-type-select'))return;var t=pref().type;el('q-type-select').value=t;if(typeof window.toggleOptionsInput==='function')window.toggleOptionsInput(t);}
@@ -24729,7 +24740,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
  window.editQuestion=function(qStr){var out=native.edit&&native.edit.apply(this,arguments);if(admin()){mount();var q=typeof qStr==='object'?qStr:JSON.parse(decodeURIComponent(qStr));setMeta(q,q.sourceHash);S.seq++;if(!S.busy)clearHasil();}return out;};
  window.renderQuestionBank=function(){var out=native.render&&native.render.apply(this,arguments);mount();return out;};
  window.loadQuestionsTable=function(){var out=native.load&&native.load.apply(this,arguments);mount();if(admin()&&!val('input-question-id')){setMeta(pref(),'');restoreType();}return out;};
- function validTopic(){if(!val('sip-soal-materi').trim()||!val('sip-soal-bab').trim()||(math()&&!val('sip-soal-bab-id')))return false;return true;}
+ function validTopic(){if(!val('sip-soal-materi').trim()||!val('sip-soal-bab').trim()||(katalog()&&!val('sip-soal-bab-id')))return false;return true;}
  window.handleAddQuestion=function(e){
   if(!admin())return native.submit&&native.submit.apply(this,arguments);mount();
   if(S.busy){if(e)e.preventDefault();message('Usulan AI masih berjalan','Tunggu hasil atau batalkan usulan. Soal belum diubah.');return false;}
@@ -24851,8 +24862,8 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
  window.sipSoalTerapkanUsulan_=terapkanTersimpan;
  window.sipSoalMintaPerbaikan_=requestAI;
  document.addEventListener('change',function(e){var n=e.target;if(!admin())return;
-  if(n.id==='sip-soal-materi'&&math()){el('sip-soal-bab-id').innerHTML=babOptions(n.value,'');el('sip-soal-bab').value='';}
-  if(n.id==='sip-soal-bab-id'&&math()){var b=T.bab.find(function(b){return b.id===n.value;});el('sip-soal-bab').value=b?b.nama:'';}
+  if(n.id==='sip-soal-materi'&&katalog()){el('sip-soal-bab-id').innerHTML=babOptions(n.value,'');el('sip-soal-bab').value='';}
+  if(n.id==='sip-soal-bab-id'&&katalog()){var b=katalog().bab.find(function(b){return b.id===n.value;});el('sip-soal-bab').value=b?b.nama:'';}
   if(n.id==='q-type-select'||/^sip-soal-(materi|bab-id|bab|target)$/.test(n.id))remember();
   if(n.id==='select-exam-q'&&!val('input-question-id')){mount();setMeta(pref(),'');restoreType();}
  });
@@ -26896,14 +26907,17 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
             dan/atau Bank Soal ujian yang ditugaskan. Tanpa tugas → beranda lama.
    Tidak mengubah menu, rute, fungsi atau alur yang sudah ada; alur Pengawas lama
    (Guru) tetap nonaktif. Otorisasi sebenarnya ada di GAS (gas/pengawas-tim.gs).
+   v1.1.0 (6 Nov): Tim mendapat seluruh fitur Bank Soal, Generator Soal AI dan
+   menu Kisi-Kisi (susun + ajukan; rilis hanya Admin). Admin melihat status
+   kisi-kisi buatan tim pada tab Tim Pembuat Soal.
    ============================================================================= */
 (function () {
   'use strict';
-  var VERSI = '1.0.0';
+  var VERSI = '1.1.0';
   var PERAN = /^dewan\s*penggalang$/i;
   var POLL_MS = 8000;
   var adm = { data: null, tab: 'ruang', examId: '', ruang: [], tim: [], ubah: false, cari: '' };
-  var ptg = { res: null, view: '', examId: '', ruangId: '', mon: null, filter: 'semua', cari: '', timer: null, sibuk: false, peranAsli: '' };
+  var ptg = { res: null, view: '', examId: '', ruangId: '', mon: null, filter: 'semua', cari: '', timer: null, sibuk: false, peranAsli: '', peranObj: null, acAsli: null };
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -27015,13 +27029,18 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
       '.sip-ptg-menu{display:none;border:0;background:#f1f5f9;border-radius:10px;padding:8px 10px;cursor:pointer}',
       '#sip-ptg-konten{flex:1;overflow:auto;padding:16px}',
       '@media (max-width:860px){.sip-ptg-side{position:fixed;inset:0 auto 0 0;z-index:2;transform:translateX(-100%);transition:transform .2s}.sip-ptg-panel.buka-menu .sip-ptg-side{transform:none}.sip-ptg-menu{display:inline-block}}',
-      /* Bank Soal di panel Tim: hanya isi manual/Excel; fitur Admin lain disembunyikan */
-      '#sip-ptg-panel.mode-tim [onclick*="form-import-q"],#sip-ptg-panel.mode-tim [onclick*="initCopyForm"],#sip-ptg-panel.mode-tim [onclick*="form-batch-q"],',
-      '#sip-ptg-panel.mode-tim [onclick*="showBatchForm"],#sip-ptg-panel.mode-tim [onclick*="openQuestionDiagnostics"],#sip-ptg-panel.mode-tim [onclick*="openRandomConfigModal"],',
-      '#sip-ptg-panel.mode-tim [onclick*="triggerImport"],#sip-ptg-panel.mode-tim [onclick*="processExcelImport"],#sip-ptg-panel.mode-tim [onclick*="downloadTemplateExcel"],#sip-ptg-panel.mode-tim [onclick*="handleCopyQuestions"],',
-      '#sip-ptg-panel.mode-tim #form-import-q,#sip-ptg-panel.mode-tim #form-copy-q,#sip-ptg-panel.mode-tim #form-batch-q,',
-      '#sip-ptg-panel.mode-tim [data-sip-kisi-langsung],#sip-ptg-panel.mode-tim [id^="sip-kisi-langsung"],#sip-ptg-panel.mode-tim [id^="sip-paket"],',
-      '#sip-ptg-panel.mode-tim [data-paket-open],#sip-ptg-panel.mode-tim [data-sip-ai],#sip-ptg-panel.mode-tim .sip-ai-tombol,#sip-ptg-panel.mode-tim [id^="sip-soal-ai"]{display:none!important}'
+      /* v1.1.0 Tim: seluruh fitur Bank Soal tampil. Yang khusus Admin (rilis/hapus kisi,
+         AI soal-dari-kisi, pengaturan AI, pratinjau siswa) disembunyikan dan juga ditolak GAS. */
+      '#sip-ptg-panel.mode-tim [onclick^="sipKisiAIForm_"],#sip-ptg-panel.mode-tim [onclick^="sipKisiHapus_"],#sip-ptg-panel.mode-tim #btn-kisi-rilis,',
+      '#sip-ptg-panel.mode-tim #kisi-v2-langsung,#sip-ptg-panel.mode-tim #kisi-v2-preview,#sip-ptg-panel.mode-tim [onclick*="openAISettings"]{display:none!important}',
+      /* Modal Bank Soal yang ditempel di <body> harus di atas panel petugas. */
+      'body.sip-ptg-panel-buka > .fixed.inset-0:not(.sip-ptg-panel),body.sip-ptg-panel-buka #randomConfigModal{z-index:1250!important}',
+      /* Paket kuota bab: tim boleh melihat/menghitung usulan; menyimpan tetap Admin. */
+      'body.sip-ptg-tim #sip-paket-simpan,body.sip-ptg-tim #sip-paket-nonaktif{display:none!important}',
+      'body.sip-ptg-tim #sip-paket-modal .sip-paket-catatan-tim{display:block}',
+      '.sip-ptg-kisi-status{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:10px}',
+      '.sip-ptg-kisi-status div{border:1px solid #e2e8f0;border-radius:12px;padding:8px 10px;background:#f8fafc}',
+      '.sip-ptg-kisi-status b{display:block;font-size:18px}.sip-ptg-kisi-status span{font-size:11px;color:#64748b;font-weight:700}'
     ].join('\n');
     document.head.appendChild(st);
   }
@@ -27365,6 +27384,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
       (nonaktif ? '<div class="sip-ptg-catatan kuning"><i class="fas fa-triangle-exclamation"></i> Jadwal belum lengkap: <b>' + esc(ex.kurang.join(', ')) +
         '</b>. Lengkapi di menu <b>Jadwal Ujian</b>; Tim Pembuat Soal baru dapat ditugaskan setelah jadwal lengkap.</div>' : '') +
       (list.length ? '<div class="sip-ptg-grid" style="margin-top:10px">' + grid + '</div>' : '<div class="sip-ptg-kosong">Tidak ada akun Dewan Penggalang yang cocok.</div>') +
+      kisiStatusHtml(ex) +
       '<div class="sip-ptg-catatan biru"><i class="fas fa-lock"></i> Anggota tim hanya dapat membuka <b>Bank Soal ujian ini</b>, setelah jadwal lengkap, dan aksesnya <b>berakhir saat ujian dimulai</b>' +
         (ex.mulaiTeks && ex.mulaiTeks !== '-' ? ' (' + esc(ex.mulaiTeks) + ')' : '') + '. Aturan Bank Soal (materi/bab wajib, jenis soal, pemeriksaan kisi-kisi) tetap berlaku. PIN ujian tidak ditampilkan kepada tim.</div>';
     var cari = $('sip-ptg-cari-tim');
@@ -27379,6 +27399,8 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     });
     $('sip-ptg-tim-semua').addEventListener('click', function () { list.forEach(function (u) { if (adm.tim.indexOf(u.id) < 0) adm.tim.push(u.id); }); tandaiUbah(); gambarTim(ex); });
     $('sip-ptg-tim-kosong').addEventListener('click', function () { adm.tim = []; tandaiUbah(); gambarTim(ex); });
+    var bk = $('sip-ptg-buka-kisi');
+    if (bk) bk.addEventListener('click', function () { bukaKisiAdmin(ex.id); });
     $('sip-ptg-simpan-tim').addEventListener('click', function () {
       var b = $('sip-ptg-simpan-tim');
       b.disabled = true; b.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Menyimpan…';
@@ -27389,6 +27411,27 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
         pesan('success', 'Tersimpan', res.message);
       }, function (e) { pesan('error', 'Gagal menyimpan', e.message); gambarTim(ex); });
     });
+  }
+
+  function kisiStatusHtml(ex) {
+    var k = ((adm.data && adm.data.kisi) || {})[ex.id];
+    if (!k || !(adm.data.tim[ex.id] || []).length) return '';
+    if (k.galat) return '<div class="sip-ptg-catatan kuning"><i class="fas fa-table-list"></i> Kisi-kisi tim: ' + esc(k.galat) + '</div>';
+    var akhir = k.terakhir ? 'Terakhir: <b>' + esc(k.terakhir.nama) + '</b> · ' + esc(k.terakhir.aksi === 'KISI_SIMPAN' ? 'menyimpan & mengajukan' : 'menjalankan analisis AI') + ' · ' + esc(k.terakhir.waktu) : 'Tim belum menyusun kisi-kisi.';
+    return '<div class="sip-ptg-kartu" style="margin-top:12px"><div class="sip-ptg-kepala"><div><b><i class="fas fa-table-list" style="color:#1b3a6b"></i> Kisi-kisi dari Tim</b>' +
+        (k.pramuka ? ' <span class="sip-ptg-chip info">Katalog Pramuka</span>' : '') +
+        ' <span class="sip-ptg-chip ' + (k.rilis ? 'ok' : 'kurang') + '">' + (k.rilis ? 'Sudah dirilis' : 'Belum dirilis') + '</span>' +
+        '<div class="sip-ptg-sub">' + akhir + '</div></div>' +
+        '<button type="button" class="sip-ptg-btn utama" id="sip-ptg-buka-kisi"><i class="fas fa-magnifying-glass"></i> Periksa &amp; Rilis di Kisi-Kisi</button></div>' +
+      '<div class="sip-ptg-kisi-status"><div><b>' + k.jumlahSoal + '</b><span>Soal di Bank Soal</span></div><div><b>' + k.dianalisis + '</b><span>Sudah dianalisis</span></div>' +
+        '<div><b>' + k.disetujui + '</b><span>Dicentang &amp; tersimpan</span></div></div>' +
+      '<div class="sip-ptg-sub" style="margin-top:8px">Hanya Admin yang dapat merilis. Periksa materi/bab dan level setiap soal sebelum menekan Rilis Kisi-Kisi.</div></div>';
+  }
+  function bukaKisiAdmin(id) {
+    var menu = $('menu-kisi');
+    if (menu) menu.click(); else if (typeof window.showAdminTab === 'function') window.showAdminTab('dash-kisi');
+    var sel = $('kisi-select-exam');
+    if (sel) { sel.value = id; if (typeof window.sipKisiMuatExam_ === 'function') window.sipKisiMuatExam_(); }
   }
 
   /* ================================================================== PANEL PETUGAS */
@@ -27415,12 +27458,29 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     } else if (!ya && n) n.parentNode.removeChild(n);
   }
   function berhentiPoll() { if (ptg.timer) { clearInterval(ptg.timer); ptg.timer = null; } }
+  /* Halaman Kisi-Kisi Admin menulis ke #admin-content. Selama tampil di panel tim,
+     id itu dipinjamkan ke wadah panel lalu dikembalikan saat pindah/keluar. */
+  function pinjamAdminContent(wadah) {
+    var asli = $('admin-content');
+    if (asli && asli !== wadah) { asli.id = 'sip-ptg-admin-content-asli'; ptg.acAsli = asli; }
+    wadah.id = 'admin-content';
+  }
+  function kembalikanAdminContent() {
+    if (!ptg.acAsli) return;
+    var w = $('admin-content');
+    if (w && w !== ptg.acAsli) w.id = 'sip-ptg-kisi-wadah';
+    ptg.acAsli.id = 'admin-content';
+    ptg.acAsli = null;
+  }
   function pulihkanPeran() {
-    var u = aku();
-    if (u && ptg.peranAsli) { u.role = ptg.peranAsli; delete u._sipPeranTampilan; }
-    ptg.peranAsli = '';
+    kembalikanAdminContent();
+    [ptg.peranObj, aku()].forEach(function (u) {
+      if (u && u._sipPeranTampilan) { u.role = ptg.peranAsli || u.role; delete u._sipPeranTampilan; }
+    });
+    ptg.peranAsli = ''; ptg.peranObj = null;
     var p = $('sip-ptg-panel');
     if (p) p.classList.remove('mode-tim');
+    try { document.body.classList.remove('sip-ptg-tim'); } catch (e) {}
   }
 
   function bukaPanel(res, hubAsli) {
@@ -27431,7 +27491,9 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
       '<aside class="sip-ptg-side">' +
         '<div class="merek"><i class="fas fa-user-shield"></i><div><b>Panel Petugas</b><small>' + esc(res.nama || u.username || '') + '</small><small>Dewan Penggalang</small></div></div>' +
         (adaMon ? '<button type="button" class="sip-ptg-nav" data-view="monitor"><i class="fas fa-desktop"></i> Monitor Ujian</button>' : '') +
-        (adaTim ? '<button type="button" class="sip-ptg-nav" data-view="bank"><i class="fas fa-book"></i> Bank Soal</button>' : '') +
+        (adaTim ? '<button type="button" class="sip-ptg-nav" data-view="bank"><i class="fas fa-book"></i> Bank Soal</button>' +
+          '<button type="button" class="sip-ptg-nav" data-view="ai"><i class="fas fa-robot"></i> Generator Soal AI</button>' +
+          '<button type="button" class="sip-ptg-nav" data-view="kisi"><i class="fas fa-table-list"></i> Kisi-Kisi</button>' : '') +
         '<div class="bawah">' +
           '<button type="button" class="sip-ptg-nav" data-view="beranda"><i class="fas fa-house"></i> Beranda</button>' +
           '<button type="button" class="sip-ptg-nav" data-view="keluar"><i class="fas fa-right-from-bracket"></i> Keluar</button>' +
@@ -27442,6 +27504,15 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     p.hidden = false;
     try { document.body.style.overflow = 'hidden'; document.body.classList.add('sip-ptg-panel-buka'); } catch (e) {}
     p.querySelector('.sip-ptg-menu').addEventListener('click', function () { p.classList.toggle('buka-menu'); });
+    if (!window.__sipPtgPeranJaga) {
+      window.__sipPtgPeranJaga = true;
+      ['pointerdown', 'keydown', 'focusin'].forEach(function (ev) {
+        document.addEventListener(ev, function () {
+          var pn = $('sip-ptg-panel');
+          if (pn && !pn.hidden && VIEW_TIM.indexOf(ptg.view) >= 0 && pn.classList.contains('mode-tim')) pasangPeranTim();
+        }, true);
+      });
+    }
     p.querySelectorAll('[data-view]').forEach(function (b) {
       b.addEventListener('click', function () {
         p.classList.remove('buka-menu');
@@ -27454,7 +27525,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     tampil(adaMon ? 'monitor' : 'bank');
   }
   function tutupPanel() {
-    berhentiPoll(); pulihkanPeran();
+    berhentiPoll(); lepasEditor(); pulihkanPeran();
     var p = $('sip-ptg-panel');
     if (p) { p.hidden = true; p.innerHTML = ''; }
     try { document.body.style.overflow = ''; document.body.classList.remove('sip-ptg-panel-buka'); } catch (e) {}
@@ -27465,12 +27536,29 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     var p = $('sip-ptg-panel');
     if (!p) return;
     berhentiPoll();
-    if (v !== 'bank') pulihkanPeran();
+    lepasEditor();
+    kembalikanAdminContent();
+    if (VIEW_TIM.indexOf(v) < 0) pulihkanPeran();
     ptg.view = v;
     p.querySelectorAll('[data-view]').forEach(function (b) { b.classList.toggle('aktif', b.getAttribute('data-view') === v); });
     var judul = $('sip-ptg-judul');
     if (v === 'monitor') { judul.textContent = 'Monitor Ujian'; gambarMonitorKerangka(); }
     else if (v === 'bank') { judul.textContent = 'Bank Soal — Tim Pembuat Soal'; gambarBank(); }
+    else if (v === 'ai') { judul.textContent = 'Generator Soal AI — Tim Pembuat Soal'; gambarAI(); }
+    else if (v === 'kisi') { judul.textContent = 'Kisi-Kisi — Tim Pembuat Soal'; gambarKisi(); }
+  }
+  var VIEW_TIM = ['bank', 'ai', 'kisi'];
+  /* Editor TinyMCE Bank Soal di panel dilepas sebelum konten panel diganti, agar
+     membuka ulang Bank Soal tidak menyisakan editor yatim. */
+  function lepasEditor() {
+    var k = $('sip-ptg-konten');
+    if (!k || !window.tinymce || typeof tinymce.get !== 'function') return;
+    try {
+      (tinymce.get() || []).slice().forEach(function (ed) {
+        var el = ed && ed.getElement && ed.getElement();
+        if (el && k.contains(el)) { try { ed.remove(); } catch (e) {} }
+      });
+    } catch (e) {}
   }
 
   /* ---------------------------------------------------------- monitor */
@@ -27587,6 +27675,57 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
   }
 
   /* ---------------------------------------------------------- bank soal tim */
+  /* Peran tampilan Admin (kosmetik) dipasang pada objek currentUser yang aktif. Bila
+     sesi menyegarkan currentUser (objek baru), peran dipasang ulang saat ada aksi. */
+  function pasangPeranTim() {
+    var u = aku();
+    if (!u || u._sipPeranTampilan) return;
+    if (!ptg.peranAsli) ptg.peranAsli = u.role;
+    if (!PERAN.test(String(ptg.peranAsli))) return;
+    u._sipPeranTampilan = 'Admin'; u.role = 'Admin'; ptg.peranObj = u;
+  }
+  function siapkanTim(daftar) {
+    pasangPeranTim();
+    $('sip-ptg-panel').classList.add('mode-tim');
+    try { document.body.classList.add('sip-ptg-tim'); } catch (e) {}
+    try { cachedExams = daftar.slice(); } catch (e) { try { window.cachedExams = daftar.slice(); } catch (e2) {} }
+  }
+  function kerangkaTim(judul, ikon, sub) {
+    var k = $('sip-ptg-konten'), res = ptg.res || {}, daftar = res.examList || [];
+    k.innerHTML = '<div class="sip-ptg-kartu"><div class="sip-ptg-kepala"><div><h2><i class="fas ' + ikon + '" style="color:#1b3a6b"></i> ' + esc(judul) + '</h2>' +
+      '<div class="sip-ptg-sub">' + sub + '</div></div></div></div><div id="sip-ptg-wadah-tim"></div>';
+    var wadah = $('sip-ptg-wadah-tim');
+    if (!daftar.length) { pulihkanPeran(); wadah.innerHTML = '<div class="sip-ptg-kartu sip-ptg-kosong">Belum ada Bank Soal yang terbuka untuk Anda saat ini.</div>'; return null; }
+    return { wadah: wadah, daftar: daftar };
+  }
+  function gambarAI() {
+    var t = kerangkaTim('Generator Soal AI', 'fa-robot', 'Hasil AI disimpan ke Bank Soal ujian tugas Anda setelah Anda periksa. Aturan materi/bab dan jenis soal tetap berlaku.');
+    if (!t) return;
+    if (typeof window.renderAIGeneratorPage !== 'function') { t.wadah.innerHTML = '<div class="sip-ptg-kartu sip-ptg-kosong">Generator AI belum siap. Muat ulang halaman.</div>'; return; }
+    siapkanTim(t.daftar);
+    try { window.renderAIGeneratorPage(t.wadah); }
+    catch (e) { t.wadah.innerHTML = '<div class="sip-ptg-kartu sip-ptg-kosong" style="color:#b91c1c">Generator AI gagal tampil: ' + esc(e.message) + '</div>'; }
+  }
+  function gambarKisi() {
+    var t = kerangkaTim('Kisi-Kisi dari Soal Tim', 'fa-table-list', 'Sistem membantu menyusun kisi-kisi dari soal yang Anda buat: jalankan analisis AI, periksa materi/bab dan level, centang, lalu <b>Simpan &amp; Ajukan ke Admin</b>. <b>Hanya Admin yang dapat merilis kisi-kisi.</b>');
+    if (!t) return;
+    if (typeof window.sipRenderKisiAdmin_ !== 'function') { t.wadah.innerHTML = '<div class="sip-ptg-kartu sip-ptg-kosong">Modul kisi-kisi belum siap. Muat ulang halaman.</div>'; return; }
+    siapkanTim(t.daftar);
+    var isi = document.createElement('div');
+    t.wadah.appendChild(isi);
+    pinjamAdminContent(isi);
+    try { window.sipRenderKisiAdmin_(); }
+    catch (e) { isi.innerHTML = '<div class="sip-ptg-kartu sip-ptg-kosong" style="color:#b91c1c">Kisi-kisi gagal tampil: ' + esc(e.message) + '</div>'; return; }
+    var simpan = $('kisi-v2-save');
+    if (simpan) simpan.textContent = 'Simpan & Ajukan ke Admin';
+    var badge = $('kisi-rilis-badge');
+    if (badge) badge.title = 'Status rilis ditentukan Admin.';
+    var sel = $('kisi-select-exam');
+    if (sel && t.daftar.length === 1 && !sel.value) {
+      sel.value = t.daftar[0].id;
+      if (typeof window.sipKisiMuatExam_ === 'function') window.sipKisiMuatExam_();
+    }
+  }
   function gambarBank() {
     var k = $('sip-ptg-konten'), res = ptg.res || {}, tim = res.tim || [], daftar = res.examList || [];
     var ringkas = '<div class="sip-ptg-kartu"><div class="sip-ptg-kepala"><div><h2><i class="fas fa-pen-ruler" style="color:#1b3a6b"></i> Tugas Tim Pembuat Soal</h2>' +
@@ -27605,10 +27744,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     /* Tampilan Bank Soal memakai komponen yang sama dengan Admin. Peran tampilan
        hanya kosmetik di peramban; server tetap membaca Role dari sheet Users dan
        membatasi ke ujian yang ditugaskan. */
-    var u = aku();
-    if (u && !ptg.peranAsli) { ptg.peranAsli = u.role; u._sipPeranTampilan = 'Admin'; u.role = 'Admin'; }
-    $('sip-ptg-panel').classList.add('mode-tim');
-    try { cachedExams = daftar.slice(); } catch (e) { try { window.cachedExams = daftar.slice(); } catch (e2) {} }
+    siapkanTim(daftar);
     try { window.renderQuestionBank(wadah); }
     catch (e) { wadah.innerHTML = '<div class="sip-ptg-kartu sip-ptg-kosong" style="color:#b91c1c">Bank Soal gagal tampil: ' + esc(e.message) + '</div>'; }
     var sub = $('qb-subtitle');
@@ -27658,7 +27794,84 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
 })();
 
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5612d383a51d2ac',t:'MTc5MzkzNzQ3Mw=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5612d383a51d2ac',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+  <!-- PESERTA CDP DAN KATALOG KISI-KISI PRAMUKA · sumber: web/cdp-pramuka.js -->
+  <script id="sipintar-cdp-pramuka">
+/* =============================================================================
+   CDP & KISI-KISI PRAMUKA · TAMBAHAN v1.0.0 · 6 November 2026
+   - Katalog materi/bab Pramuka (SKU Penggalang) untuk Bank Soal & Kisi-Kisi.
+   - Manajemen User: pilihan Role "Dewan Penggalang" dan "CDP" (agar mengedit akun
+     CDP/Dewan tidak mengubah Role-nya menjadi Siswa) + filter Role.
+   - Jadwal Ujian (Admin): kelas "CDP" dan mapel "Pramuka" tersedia bila belum ada
+     di Data Master. Hanya pilihan di formulir; sheet Data Master tidak ditulis.
+   Otorisasi tetap di GAS (gas/cdp-pramuka.gs).
+   ============================================================================= */
+(function () {
+  'use strict';
+  var KATALOG = {"versi":"pramuka-sku-penggalang-2026-11","sumber":"Disusun dari Syarat Kecakapan Umum (SKU) Pramuka Penggalang Ramu/Rakit/Terap. Daftar terpisah dari taksonomi Matematika.","materi":["Pengetahuan Kepramukaan","Kode Kehormatan Pramuka","Komunikasi dan Isyarat","Keterampilan Kepramukaan"],"bab":[{"id":"PRM_SEJARAH","materi":"Pengetahuan Kepramukaan","nama":"Sejarah Kepramukaan","kata":"Baden-Powell, sejarah gerakan pramuka dunia dan Indonesia, Hari Pramuka 14 Agustus, tokoh kepramukaan"},{"id":"PRM_LAMBANG","materi":"Pengetahuan Kepramukaan","nama":"Lambang Gerakan Pramuka dan Kiasannya","kata":"tunas kelapa, kiasan lambang, bendera WOSM, tanda pengenal, seragam dan atribut"},{"id":"PRM_ORGANISASI","materi":"Pengetahuan Kepramukaan","nama":"Organisasi Gerakan Pramuka","kata":"gugus depan, kwartir, pasukan, regu, pembina, golongan Siaga Penggalang Penegak Pandega, saka"},{"id":"PRM_SKU","materi":"Pengetahuan Kepramukaan","nama":"SKU, SKK dan Tingkatan Penggalang","kata":"Ramu, Rakit, Terap, Penggalang Garuda, TKK, tanda kecakapan, sistem tanda kecakapan"},{"id":"PRM_UMUM","materi":"Pengetahuan Kepramukaan","nama":"Pengetahuan Umum Kepramukaan","kata":"pilih hanya bila soal mencakup beberapa topik kepramukaan dan tidak ada bab yang lebih tepat"},{"id":"PRM_KODE","materi":"Kode Kehormatan Pramuka","nama":"Trisatya dan Dasa Darma","kata":"Trisatya Penggalang, Dasa Darma Pramuka, makna dan pengamalan butir kode kehormatan"},{"id":"PRM_PRINSIP","materi":"Kode Kehormatan Pramuka","nama":"Prinsip Dasar dan Metode Kepramukaan","kata":"prinsip dasar, metode kepramukaan, sistem beregu, kiasan dasar, motto, kegiatan menarik dan menantang"},{"id":"PRM_SANDI","materi":"Komunikasi dan Isyarat","nama":"Sandi","kata":"sandi kotak, sandi angka, sandi rumput, sandi AN, sandi napoleon, menyandikan dan membaca sandi"},{"id":"PRM_MORSE","materi":"Komunikasi dan Isyarat","nama":"Morse dan Semaphore","kata":"isyarat morse dengan peluit, senter atau bendera, semaphore dengan dua bendera, kode huruf"},{"id":"PRM_TALI","materi":"Keterampilan Kepramukaan","nama":"Tali-temali dan Pionering","kata":"simpul mati, simpul pangkal, simpul jangkar, ikatan palang, ikatan canggah, pionering, menara pandang"},{"id":"PRM_NAVIGASI","materi":"Keterampilan Kepramukaan","nama":"Navigasi dan Kompas","kata":"kompas, arah mata angin, azimut dan back azimut, peta pita, menaksir jarak, tinggi dan lebar"},{"id":"PRM_P3K","materi":"Keterampilan Kepramukaan","nama":"Pertolongan Pertama (P3K)","kata":"luka, pingsan, pembalutan, mitela, kotak P3K, pertolongan pertama pada kecelakaan"},{"id":"PRM_PBB","materi":"Keterampilan Kepramukaan","nama":"Peraturan Baris-Berbaris (PBB)","kata":"aba-aba, sikap sempurna, hormat, langkah tegap, bentuk barisan regu, upacara pembukaan dan penutupan"},{"id":"PRM_KEMAH","materi":"Keterampilan Kepramukaan","nama":"Perkemahan","kata":"mendirikan tenda, perlengkapan kemah, api unggun, memasak di alam terbuka, menjaga kebersihan dan keselamatan"}]};
+  window.SIPINTAR_PRAMUKA_KATALOG = KATALOG;
+  window.SIPINTAR_CDP_VERSI = '1.0.0';
+  function $(id) { return document.getElementById(id); }
+  function admin() { var u = window.currentUser; return !!(u && u.role === 'Admin' && !u._sipPeranTampilan); }
+  function tambahOpsi(sel, nilai) {
+    if (!sel || Array.prototype.some.call(sel.options, function (o) { return o.value === nilai; })) return;
+    var o = document.createElement('option');
+    o.value = nilai; o.textContent = nilai;
+    o.setAttribute('data-sip-cdp', '1');
+    sel.appendChild(o);
+  }
+  function pasangPeran() {
+    ['input-role', 'user-role-filter'].forEach(function (id) {
+      var s = $(id);
+      tambahOpsi(s, 'Dewan Penggalang');
+      tambahOpsi(s, 'CDP');
+    });
+  }
+  function kaitJadwal() {
+    var asliKelas = window.populateClassCheckboxes;
+    if (typeof asliKelas === 'function' && !asliKelas.__sipCdp) {
+      var fk = function (classArray, selectedClasses) {
+        var arr = classArray;
+        if (admin() && Array.isArray(classArray) && classArray.length &&
+            !classArray.some(function (c) { return String(c && typeof c === 'object' ? c.value : c).trim().toUpperCase() === 'CDP'; })) {
+          arr = classArray.concat(['CDP']);
+        }
+        return asliKelas.call(this, arr, selectedClasses || []);
+      };
+      fk.__sipCdp = true;
+      window.populateClassCheckboxes = fk;
+    }
+    var asliPilih = window.populateSelect;
+    if (typeof asliPilih === 'function' && !asliPilih.__sipCdp) {
+      var fp = function (selectEl, options, keepOld) {
+        var opsi = options;
+        if (selectEl && selectEl.id === 'input-subject' && admin() && Array.isArray(options) && options.length &&
+            !options.some(function (o) { return /pramuka/i.test(String(o)); })) {
+          opsi = options.concat(['Pramuka']);
+        }
+        return asliPilih.call(this, selectEl, opsi, keepOld);
+      };
+      fp.__sipCdp = true;
+      window.populateSelect = fp;
+    }
+  }
+  function mulai() {
+    pasangPeran(); kaitJadwal();
+    /* Formulir/filter user dirender ulang oleh menu Manajemen User: pasang lagi bila muncul. */
+    if (typeof MutationObserver === 'function' && document.body) {
+      var jadwal = 0;
+      new MutationObserver(function () {
+        if (jadwal) return;
+        jadwal = setTimeout(function () { jadwal = 0; pasangPeran(); kaitJadwal(); }, 60);
+      }).observe(document.body, { childList: true, subtree: true });
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mulai);
+  else mulai();
+})();
+
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5624b416fd1f888',t:'MTc5Mzk0OTE4OQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5624b416fd1f888',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 <!-- Lisensi MathJax tertanam:
 
                                  Apache License
