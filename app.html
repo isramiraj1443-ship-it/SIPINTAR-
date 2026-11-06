@@ -26910,14 +26910,20 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
    v1.1.0 (6 Nov): Tim mendapat seluruh fitur Bank Soal, Generator Soal AI dan
    menu Kisi-Kisi (susun + ajukan; rilis hanya Admin). Admin melihat status
    kisi-kisi buatan tim pada tab Tim Pembuat Soal.
+   v1.2.0 (6 Nov, Mode Pramuka): menu panel PERSIS sesuai tugas — Pengawas →
+   Monitor Ujian saja; Tim → Bank Soal saja; keduanya → keduanya. Tim TIDAK lagi
+   memiliki Generator Soal AI, menu Kisi-Kisi, tombol AI di editor soal, maupun
+   rilis kisi langsung (server juga menolak). Petugas yang profilnya belum lengkap
+   diarahkan mengisi Profil dulu, lalu langsung masuk Panel Petugas. Beranda
+   membuka beranda Pramuka terbatas yang memiliki tombol "Panel Petugas".
    ============================================================================= */
 (function () {
   'use strict';
-  var VERSI = '1.1.0';
+  var VERSI = '1.2.0';
   var PERAN = /^dewan\s*penggalang$/i;
   var POLL_MS = 8000;
   var adm = { data: null, tab: 'ruang', examId: '', ruang: [], tim: [], ubah: false, cari: '' };
-  var ptg = { res: null, view: '', examId: '', ruangId: '', mon: null, filter: 'semua', cari: '', timer: null, sibuk: false, peranAsli: '', peranObj: null, acAsli: null };
+  var ptg = { tunda: null, terakhir: null, hubAsli: null, res: null, view: '', examId: '', ruangId: '', mon: null, filter: 'semua', cari: '', timer: null, sibuk: false, peranAsli: '', peranObj: null, acAsli: null };
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -27037,6 +27043,9 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
       'body.sip-ptg-panel-buka > .fixed.inset-0:not(.sip-ptg-panel),body.sip-ptg-panel-buka #randomConfigModal{z-index:1250!important}',
       /* Paket kuota bab: tim boleh melihat/menghitung usulan; menyimpan tetap Admin. */
       'body.sip-ptg-tim #sip-paket-simpan,body.sip-ptg-tim #sip-paket-nonaktif{display:none!important}',
+      /* v1.2.0: Tim Pembuat Soal tanpa AI & kisi-kisi */
+      'body.sip-ptg-tim #sip-soal-ai,body.sip-ptg-tim #sip-soal-ai-batal,body.sip-ptg-tim #sip-soal-ai-hasil,body.sip-ptg-tim #sip-soal-ai-status,body.sip-ptg-tim #sip-soal-ai-terapkan,body.sip-ptg-tim .sip-soal-ai-row+.sip-soal-note{display:none!important}',
+      'body.sip-ptg-tim [data-sip-ai],body.sip-ptg-tim .sip-ai-tombol,body.sip-ptg-tim [data-sip-kisi-langsung],body.sip-ptg-tim #kisi-v2-langsung,body.sip-ptg-tim [onclick*="openAISettings"],body.sip-ptg-tim [onclick*="GenerateAI"],body.sip-ptg-tim [onclick*="sipKisi"]{display:none!important}',
       'body.sip-ptg-tim #sip-paket-modal .sip-paket-catatan-tim{display:block}',
       '.sip-ptg-kisi-status{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:10px}',
       '.sip-ptg-kisi-status div{border:1px solid #e2e8f0;border-radius:12px;padding:8px 10px;background:#f8fafc}',
@@ -27386,7 +27395,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
       (list.length ? '<div class="sip-ptg-grid" style="margin-top:10px">' + grid + '</div>' : '<div class="sip-ptg-kosong">Tidak ada akun Dewan Penggalang yang cocok.</div>') +
       kisiStatusHtml(ex) +
       '<div class="sip-ptg-catatan biru"><i class="fas fa-lock"></i> Anggota tim hanya dapat membuka <b>Bank Soal ujian ini</b>, setelah jadwal lengkap, dan aksesnya <b>berakhir saat ujian dimulai</b>' +
-        (ex.mulaiTeks && ex.mulaiTeks !== '-' ? ' (' + esc(ex.mulaiTeks) + ')' : '') + '. Aturan Bank Soal (materi/bab wajib, jenis soal, pemeriksaan kisi-kisi) tetap berlaku. PIN ujian tidak ditampilkan kepada tim.</div>';
+        (ex.mulaiTeks && ex.mulaiTeks !== '-' ? ' (' + esc(ex.mulaiTeks) + ')' : '') + '. Aturan Bank Soal (materi/bab wajib, jenis soal) tetap berlaku. Tim <b>tidak</b> memakai AI dan tidak memiliki menu kisi-kisi. PIN ujian tidak ditampilkan kepada tim.</div>';
     var cari = $('sip-ptg-cari-tim');
     cari.addEventListener('input', function () { adm.cari = cari.value; var pos = cari.selectionStart; gambarTim(ex); var n = $('sip-ptg-cari-tim'); n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) {} });
     isi.querySelectorAll('.sip-ptg-grid input[type=checkbox]').forEach(function (cb) {
@@ -27416,16 +27425,17 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
   function kisiStatusHtml(ex) {
     var k = ((adm.data && adm.data.kisi) || {})[ex.id];
     if (!k || !(adm.data.tim[ex.id] || []).length) return '';
-    if (k.galat) return '<div class="sip-ptg-catatan kuning"><i class="fas fa-table-list"></i> Kisi-kisi tim: ' + esc(k.galat) + '</div>';
-    var akhir = k.terakhir ? 'Terakhir: <b>' + esc(k.terakhir.nama) + '</b> · ' + esc(k.terakhir.aksi === 'KISI_SIMPAN' ? 'menyimpan & mengajukan' : 'menjalankan analisis AI') + ' · ' + esc(k.terakhir.waktu) : 'Tim belum menyusun kisi-kisi.';
-    return '<div class="sip-ptg-kartu" style="margin-top:12px"><div class="sip-ptg-kepala"><div><b><i class="fas fa-table-list" style="color:#1b3a6b"></i> Kisi-kisi dari Tim</b>' +
+    if (k.galat) return '<div class="sip-ptg-catatan kuning"><i class="fas fa-table-list"></i> Kisi-kisi ujian: ' + esc(k.galat) + '</div>';
+    var akhir = 'Tim Pembuat Soal hanya mengisi Bank Soal (tanpa AI dan tanpa menu kisi-kisi). Analisis, pemeriksaan dan rilis kisi-kisi dilakukan Admin.' +
+      (k.terakhir ? ' Catatan lama: <b>' + esc(k.terakhir.nama) + '</b> · ' + esc(k.terakhir.waktu) + '.' : '');
+    return '<div class="sip-ptg-kartu" style="margin-top:12px"><div class="sip-ptg-kepala"><div><b><i class="fas fa-table-list" style="color:#1b3a6b"></i> Kisi-kisi Ujian · Analisis Admin</b>' +
         (k.pramuka ? ' <span class="sip-ptg-chip info">Katalog Pramuka</span>' : '') +
         ' <span class="sip-ptg-chip ' + (k.rilis ? 'ok' : 'kurang') + '">' + (k.rilis ? 'Sudah dirilis' : 'Belum dirilis') + '</span>' +
         '<div class="sip-ptg-sub">' + akhir + '</div></div>' +
-        '<button type="button" class="sip-ptg-btn utama" id="sip-ptg-buka-kisi"><i class="fas fa-magnifying-glass"></i> Periksa &amp; Rilis di Kisi-Kisi</button></div>' +
+        '<button type="button" class="sip-ptg-btn utama" id="sip-ptg-buka-kisi"><i class="fas fa-magnifying-glass"></i> Analisis &amp; Rilis di Kisi-Kisi</button></div>' +
       '<div class="sip-ptg-kisi-status"><div><b>' + k.jumlahSoal + '</b><span>Soal di Bank Soal</span></div><div><b>' + k.dianalisis + '</b><span>Sudah dianalisis</span></div>' +
         '<div><b>' + k.disetujui + '</b><span>Dicentang &amp; tersimpan</span></div></div>' +
-      '<div class="sip-ptg-sub" style="margin-top:8px">Hanya Admin yang dapat merilis. Periksa materi/bab dan level setiap soal sebelum menekan Rilis Kisi-Kisi.</div></div>';
+      '<div class="sip-ptg-sub" style="margin-top:8px">Setelah tim selesai mengisi soal: buka Kisi-Kisi, jalankan analisis, periksa materi/bab dan level setiap soal, lalu Rilis Kisi-Kisi.</div></div>';
   }
   function bukaKisiAdmin(id) {
     var menu = $('menu-kisi');
@@ -27458,13 +27468,8 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     } else if (!ya && n) n.parentNode.removeChild(n);
   }
   function berhentiPoll() { if (ptg.timer) { clearInterval(ptg.timer); ptg.timer = null; } }
-  /* Halaman Kisi-Kisi Admin menulis ke #admin-content. Selama tampil di panel tim,
-     id itu dipinjamkan ke wadah panel lalu dikembalikan saat pindah/keluar. */
-  function pinjamAdminContent(wadah) {
-    var asli = $('admin-content');
-    if (asli && asli !== wadah) { asli.id = 'sip-ptg-admin-content-asli'; ptg.acAsli = asli; }
-    wadah.id = 'admin-content';
-  }
+  /* (v1.1.0 meminjam #admin-content untuk Kisi-Kisi tim; v1.2.0 tanpa kisi —
+     pemulihan tetap ada agar aman bila state lama tersisa.) */
   function kembalikanAdminContent() {
     if (!ptg.acAsli) return;
     var w = $('admin-content');
@@ -27484,16 +27489,14 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
   }
 
   function bukaPanel(res, hubAsli) {
-    ptg.res = res; ptg.hubAsli = hubAsli;
+    ptg.res = res; ptg.hubAsli = hubAsli; ptg.terakhir = res; ptg.tunda = null;
     var p = panel(), u = aku() || {};
     var adaMon = (res.pengawas || []).length > 0, adaTim = (res.tim || []).length > 0;
     p.innerHTML =
       '<aside class="sip-ptg-side">' +
         '<div class="merek"><i class="fas fa-user-shield"></i><div><b>Panel Petugas</b><small>' + esc(res.nama || u.username || '') + '</small><small>Dewan Penggalang</small></div></div>' +
         (adaMon ? '<button type="button" class="sip-ptg-nav" data-view="monitor"><i class="fas fa-desktop"></i> Monitor Ujian</button>' : '') +
-        (adaTim ? '<button type="button" class="sip-ptg-nav" data-view="bank"><i class="fas fa-book"></i> Bank Soal</button>' +
-          '<button type="button" class="sip-ptg-nav" data-view="ai"><i class="fas fa-robot"></i> Generator Soal AI</button>' +
-          '<button type="button" class="sip-ptg-nav" data-view="kisi"><i class="fas fa-table-list"></i> Kisi-Kisi</button>' : '') +
+        (adaTim ? '<button type="button" class="sip-ptg-nav" data-view="bank"><i class="fas fa-book"></i> Bank Soal</button>' : '') +
         '<div class="bawah">' +
           '<button type="button" class="sip-ptg-nav" data-view="beranda"><i class="fas fa-house"></i> Beranda</button>' +
           '<button type="button" class="sip-ptg-nav" data-view="keluar"><i class="fas fa-right-from-bracket"></i> Keluar</button>' +
@@ -27518,7 +27521,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
         p.classList.remove('buka-menu');
         var v = b.getAttribute('data-view');
         if (v === 'keluar') { if (typeof window.logout === 'function') window.logout(); return; }
-        if (v === 'beranda') { tutupPanel(); window._sipPtgLewati = true; try { (ptg.hubAsli || function () {})('dash'); } finally { window._sipPtgLewati = false; } return; }
+        if (v === 'beranda') { tutupPanel(); window._sipPtgLewati = true; try { (ptg.hubAsli || function () {})('dash'); } finally { window._sipPtgLewati = false; } pasangTombolPanel(); return; }
         tampil(v);
       });
     });
@@ -27535,6 +27538,10 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
   function tampil(v) {
     var p = $('sip-ptg-panel');
     if (!p) return;
+    var r0 = ptg.res || {}, bolehMon = (r0.pengawas || []).length > 0, bolehTim = (r0.tim || []).length > 0;
+    if (v !== 'monitor' && v !== 'bank') v = bolehMon ? 'monitor' : 'bank';
+    if (v === 'monitor' && !bolehMon) v = 'bank';
+    if (v === 'bank' && !bolehTim) v = 'monitor';
     berhentiPoll();
     lepasEditor();
     kembalikanAdminContent();
@@ -27544,10 +27551,8 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     var judul = $('sip-ptg-judul');
     if (v === 'monitor') { judul.textContent = 'Monitor Ujian'; gambarMonitorKerangka(); }
     else if (v === 'bank') { judul.textContent = 'Bank Soal — Tim Pembuat Soal'; gambarBank(); }
-    else if (v === 'ai') { judul.textContent = 'Generator Soal AI — Tim Pembuat Soal'; gambarAI(); }
-    else if (v === 'kisi') { judul.textContent = 'Kisi-Kisi — Tim Pembuat Soal'; gambarKisi(); }
   }
-  var VIEW_TIM = ['bank', 'ai', 'kisi'];
+  var VIEW_TIM = ['bank'];
   /* Editor TinyMCE Bank Soal di panel dilepas sebelum konten panel diganti, agar
      membuka ulang Bank Soal tidak menyisakan editor yatim. */
   function lepasEditor() {
@@ -27698,34 +27703,6 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     if (!daftar.length) { pulihkanPeran(); wadah.innerHTML = '<div class="sip-ptg-kartu sip-ptg-kosong">Belum ada Bank Soal yang terbuka untuk Anda saat ini.</div>'; return null; }
     return { wadah: wadah, daftar: daftar };
   }
-  function gambarAI() {
-    var t = kerangkaTim('Generator Soal AI', 'fa-robot', 'Hasil AI disimpan ke Bank Soal ujian tugas Anda setelah Anda periksa. Aturan materi/bab dan jenis soal tetap berlaku.');
-    if (!t) return;
-    if (typeof window.renderAIGeneratorPage !== 'function') { t.wadah.innerHTML = '<div class="sip-ptg-kartu sip-ptg-kosong">Generator AI belum siap. Muat ulang halaman.</div>'; return; }
-    siapkanTim(t.daftar);
-    try { window.renderAIGeneratorPage(t.wadah); }
-    catch (e) { t.wadah.innerHTML = '<div class="sip-ptg-kartu sip-ptg-kosong" style="color:#b91c1c">Generator AI gagal tampil: ' + esc(e.message) + '</div>'; }
-  }
-  function gambarKisi() {
-    var t = kerangkaTim('Kisi-Kisi dari Soal Tim', 'fa-table-list', 'Sistem membantu menyusun kisi-kisi dari soal yang Anda buat: jalankan analisis AI, periksa materi/bab dan level, centang, lalu <b>Simpan &amp; Ajukan ke Admin</b>. <b>Hanya Admin yang dapat merilis kisi-kisi.</b>');
-    if (!t) return;
-    if (typeof window.sipRenderKisiAdmin_ !== 'function') { t.wadah.innerHTML = '<div class="sip-ptg-kartu sip-ptg-kosong">Modul kisi-kisi belum siap. Muat ulang halaman.</div>'; return; }
-    siapkanTim(t.daftar);
-    var isi = document.createElement('div');
-    t.wadah.appendChild(isi);
-    pinjamAdminContent(isi);
-    try { window.sipRenderKisiAdmin_(); }
-    catch (e) { isi.innerHTML = '<div class="sip-ptg-kartu sip-ptg-kosong" style="color:#b91c1c">Kisi-kisi gagal tampil: ' + esc(e.message) + '</div>'; return; }
-    var simpan = $('kisi-v2-save');
-    if (simpan) simpan.textContent = 'Simpan & Ajukan ke Admin';
-    var badge = $('kisi-rilis-badge');
-    if (badge) badge.title = 'Status rilis ditentukan Admin.';
-    var sel = $('kisi-select-exam');
-    if (sel && t.daftar.length === 1 && !sel.value) {
-      sel.value = t.daftar[0].id;
-      if (typeof window.sipKisiMuatExam_ === 'function') window.sipKisiMuatExam_();
-    }
-  }
   function gambarBank() {
     var k = $('sip-ptg-konten'), res = ptg.res || {}, tim = res.tim || [], daftar = res.examList || [];
     var ringkas = '<div class="sip-ptg-kartu"><div class="sip-ptg-kepala"><div><h2><i class="fas fa-pen-ruler" style="color:#1b3a6b"></i> Tugas Tim Pembuat Soal</h2>' +
@@ -27757,17 +27734,81 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     if (typeof asli !== 'function' || asli.__sipPetugas) return;
     var fn = function () {
       var u = aku(), self = this, args = arguments;
-      if (window._sipPtgLewati || !u || !u.userID || !PERAN.test(String(u._sipPeranTampilan ? ptg.peranAsli : u.role || ''))) return asli.apply(self, args);
+      var hubAsli = function (tab) { return asli.call(self, tab); };
+      if (window._sipPtgLewati || !u || !u.userID || !PERAN.test(String(u._sipPeranTampilan ? ptg.peranAsli : u.role || ''))) {
+        if (!window._sipPtgLewati) { ptg.tunda = null; ptg.terakhir = null; }
+        var h = asli.apply(self, args);
+        pasangTombolPanel();
+        return h;
+      }
       memuat(true);
       run('getPetugasSaya', [u.userID, u.token]).then(function (res) {
         memuat(false);
-        if (res && res.success && res.petugas) bukaPanel(res, function (tab) { return asli.call(self, tab); });
-        else asli.apply(self, args);
-      }, function () { memuat(false); asli.apply(self, args); });
+        if (res && res.success && res.petugas) {
+          ptg.terakhir = res; ptg.hubAsli = hubAsli;
+          if (res.profilLengkap === false) {
+            /* v1.2.0: profil dulu → setelah tersimpan lengkap Panel Petugas dibuka otomatis. */
+            ptg.tunda = res;
+            asli.call(self, 'profil');
+            pasangTombolPanel();
+            pesan('info', 'Lengkapi Profil Diri dulu', 'Anda bertugas sebagai ' + tugasTeks(res) + '. Isi seluruh field Profil Diri lalu Simpan; Panel Petugas akan terbuka otomatis.');
+            return;
+          }
+          bukaPanel(res, hubAsli);
+        } else { ptg.tunda = null; ptg.terakhir = null; asli.apply(self, args); pasangTombolPanel(); }
+      }, function () { memuat(false); asli.apply(self, args); pasangTombolPanel(); });
     };
     fn.__sipPetugas = true;
     window.showStudentHub = fn;
   }
+  function tugasTeks(res) {
+    var a = [];
+    if ((res.pengawas || []).length) a.push('Pengawas Ruang');
+    if ((res.tim || []).length) a.push('Tim Pembuat Soal');
+    return a.join(' dan ') || 'petugas';
+  }
+  /* Tombol "Panel Petugas" di beranda Pramuka — hanya untuk petugas yang ditugaskan. */
+  function pasangTombolPanel() {
+    var ada = $('sip-ptg-nav-panel'), res = ptg.terakhir, u = aku();
+    if (!res || !res.petugas || !u || String(res.userID) !== String(u.userID)) { if (ada && ada.parentNode) ada.parentNode.removeChild(ada); return; }
+    if (ada) return;
+    var nav = $('siswa-side-nav'), kel = $('siswa-nav-keluar');
+    if (!nav) return;
+    var b = document.createElement('button');
+    b.type = 'button'; b.id = 'sip-ptg-nav-panel';
+    b.className = 'siswa-nav-btn px-4 py-3 text-left text-sm font-bold flex items-center gap-2 whitespace-nowrap';
+    b.innerHTML = '<i class="fas fa-user-shield w-4"></i> <span class="siswa-nav-label">Panel Petugas</span>';
+    b.addEventListener('click', bukaDariHub);
+    nav.insertBefore(b, kel && kel.parentNode === nav ? kel : null);
+  }
+  function bukaDariHub() {
+    var siap = typeof window.sipPramukaProfilSiap_ === 'function' ? window.sipPramukaProfilSiap_() : true;
+    if (!siap) {
+      ptg.tunda = ptg.terakhir;
+      pesan('info', 'Lengkapi Profil Diri dulu', 'Panel Petugas terbuka setelah Profil Diri tersimpan lengkap.');
+      if (typeof window.showSiswaTab === 'function') window.showSiswaTab('profil');
+      return;
+    }
+    memuat(true);
+    run('getPetugasSaya', kred()).then(function (res) {
+      memuat(false);
+      if (res && res.success && res.petugas) { ptg.terakhir = res; bukaPanel(res, ptg.hubAsli); }
+      else { ptg.terakhir = null; pasangTombolPanel(); pesan('info', 'Tidak ada tugas', (res && res.message) || 'Anda tidak sedang ditugaskan sebagai petugas ujian.'); }
+    }, function (e) { memuat(false); pesan('error', 'Gagal', e.message); });
+  }
+  /* Dipanggil Mode Pramuka (web/cdp-pramuka.js) setiap gerbang profil menyatakan lengkap. */
+  window.sipPtgSetelahProfil_ = function () {
+    var res = ptg.tunda, u = aku();
+    if (!res) return;
+    ptg.tunda = null;
+    if (!u || String(res.userID) !== String(u.userID)) return;
+    res.profilLengkap = true;
+    setTimeout(function () {
+      var pn = $('sip-ptg-panel');
+      if (pn && !pn.hidden) return;
+      bukaPanel(res, ptg.hubAsli);
+    }, 1700);
+  };
   function kaitAdmin() {
     var asli = window.initAdminPanel;
     if (typeof asli !== 'function' || asli.__sipPetugasAdmin) return;
@@ -27805,12 +27846,18 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
    - Jadwal Ujian (Admin): kelas "CDP" dan mapel "Pramuka" tersedia bila belum ada
      di Data Master. Hanya pilihan di formulir; sheet Data Master tidak ditulis.
    Otorisasi tetap di GAS (gas/cdp-pramuka.gs).
+   v1.1.0 MODE PRAMUKA (akun CDP & Dewan Penggalang; akun Siswa TIDAK berubah):
+   - Wajib mengisi Profil Diri lebih dahulu; selama belum lengkap hanya menu
+     Profil (+ Keluar) yang tampil dan menu lain diarahkan ke Profil.
+   - Setelah lengkap hanya: Dashboard, Profil Diri, Ujian, Hasil & Nilai,
+     Peringkat dan Keluar. Menu Pembelajaran (materi/penugasan/jurnal/kisi) dan
+     Gamefikasi beserta pintasannya di Dashboard disembunyikan.
    ============================================================================= */
 (function () {
   'use strict';
   var KATALOG = {"versi":"pramuka-sku-penggalang-2026-11","sumber":"Disusun dari Syarat Kecakapan Umum (SKU) Pramuka Penggalang Ramu/Rakit/Terap. Daftar terpisah dari taksonomi Matematika.","materi":["Pengetahuan Kepramukaan","Kode Kehormatan Pramuka","Komunikasi dan Isyarat","Keterampilan Kepramukaan"],"bab":[{"id":"PRM_SEJARAH","materi":"Pengetahuan Kepramukaan","nama":"Sejarah Kepramukaan","kata":"Baden-Powell, sejarah gerakan pramuka dunia dan Indonesia, Hari Pramuka 14 Agustus, tokoh kepramukaan"},{"id":"PRM_LAMBANG","materi":"Pengetahuan Kepramukaan","nama":"Lambang Gerakan Pramuka dan Kiasannya","kata":"tunas kelapa, kiasan lambang, bendera WOSM, tanda pengenal, seragam dan atribut"},{"id":"PRM_ORGANISASI","materi":"Pengetahuan Kepramukaan","nama":"Organisasi Gerakan Pramuka","kata":"gugus depan, kwartir, pasukan, regu, pembina, golongan Siaga Penggalang Penegak Pandega, saka"},{"id":"PRM_SKU","materi":"Pengetahuan Kepramukaan","nama":"SKU, SKK dan Tingkatan Penggalang","kata":"Ramu, Rakit, Terap, Penggalang Garuda, TKK, tanda kecakapan, sistem tanda kecakapan"},{"id":"PRM_UMUM","materi":"Pengetahuan Kepramukaan","nama":"Pengetahuan Umum Kepramukaan","kata":"pilih hanya bila soal mencakup beberapa topik kepramukaan dan tidak ada bab yang lebih tepat"},{"id":"PRM_KODE","materi":"Kode Kehormatan Pramuka","nama":"Trisatya dan Dasa Darma","kata":"Trisatya Penggalang, Dasa Darma Pramuka, makna dan pengamalan butir kode kehormatan"},{"id":"PRM_PRINSIP","materi":"Kode Kehormatan Pramuka","nama":"Prinsip Dasar dan Metode Kepramukaan","kata":"prinsip dasar, metode kepramukaan, sistem beregu, kiasan dasar, motto, kegiatan menarik dan menantang"},{"id":"PRM_SANDI","materi":"Komunikasi dan Isyarat","nama":"Sandi","kata":"sandi kotak, sandi angka, sandi rumput, sandi AN, sandi napoleon, menyandikan dan membaca sandi"},{"id":"PRM_MORSE","materi":"Komunikasi dan Isyarat","nama":"Morse dan Semaphore","kata":"isyarat morse dengan peluit, senter atau bendera, semaphore dengan dua bendera, kode huruf"},{"id":"PRM_TALI","materi":"Keterampilan Kepramukaan","nama":"Tali-temali dan Pionering","kata":"simpul mati, simpul pangkal, simpul jangkar, ikatan palang, ikatan canggah, pionering, menara pandang"},{"id":"PRM_NAVIGASI","materi":"Keterampilan Kepramukaan","nama":"Navigasi dan Kompas","kata":"kompas, arah mata angin, azimut dan back azimut, peta pita, menaksir jarak, tinggi dan lebar"},{"id":"PRM_P3K","materi":"Keterampilan Kepramukaan","nama":"Pertolongan Pertama (P3K)","kata":"luka, pingsan, pembalutan, mitela, kotak P3K, pertolongan pertama pada kecelakaan"},{"id":"PRM_PBB","materi":"Keterampilan Kepramukaan","nama":"Peraturan Baris-Berbaris (PBB)","kata":"aba-aba, sikap sempurna, hormat, langkah tegap, bentuk barisan regu, upacara pembukaan dan penutupan"},{"id":"PRM_KEMAH","materi":"Keterampilan Kepramukaan","nama":"Perkemahan","kata":"mendirikan tenda, perlengkapan kemah, api unggun, memasak di alam terbuka, menjaga kebersihan dan keselamatan"}]};
   window.SIPINTAR_PRAMUKA_KATALOG = KATALOG;
-  window.SIPINTAR_CDP_VERSI = '1.0.0';
+  window.SIPINTAR_CDP_VERSI = '1.1.0';
   function $(id) { return document.getElementById(id); }
   function admin() { var u = window.currentUser; return !!(u && u.role === 'Admin' && !u._sipPeranTampilan); }
   function tambahOpsi(sel, nilai) {
@@ -27855,8 +27902,141 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
       window.populateSelect = fp;
     }
   }
+  /* ============================================================ MODE PRAMUKA */
+  var TAB_PRAMUKA = ['dash', 'profil', 'ujian', 'nilai'];
+  var LARANG = ['materi', 'tugas', 'jurnal', 'kisi', 'game'];
+  var prm = { asliTab: null, asliGerbang: null, asliForm: null, paksaUid: '' };
+  /** '' bila bukan akun Pramuka; 'CDP' atau 'Dewan Penggalang'. */
+  function peranPramuka(u) {
+    u = u || window.currentUser;
+    if (!u || !u.userID) return '';
+    if (/^cdp$/i.test(String(u.peranAsli || '').trim())) return 'CDP';
+    var r = String(u.role || '').trim();
+    if (/^cdp$/i.test(r)) return 'CDP';
+    if (/^dewan\s*penggalang$/i.test(r)) return 'Dewan Penggalang';
+    var s = window.__sipPramuka;
+    /* Peran tampilan sementara (mis. panel tim) tidak menghapus status Pramuka akun yang sama. */
+    if (s && s.uid === String(u.userID) && u._sipPeranTampilan) return s.peran;
+    return '';
+  }
+  window.sipPeranPramuka_ = peranPramuka;
+  function profilDiketahui() { return window._siswaProfilCache != null; }
+  function profilSiap() { try { return typeof window.sipSiswaProfilSiap_ === 'function' && !!window.sipSiswaProfilSiap_(); } catch (e) { return false; } }
+  window.sipPramukaProfilSiap_ = function () { return profilDiketahui() && profilSiap(); };
+  function gayaPramuka() {
+    if ($('sip-pramuka-css')) return;
+    var h = '#page-siswa-hub ', b = 'body.sip-pramuka ', bb = 'body.sip-pramuka-belum ';
+    var aturan = [
+      b + '#siswa-mod-belajar,' + b + '#sip-belajar-info,' + LARANG.map(function (t) { return b + '#siswa-nav-' + t; }).join(',') + '{display:none!important}',
+      LARANG.map(function (t) { return b + h + '#siswa-tab-dash [onclick*="\'' + t + '\'"],' + b + h + '#siswa-tab-nilai [onclick*="\'' + t + '\'"]'; }).join(',') + '{display:none!important}',
+      ['dash', 'ujian', 'nilai', 'peringkat'].map(function (t) { return bb + '#siswa-nav-' + t; }).join(',') + ',' + bb + '#sip-ptg-nav-panel,' + bb + '#sip-kartu-peringkat{display:none!important}'
+    ];
+    var st = document.createElement('style');
+    st.id = 'sip-pramuka-css';
+    st.textContent = aturan.join('\n');
+    (document.head || document.documentElement).appendChild(st);
+  }
+  function label(el, teks) {
+    if (!el) return;
+    if (!el.hasAttribute('data-sip-teks-asli')) el.setAttribute('data-sip-teks-asli', el.textContent);
+    el.textContent = teks == null ? el.getAttribute('data-sip-teks-asli') : teks;
+  }
+  function tabAktif() {
+    var t = '';
+    ['dash', 'profil', 'materi', 'tugas', 'jurnal', 'kisi', 'game', 'nilai', 'ujian'].forEach(function (k) {
+      var n = $('siswa-tab-' + k); if (n && !n.classList.contains('hidden')) t = t || k;
+    });
+    return t;
+  }
+  /** Pasang/lepas kelas body Mode Pramuka. Mengembalikan peran ('' bila bukan Pramuka). */
+  function terapkanPramuka() {
+    var b = document.body;
+    if (!b) return '';
+    var p = peranPramuka(), navP = document.querySelector('#siswa-nav-profil .siswa-nav-label'), judul = document.querySelector('#siswa-tab-profil h2');
+    if (!p) {
+      b.classList.remove('sip-pramuka', 'sip-pramuka-belum'); b.removeAttribute('data-sip-pramuka');
+      if (navP && navP.hasAttribute('data-sip-teks-asli')) label(navP, null);
+      if (judul && judul.hasAttribute('data-sip-teks-asli')) label(judul, null);
+      return '';
+    }
+    gayaPramuka();
+    window.__sipPramuka = { uid: String(window.currentUser.userID), peran: p };
+    b.classList.add('sip-pramuka');
+    b.classList.toggle('sip-pramuka-belum', !(profilDiketahui() && profilSiap()));
+    b.setAttribute('data-sip-pramuka', p);
+    label(navP, 'Profil Diri');
+    label(judul, 'Profil Diri · ' + p);
+    return p;
+  }
+  window.sipTerapkanModePramuka_ = terapkanPramuka;
+  function pesanProfil() {
+    if (window.Swal) Swal.fire({ icon: 'info', title: 'Lengkapi Profil Diri dulu', text: 'Akun Pramuka wajib mengisi seluruh field Profil Diri. Setelah tersimpan, menu Dashboard, Ujian, Hasil & Nilai dan Peringkat terbuka.' });
+  }
+  function kaitPramuka() {
+    var tab = window.showSiswaTab;
+    if (typeof tab === 'function' && !tab.__sipPramuka) {
+      prm.asliTab = tab;
+      var ft = function (t) {
+        if (!terapkanPramuka()) return prm.asliTab.apply(this, arguments);
+        t = String(t || 'dash');
+        if (t !== 'profil') {
+          if (profilDiketahui() && !profilSiap()) { pesanProfil(); t = 'profil'; }
+          else if (TAB_PRAMUKA.indexOf(t) < 0) t = profilDiketahui() ? 'dash' : 'profil';
+          else if (!profilDiketahui() && t !== 'dash') t = 'dash';
+        }
+        return prm.asliTab.call(this, t);
+      };
+      ft.__sipPramuka = true;
+      window.showSiswaTab = ft;
+    }
+    var g = window.sipTerapkanGerbangBelajarSiswa_;
+    if (typeof g === 'function' && !g.__sipPramuka) {
+      prm.asliGerbang = g;
+      var fg = function () {
+        var ok = prm.asliGerbang.apply(this, arguments);
+        if (!terapkanPramuka() || !profilDiketahui()) return ok;
+        if (!profilSiap()) {
+          var uid = String((window.currentUser || {}).userID || '');
+          if (tabAktif() !== 'profil' && prm.asliTab) {
+            if (prm.paksaUid !== uid) { prm.paksaUid = uid; pesanProfil(); }
+            prm.asliTab.call(window, 'profil');
+          }
+        } else if (typeof window.sipPtgSetelahProfil_ === 'function') {
+          try { window.sipPtgSetelahProfil_(); } catch (e) {}
+        }
+        return ok;
+      };
+      fg.__sipPramuka = true;
+      window.sipTerapkanGerbangBelajarSiswa_ = fg;
+    }
+    var f = window.profilFormHtml_;
+    if (typeof f === 'function' && !f.__sipPramuka) {
+      prm.asliForm = f;
+      var ff = function (p, opts) {
+        if (peranPramuka()) opts = Object.assign({}, opts || {}, { lockIdentitas: true });
+        return prm.asliForm.call(this, p, opts);
+      };
+      ff.__sipPramuka = true;
+      window.profilFormHtml_ = ff;
+    }
+    var hub = window.showStudentHub;
+    if (typeof hub === 'function' && !hub.__sipPramukaHub) {
+      var fh = function () {
+        var u = window.currentUser, s = window.__sipPramuka;
+        if (s && (!u || String(u.userID) !== s.uid)) window.__sipPramuka = null;
+        prm.paksaUid = '';
+        terapkanPramuka();
+        return hub.apply(this, arguments);
+      };
+      Object.keys(hub).forEach(function (k) { if (!(k in fh)) fh[k] = hub[k]; });
+      fh.__sipPramukaHub = true;
+      window.showStudentHub = fh;
+    }
+  }
+
   function mulai() {
     pasangPeran(); kaitJadwal();
+    kaitPramuka();
     /* Formulir/filter user dirender ulang oleh menu Manajemen User: pasang lagi bila muncul. */
     if (typeof MutationObserver === 'function' && document.body) {
       var jadwal = 0;
@@ -27871,7 +28051,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
 })();
 
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5624b416fd1f888',t:'MTc5Mzk0OTE4OQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5624b416fd1f888',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a563164eaf763da5',t:'MTc5Mzk1NzUwNg=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a563164eaf763da5',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 <!-- Lisensi MathJax tertanam:
 
                                  Apache License
