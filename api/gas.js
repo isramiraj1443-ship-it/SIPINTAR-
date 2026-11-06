@@ -26,7 +26,7 @@
 /* --- URL web app GAS (cadangan bila environment variable belum diisi) ------ */
 var CADANGAN_GAS_URL =
   process.env.GAS_WEB_APP_URL ||
-  'https://script.google.com/macros/s/AKfycbzWMKpiFErd1P1b5WXv1S_s-T-UMZJBJRnEHITRgS_32Xrjc7wvdE1o3DJIJN78cTw2DA/exec';
+  'https://script.google.com/macros/s/AKfycbxTsPGRhenyTUO6WFQonDWj0p7tyu9B3NDJukFnuSI-hrn9PJooPFyaW9OATkRfmbetjg/exec';
 
 var TIMEOUT_MS = 55000;                       /* batas tunggu ke Google */
 var API_VERSION = '1.0.0';
