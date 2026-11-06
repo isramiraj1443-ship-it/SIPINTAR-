@@ -73,7 +73,10 @@
     'uploadExamMusicFile', 'uploadBelajarFile', 'uploadJurnalFile',
     'uploadProfilFoto', 'kumpulPenugasanSiswa', 'getSavedImages',
     'listMateriPembelajaran', 'getAllImages', 'getExamMonitorData',
-    'getStudentAnswerDetails', 'getHasilAnalisis'
+    'getStudentAnswerDetails', 'getHasilAnalisis',
+    /* Unggah penugasan (paket 45/46): potongan ± 2,8 MB & proses Drive → jalur langsung. */
+    'mulaiUnggahTugas', 'kirimPotonganTugas', 'simpanKumpulTugas', 'periksaLokasiBerkasTugas',
+    'getKumpulSaya', 'listKumpulPenugasan'
   ];
 
   /* --- Aksi yang dilarang diulang-otomatis (efek samping permanen) --- */
@@ -179,6 +182,7 @@
 
   function saluranUtama() {
     if (MODE === 'direct' && hasDirect()) return 'direct';
+    if (MODE === 'auto' && MEM.proxyUsang && hasDirect()) return 'direct';   /* proxy → deployment lama */
     if (MODE === 'proxy') return 'proxy';
     if (MEM.channel && (MEM.channel !== 'direct' || hasDirect())) return MEM.channel;
     if (!hasDirect()) return 'proxy';
@@ -331,6 +335,17 @@
       if (MEM.channel !== utama) simpanSaluran(utama);      /* hanya bila berubah */
       return hasil;
     }, function (err) {
+      /* Jalur ini terhubung ke deployment Apps Script LAMA (aksi belum dikenal).
+         Server menolak SEBELUM menjalankan apa pun, jadi aman dicoba di jalur lain
+         untuk aksi apa saja; jalur yang berhasil diingat 10 menit. */
+      var cadUsang = saluranCadangan(utama);
+      if (MODE === 'auto' && cadUsang && err && err.__appError && /tidak terdaftar di API/i.test(err.message || '')) {
+        warn(action, 'tidak dikenal oleh server di jalur', utama, '(deployment lama?) → coba', cadUsang);
+        return kirim(cadUsang, action, args, opts).then(function (hasil) {
+          simpanSaluran(cadUsang);
+          return hasil;
+        });
+      }
       if (!bolehPindah) throw err;
       warn(action, 'gagal di', utama, '-', err.message, '→ pindah ke', cadangan);
       return kirim(cadangan, action, args, opts).then(function (hasil) {
@@ -517,8 +532,43 @@
       .then(function (h) { return h.data; }, function () { return null; });
   }
 
+  /* TAMBAHAN 6 Nov 2026 — deteksi proxy Vercel yang menunjuk deployment Apps
+     Script LAMA. Bila server di balik proxy tidak mengenal aksi resmi
+     (web/api-actions.js) sedangkan jalur langsung (config.js) mengenalnya,
+     semua permintaan memakai jalur langsung. Hasil disimpan 30 menit agar
+     tidak membebani server saat ujian. Tidak mengubah data apa pun. */
+  var USANG_KEY = 'sipintar_proxy_usang_v1';
+  function cekDeploymentUsang() {
+    if (MODE !== 'auto' || !hasDirect() || CFG.API_CEK_USANG === false) return Promise.resolve(null);
+    var resmi = window.SIPINTAR_API_ACTIONS;
+    if (!resmi || !resmi.length) return Promise.resolve(null);
+    try {
+      var lama = JSON.parse(localStorage.getItem(USANG_KEY) || 'null');
+      if (lama && Date.now() - (lama.at || 0) < 30 * 60 * 1000 && lama.n === resmi.length) {
+        MEM.proxyUsang = !!lama.usang; return Promise.resolve(lama);
+      }
+    } catch (e) {}
+    var ms = Number(CFG.API_HEALTH_TIMEOUT_MS) || 12000;
+    function daftar(ch) { return kirim(ch, 'apiActions', [], { timeout: ms, cid: uid() }).then(function (r) { return r.data; }, function () { return null; }); }
+    function kurang(d) { if (!d || !d.aksi) return -1; var n = 0; for (var i = 0; i < resmi.length; i++) if (d.aksi.indexOf(resmi[i]) < 0) n++; return n; }
+    return Promise.all([daftar('proxy'), daftar('direct')]).then(function (h) {
+      var kp = kurang(h[0]), kd = kurang(h[1]);
+      if (kp < 0 || kd < 0) return null;                   /* salah satu tak terjangkau: biarkan seperti biasa */
+      var hasil = { at: Date.now(), n: resmi.length, usang: kp > 0 && kd === 0, proxy: h[0].jumlah, langsung: h[1].jumlah };
+      MEM.proxyUsang = hasil.usang;
+      if (hasil.usang) {
+        warn('Proxy Vercel terhubung ke deployment Apps Script LAMA (' + hasil.proxy + ' aksi; resmi ' + resmi.length +
+             '). Memakai jalur langsung (' + hasil.langsung + ' aksi). Perbaiki GAS_WEB_APP_URL di Vercel.');
+        simpanSaluran('direct');
+      }
+      try { localStorage.setItem(USANG_KEY, JSON.stringify(hasil)); } catch (e) {}
+      return hasil;
+    });
+  }
+
   var api = {
     version: VERSION,
+    cekDeploymentUsang: cekDeploymentUsang,
     request: sipRequest,
     health: health,
     probe: probe,
@@ -543,6 +593,8 @@
   window.SIPINTAR_API = api;
   window.google = window.google || {};
   window.google.script = window.google.script || {};
+
+  try { setTimeout(function () { cekDeploymentUsang().catch(function () {}); }, 1500); } catch (eU) {}
 
   if (!window.google.script.run) {
     var r = buatRunner();
