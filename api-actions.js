@@ -112,6 +112,7 @@ window.SIPINTAR_API_ACTIONS = [
   'isValidSession',
   'kirimPotonganTugas',
   'kumpulPenugasanSiswa',
+  'listBerkasDriveMateri',
   'listCapaianPembelajaran',
   'listExamMusicLibrary',
   'listGamefikasi',
