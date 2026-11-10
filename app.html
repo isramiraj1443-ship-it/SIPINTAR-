@@ -28427,7 +28427,167 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
 })();
 
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5822b66f97ffd2d',t:'MTc5NDI4MzQyOA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5822b66f97ffd2d',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+  <!-- TOPIK SOAL PADA REDAKSI KISI-KISI · sumber: web/kisi-topik-soal.js -->
+  <script id="sipintar-kisi-topik">
+/* Kisi-kisi: topik soal dalam redaksi v1.0.0 · 10 November 2026 · tambahan.
+   Admin: tiap kartu tinjauan mendapat kolom "Topik soal" (usulan AI, dapat
+   diubah) + centang persetujuan topik, dan tombol "Buat Topik Soal (AI)" untuk
+   soal yang sudah dianalisis sebelumnya. Redaksi kisi siswa menjadi:
+   "Peserta didik mampu <level> <bab> pada soal tentang <topik> …".
+   Topik hanya tampil ke siswa setelah disetujui Admin dan disimpan. */
+(function () {
+  'use strict';
+  var asli = { tabel: window.sipKisiRenderTable_, render: window.sipRenderKisiAdmin_ };
+  var jalan = false;
+  function el(id) { return document.getElementById(id); }
+  function e(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function admin() { return window.currentUser && currentUser.role === 'Admin'; }
+  function items() { return window._sipKisiItems || []; }
+  function api(action, args) {
+    return new Promise(function (ok, no) {
+      var run = google.script.run.withSuccessHandler(function (r) {
+        if (!r || !r.success) return no(new Error((r && r.message) || 'Permintaan tidak berhasil.'));
+        ok(r);
+      }).withFailureHandler(function (err) { no(new Error((err && err.message) || String(err))); });
+      var ret = run[action].apply(run, (args || []).concat([currentUser.userID, currentUser.token])); if (ret && ret.catch) ret.catch(function () {});
+    });
+  }
+  /* Pemeriksaan cepat di browser (server tetap memeriksa ulang saat Simpan). */
+  function cekTopik(t) {
+    t = String(t || '').trim();
+    if (!t) return '';
+    if (t.length > 90) return 'Terlalu panjang (maks. 90 karakter).';
+    if (/[0-9]/.test(t)) return 'Tidak boleh memuat angka.';
+    if (/[<>?={}\[\]\\^*\/+%$|_#@&"`~]/.test(t)) return 'Tidak boleh memuat simbol, rumus atau tanda tanya.';
+    var kata = t.toLowerCase().replace(/[^a-z\u00c0-\u024f ]/g, ' ').trim().split(/\s+/);
+    if (kata.length < 2) return 'Minimal dua kata.';
+    if (kata.some(function (k) { return k.length === 1; })) return 'Tidak boleh memuat variabel/huruf tunggal.';
+    if (/^(hitung|tentukan|jelaskan|sebutkan|carilah|selesaikan|pilih|perhatikan|diketahui|tuliskan|berapa|apa|apakah|siapa|mengapa|bagaimana|manakah)\b/i.test(t)) return 'Tulis sebagai topik, bukan kalimat tanya/perintah.';
+    return '';
+  }
+  function statusTeks(r) {
+    if (!String(r.topikSoal || '').trim()) return r.topikDicoba ? 'AI belum dapat membuat topik — isi manual bila perlu.' : 'Belum ada topik. Isi manual atau tekan "Buat Topik Soal (AI)".';
+    return 'Asal: ' + (r.topikAsal === 'Admin' ? 'Admin' : 'AI') + ' · ' + (r.topikDisetujui ? 'Disetujui untuk kisi' : 'Belum disetujui — tidak tampil ke siswa');
+  }
+  function kotak(r, i) {
+    var t = String(r.topikSoal || ''), salah = cekTopik(t);
+    return '<div class="sip-kts" data-kts-box="' + i + '">' +
+      '<label class="sip-kts-label">Topik soal untuk redaksi kisi <small>(tampil ke siswa: “… pada soal tentang <i>topik</i>”. Tanpa angka, rumus, kutipan soal, pilihan, atau jawaban)</small>' +
+      '<input type="text" maxlength="90" aria-label="Topik soal ' + (i + 1) + '" data-kisi-edit="topikSoal" data-index="' + i + '" value="' + e(t) + '" placeholder="contoh: hasil perkalian dua bentuk aljabar"></label>' +
+      '<p class="sip-kts-galat" data-kts-galat="' + i + '"' + (salah ? '' : ' hidden') + '>' + e(salah) + '</p>' +
+      '<div class="sip-kts-baris"><label class="sip-kts-ok"><input type="checkbox" data-kts-ok="' + i + '"' + (r.topikDisetujui && t ? ' checked' : '') + (t ? '' : ' disabled') + '> Topik ini sesuai soal dan aman ditampilkan</label>' +
+      '<span class="sip-kts-status" data-kts-status="' + i + '">' + e(statusTeks(r)) + '</span></div></div>';
+  }
+  function pasangKotak() {
+    var box = el('kisi-table'); if (!box || !admin()) return;
+    items().forEach(function (r, i) {
+      var card = box.querySelector('[data-kisi-row="' + i + '"]');
+      if (!card || card.querySelector('[data-kts-box]')) return;
+      var wadah = document.createElement('div'); wadah.innerHTML = kotak(r, i);
+      var alasan = card.querySelector('.sip-kisi-reason');
+      card.insertBefore(wadah.firstChild, alasan || card.querySelector('.sip-kisi-approve'));
+      var lbl = card.querySelector('.sip-kisi-approve');
+      if (lbl && !lbl.querySelector('[data-kts-catatan]')) { var s = document.createElement('span'); s.setAttribute('data-kts-catatan', '1'); s.textContent = ' Topik soal yang terisi ikut disetujui.'; lbl.appendChild(s); }
+    });
+  }
+  function segarkan(i) {
+    var r = items()[i]; if (!r) return;
+    var st = document.querySelector('[data-kts-status="' + i + '"]'); if (st) st.textContent = statusTeks(r);
+    var cb = document.querySelector('[data-kts-ok="' + i + '"]'); if (cb) { cb.checked = !!(r.topikDisetujui && String(r.topikSoal || '').trim()); cb.disabled = !String(r.topikSoal || '').trim(); }
+  }
+  if (typeof asli.tabel === 'function') {
+    window.sipKisiRenderTable_ = function () {
+      var out = asli.tabel.apply(this, arguments);
+      try { pasangKotak(); } catch (err) {}
+      return out;
+    };
+  }
+  function pasangTombol() {
+    if (!admin() || el('kisi-topik-ai')) return;
+    var ai = el('kisi-v2-ai'); if (!ai || !ai.parentNode) return;
+    var b = document.createElement('button');
+    b.type = 'button'; b.id = 'kisi-topik-ai'; b.setAttribute('onclick', 'sipKisiBuatTopik_()');
+    b.className = ai.className || 'px-4 py-2 rounded-lg text-sm font-bold';
+    b.style.background = '#0f766e'; b.style.color = '#fff';
+    b.textContent = 'Buat Topik Soal (AI)';
+    b.title = 'AI mengusulkan topik singkat tiap soal untuk redaksi kisi (tanpa angka/jawaban). Wajib ditinjau Admin.';
+    ai.parentNode.insertBefore(b, ai.nextSibling);
+  }
+  if (typeof asli.render === 'function') {
+    window.sipRenderKisiAdmin_ = function () { var r = asli.render.apply(this, arguments); try { pasangTombol(); } catch (err) {} return r; };
+  }
+  window.sipKisiBuatTopik_ = async function () {
+    if (!admin() || jalan) return;
+    var id = window._sipKisiExam || '';
+    if (!id || !items().length) return Swal.fire('Pilih ujian', 'Pilih ujian dan tunggu Bank Soal selesai dimuat.', 'warning');
+    var st = el('kisi-v2-status');
+    if (st && st.dataset.dirty === '1') return Swal.fire('Simpan dulu', 'Simpan perubahan metadata sebelum membuat topik soal dengan AI.', 'warning');
+    var ask = await Swal.fire({ icon: 'question', title: 'Buat topik soal dengan AI?', text: 'Teks soal (tanpa kunci) dikirim ke penyedia AI yang dikonfigurasi dan memakai kuota. AI hanya mengisi soal yang belum bertopik; materi/bab, level, dan persetujuan tidak diubah. Topik baru tampil ke siswa setelah Anda setujui dan Simpan.', showCancelButton: true, confirmButtonText: 'Ya, buat topik', cancelButtonText: 'Batal' });
+    if (!ask.isConfirmed) return;
+    jalan = true;
+    var tombol = el('kisi-topik-ai'); if (tombol) tombol.disabled = true;
+    var prog = el('kisi-v2-progress'), r, putaran = 0, diproses = 0;
+    try {
+      do {
+        if (prog) prog.textContent = 'Membuat topik soal batch berikutnya…';
+        r = await api('buatTopikSoalKisi', [id]);
+        if ((window._sipKisiExam || '') !== id) return;
+        diproses += r.topikDiproses || 0;
+        if (prog) prog.textContent = 'Topik soal: ' + r.jumlahBertopik + '/' + r.jumlahSoal + ' soal bertopik (perlu ditinjau Admin).';
+        putaran++;
+      } while (r.perluLanjut && r.topikDiproses > 0 && putaran < 60);
+      jalan = false; if (tombol) tombol.disabled = false;
+      if (typeof window.sipKisiMuatExam_ === 'function') await window.sipKisiMuatExam_();
+      await Swal.fire(diproses ? 'Topik soal diusulkan' : 'Tidak ada yang perlu dibuat', r.message + (diproses ? ' Buka kartu tiap soal, periksa kolom "Topik soal", centang persetujuan, lalu tekan Simpan.' : ''), 'info');
+    } catch (err) {
+      await Swal.fire('Topik soal belum selesai', err.message + ' Topik yang sudah dibuat tetap tersimpan; topik juga dapat diisi manual.', 'warning');
+    } finally { jalan = false; if (tombol) tombol.disabled = false; }
+  };
+  /* Ketik topik → ditandai sebagai topik Admin dan perlu disetujui ulang. */
+  document.addEventListener('input', function (ev) {
+    var n = ev.target; if (!n.matches || !n.matches('[data-kisi-edit="topikSoal"]')) return;
+    var i = Number(n.dataset.index), r = items()[i]; if (!r) return;
+    r.topikAsal = 'Admin'; r.topikDisetujui = false;
+    var g = document.querySelector('[data-kts-galat="' + i + '"]'), salah = cekTopik(n.value);
+    if (g) { g.textContent = salah; g.hidden = !salah; }
+    segarkan(i);
+  });
+  document.addEventListener('change', function (ev) {
+    var n = ev.target; if (!n.matches) return;
+    if (n.matches('[data-kisi-approve]')) {
+      var r = items()[Number(n.dataset.kisiApprove)]; if (!r) return;
+      if (n.checked && String(r.topikSoal || '').trim() && cekTopik(r.topikSoal)) {
+        Swal.fire('Perbaiki topik soal', 'Soal ' + (Number(n.dataset.kisiApprove) + 1) + ': ' + cekTopik(r.topikSoal) + ' Kosongkan atau perbaiki topik sebelum menyetujui.', 'warning');
+        n.checked = false; r.disetujui = false; r.topikDisetujui = false; segarkan(Number(n.dataset.kisiApprove)); return;
+      }
+      r.topikDisetujui = !!(n.checked && String(r.topikSoal || '').trim());
+      segarkan(Number(n.dataset.kisiApprove));
+      return;
+    }
+    if (n.matches('[data-kts-ok]')) {
+      var i = Number(n.dataset.ktsOk), x = items()[i]; if (!x) return;
+      if (n.checked && cekTopik(x.topikSoal)) { n.checked = false; Swal.fire('Perbaiki topik soal', cekTopik(x.topikSoal), 'warning'); return; }
+      var lama = { d: x.disetujui, a: x.asal };
+      /* Tandai perubahan belum disimpan lewat jalur resmi, lalu pulihkan persetujuan soal. */
+      if (typeof window.sipKisiUbah_ === 'function') window.sipKisiUbah_(i, 'topikDisetujui', n.checked);
+      x.topikDisetujui = n.checked; x.disetujui = lama.d; x.asal = lama.a;
+      if (typeof window.sipKisiRenderTable_ === 'function') window.sipKisiRenderTable_();
+    }
+  });
+  var css = document.createElement('style'); css.id = 'sipintar-kisi-topik-css';
+  css.textContent = '.sip-kts{margin:12px 0;padding:10px 12px;border:1px dashed #5eead4;border-radius:10px;background:#f0fdfa}' +
+    '.sip-kts-label{display:block;font-size:11px;font-weight:700;color:#115e59}.sip-kts-label small{font-weight:500;color:#475569}' +
+    '.sip-kts-label input{display:block;width:100%;min-width:0;padding:9px 10px;border:1px solid #99f6e4;border-radius:9px;margin-top:5px;background:#fff;font-size:13px;color:#172033;font-weight:500}' +
+    '.sip-kts-galat{font-size:11.5px;color:#b91c1c;margin:5px 0 0}.sip-kts-galat[hidden]{display:none}' +
+    '.sip-kts-baris{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin-top:7px}.sip-kts-ok{display:flex;gap:7px;align-items:center;font-size:12px;color:#115e59}.sip-kts-ok input{width:16px;height:16px}' +
+    '.sip-kts-status{font-size:11px;color:#64748b}';
+  document.head.appendChild(css);
+  window.SIPINTAR_KISI_TOPIK_VERSI = '1.0.0';
+})();
+
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a582627f4b57ce05',t:'MTc5NDI4NTY4NQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a582627f4b57ce05',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 <!-- Lisensi MathJax tertanam:
 
                                  Apache License
