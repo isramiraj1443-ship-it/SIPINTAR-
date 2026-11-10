@@ -8,6 +8,7 @@ window.SIPINTAR_API_ACTIONS = [
   'buatKisiKisi',
   'buatPerangkinganUjian',
   'buatSoalDariKisiAI',
+  'buatTopikSoalKisi',
   'bulkResetStudents',
   'bulkUnlockStudents',
   'checkAnswerLogic',
