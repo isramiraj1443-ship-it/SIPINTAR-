@@ -28473,7 +28473,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
   function kotak(r, i) {
     var t = String(r.topikSoal || ''), salah = cekTopik(t);
     return '<div class="sip-kts" data-kts-box="' + i + '">' +
-      '<label class="sip-kts-label">Topik soal untuk redaksi kisi <small>(tampil ke siswa: “… pada soal tentang <i>topik</i>”. Tanpa angka, rumus, kutipan soal, pilihan, atau jawaban)</small>' +
+      '<label class="sip-kts-label">Topik soal untuk redaksi kisi <small>(dipakai pada kolom Indikator Soal: “Peserta didik dapat &lt;kata kerja level&gt; <i>topik</i>.” Tanpa angka, rumus, kutipan soal, pilihan, atau jawaban)</small>' +
       '<input type="text" maxlength="90" aria-label="Topik soal ' + (i + 1) + '" data-kisi-edit="topikSoal" data-index="' + i + '" value="' + e(t) + '" placeholder="contoh: hasil perkalian dua bentuk aljabar"></label>' +
       '<p class="sip-kts-galat" data-kts-galat="' + i + '"' + (salah ? '' : ' hidden') + '>' + e(salah) + '</p>' +
       '<div class="sip-kts-baris"><label class="sip-kts-ok"><input type="checkbox" data-kts-ok="' + i + '"' + (r.topikDisetujui && t ? ' checked' : '') + (t ? '' : ' disabled') + '> Topik ini sesuai soal dan aman ditampilkan</label>' +
@@ -28587,7 +28587,302 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
 })();
 
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a582627f4b57ce05',t:'MTc5NDI4NTY4NQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a582627f4b57ce05',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+  <!-- TABEL KISI-KISI 5 KOLOM DAN INDIKATOR TERUKUR · sumber: web/kisi-tabel-indikator.js -->
+  <script id="sipintar-kisi-tabel">
+/* Tabel kisi-kisi 5 kolom v1.0.0 · 14 Oktober 2026 · tambahan.
+   Kolom: Materi Pokok / Submateri · Indikator Soal · Level Kognitif · Bentuk Soal ·
+   Nomor Soal. Indikator (rumusan perilaku terukur) disusun server; browser hanya
+   menampilkan. Dipakai di tab Kisi siswa, pratinjau rilis Admin, dan pratinjau draf.
+   HP: tiap baris menjadi kartu berlabel kolom (tanpa geser ke samping). */
+(function () {
+  'use strict';
+  var T = window.SIPINTAR_KISI_TAKSONOMI || {
+    levelC: { C1: 'Mengingat', C2: 'Memahami', C3: 'Menerapkan', C4: 'Menganalisis', C5: 'Mengevaluasi', C6: 'Mencipta' },
+    levelL: { L1: 'Pengetahuan dan Pemahaman', L2: 'Aplikasi', L3: 'Penalaran' }
+  };
+  var KOLOM = ['Materi Pokok / Submateri', 'Indikator Soal', 'Level Kognitif', 'Bentuk Soal', 'Nomor Soal'];
+  var BENTUK = { PG: 'Pilihan Ganda', PG_KOMPLEKS: 'PG Kompleks', BS: 'Benar/Salah', JODOH: 'Menjodohkan', Esai: 'Esai', LAIN: 'Lainnya' };
+  var asli = { nomor: window.sipKisiNomorHtml_, items: window.sipKisiTabelItemsHtml_ };
+  function e(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function labelC(c) { return (T && T.levelC && T.levelC[c]) || ''; }
+  function labelL(l) { return (T && T.levelL && T.levelL[l]) || ''; }
+  function sel(i, isi, cls) { return '<td data-kolom="' + e(KOLOM[i]) + '"' + (cls ? ' class="' + cls + '"' : '') + '>' + isi + '</td>'; }
+  function level(r) {
+    var cs = r.levelsC || (r.levelC ? String(r.levelC).split(/\s*\/\s*/) : []), ls = r.levelsL || (r.levelL ? String(r.levelL).split(/\s*\/\s*/) : []);
+    return cs.map(function (c) { return '<span class="c" title="' + e(labelC(c)) + '">' + e(c) + '</span><small>' + e(labelC(c)) + '</small>'; }).join('') +
+      ls.map(function (l) { return '<span class="l" title="' + e(labelL(l)) + '">' + e(l) + '</span><small>' + e(labelL(l)) + '</small>'; }).join('');
+  }
+  function tabel(rows, catatan) {
+    var hit = {};
+    rows.forEach(function (r) { if (r.levelC && !r.acak) hit[r.levelC] = (hit[r.levelC] || 0) + 1; });
+    var chip = Object.keys(hit).sort().map(function (c) { return '<span class="sip-kn-chip" title="' + e(labelC(c)) + '">' + e(c) + ' · ' + hit[c] + '</span>'; }).join('');
+    return (chip ? '<div class="sip-kn-ringkas">' + chip + '</div>' : '') +
+      '<div class="sip-kn-wadah"><table class="sip-kn-tabel sip-kk5"><thead><tr>' + KOLOM.map(function (h) { return '<th>' + e(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      rows.map(function (r) {
+        return '<tr' + (r.acak ? ' class="acak"' : '') + '>' +
+          sel(0, '<b>' + e(r.materi) + '</b><span class="materi">' + e(r.bab) + '</span>') +
+          sel(1, '<p>' + e(r.indikator || 'Indikator menunggu pemeriksaan Admin.') + '</p>') +
+          sel(2, level(r), 'lv') +
+          sel(3, e(r.bentuk || BENTUK[r.tipe] || r.bentukSoal || '—'), 'bentuk') +
+          sel(4, e(r.nomor != null ? r.nomor : r.no) + (r.acak ? '<small>acak</small>' : '') + (r.keteranganAcak ? '<em>' + e(r.keteranganAcak) + '</em>' : ''), 'no') + '</tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<p class="sip-kn-catatan">' + e(catatan || '') + ' Indikator soal = rumusan perilaku terukur; tidak memuat isi soal, pilihan, atau kunci.</p>';
+  }
+  window.sipKisiTabel5Html_ = tabel;
+  window.sipKisiNomorHtml_ = function (k) {
+    k = k || {};
+    var rows = Array.isArray(k.perNomor) ? k.perNomor : [];
+    if (rows.length) return tabel(rows, k.catatanNomor || 'Nomor sesuai urutan soal pada ujian.');
+    var items = (k.items || []).map(function (it) {
+      return Object.assign({}, it, {
+        bentuk: it.bentuk || (k.modePaketMateri ? 'Bervariasi sesuai paket' : 'Sesuai Bank Soal'),
+        nomor: k.modePaketMateri ? Number(it.jumlahSoal || 0) + ' soal setiap peserta' : Number(it.jumlahSoal || 0) + ' butir',
+        keteranganAcak: k.modePaketMateri ? 'Nomor berbeda tiap peserta' : ''
+      });
+    });
+    if (!items.length) return typeof asli.nomor === 'function' ? asli.nomor.apply(this, arguments) : '<p>Belum ada kisi-kisi.</p>';
+    return tabel(items, k.catatanNomor || k.catatanPaket || '');
+  };
+  /* Pratinjau draf Admin (agregat per bab di browser). */
+  window.sipKisiTabelItemsHtml_ = function (rows) {
+    rows = rows || [];
+    /* Mode paket materi aktif: pratinjau draf memakai agregasi kuota paket (sudah ada). */
+    if (typeof asli.items === 'function') {
+      var paket = asli.items.apply(this, arguments);
+      if (typeof paket === 'string' && paket.indexOf('sip-kisi-public') >= 0) return paket;
+    }
+    if (!rows.length || rows.some(function (r) { return !r.bab || !T.levelC[r.levelC]; })) {
+      return typeof asli.items === 'function' ? asli.items.apply(this, arguments) : '<p>Kisi-kisi perlu diperbarui dan diverifikasi Admin.</p>';
+    }
+    return tabel(rows.map(function (r) {
+      return Object.assign({}, r, { bentuk: r.bentuk || 'Sesuai Bank Soal', nomor: Number(r.jumlahSoal || 0) + ' butir',
+        indikator: r.indikator || 'Indikator disusun server setelah metadata disimpan dan disetujui.' });
+    }), 'Pratinjau draf per bab.');
+  };
+  var css = document.createElement('style'); css.id = 'sipintar-kisi-tabel-css';
+  css.textContent =
+    '.sip-kk5 th{white-space:nowrap}.sip-kk5 td.no{text-align:center;font-weight:900;white-space:nowrap;width:5.5rem}.sip-kk5 td.no small{display:block;font-size:9.5px;font-weight:700;color:#b45309}' +
+    '.sip-kk5 td.no em{display:block;white-space:normal;font-size:10px;font-weight:500;color:#b45309;margin-top:2px}' +
+    '.sip-kk5 td.bentuk{white-space:nowrap;font-size:11.5px;color:#334155}.sip-kk5 td.lv{white-space:nowrap}' +
+    '.sip-kk5 td.lv span{display:inline-block;font-weight:800;font-size:11px;padding:2px 7px;border-radius:7px;background:#dcfce7;color:#166534}.sip-kk5 td.lv span.l{background:#fef3c7;color:#92400e;margin-top:3px}' +
+    '.sip-kk5 td.lv small{display:block;font-size:10px;color:#64748b}.sip-kk5 p{margin:0;font-size:12px;color:#1e293b;line-height:1.5}' +
+    '@media(max-width:560px){.sip-kk5,.sip-kk5 tbody,.sip-kk5 tr,.sip-kk5 td{display:block;width:100%}.sip-kk5 thead{display:none}' +
+    '.sip-kk5 tr{border:1px solid #e2e8f0;border-radius:12px;margin:0 0 8px;padding:6px 8px;background:#fff}.sip-kk5 tr.acak{background:#fffbeb}.sip-kk5 tr.acak td{background:transparent}' +
+    '.sip-kk5 td{border:0;padding:4px 0;text-align:left!important;width:auto!important;white-space:normal!important}.sip-kk5 td::before{content:attr(data-kolom);display:block;font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#64748b}' +
+    '.sip-kk5 td.bentuk{display:block!important;font-size:12px}.sip-kk5 td.lv span,.sip-kk5 td.lv small{display:inline-block;margin-right:4px}.sip-kk5 td.no small{display:inline;margin-left:6px}}';
+  document.head.appendChild(css);
+  window.SIPINTAR_KISI_TABEL_VERSI = '1.0.0';
+})();
+
+  </script>
+
+  <!-- MUAT ULANG TETAP DI HALAMAN YANG DIBUKA · sumber: web/sesi-halaman.js -->
+  <script id="sipintar-sesi-halaman">
+/* Muat ulang tetap di halaman yang dibuka v1.0.0 · 14 Oktober 2026 · tambahan.
+   Permintaan: saat pengguna me-refresh halaman (selain modul ujian), pengguna tetap
+   di menu yang sedang dibuka atau kembali ke Dashboard — bukan ke halaman login.
+   - Admin/Guru: alur pemulihan lama tetap dipakai (batas sesi 2 jam tetap berlaku),
+     lalu menu terakhir dibuka lagi (bukan selalu Dashboard Overview).
+   - Siswa, CDP, Dewan Penggalang/petugas: sebelumnya sesi dihapus dan diarahkan ke
+     login; kini token divalidasi ke server (checkSession) lalu kembali ke tab terakhir.
+   - Modul UJIAN tidak diubah: halaman ujian, ruang tunggu, info ujian, hasil, dan tab
+     "Ujian" (gerbang login ulang) tetap memakai alur keamanan lama.
+   - Hanya untuk muat ulang di TAB YANG SAMA (sessionStorage). Membuka aplikasi di tab/
+     peramban baru pada komputer bersama tidak otomatis masuk sebagai siswa terakhir.
+   Tidak ada data yang diubah; hanya penanda halaman di sessionStorage. */
+(function () {
+  'use strict';
+  var KUNCI = 'sipintar_halaman_v1', SESI = 'sipadu_session';
+  var HALAMAN_UJIAN = ['page-exam', 'page-exam-info', 'page-lobby', 'page-result'];
+  var st = { pulihAdmin: '', pulihSampai: 0, memulihkan: false, sudah: false, tutupAwal: false, mengarahkan: false, pulihKe: 0 };
+
+  function el(id) { return document.getElementById(id); }
+  function aku() { try { if (typeof currentUser !== 'undefined' && currentUser) return currentUser; } catch (e) {} return window.currentUser || null; }
+  function baca() { try { return JSON.parse(sessionStorage.getItem(KUNCI) || 'null'); } catch (e) { return null; } }
+  function sesi() { try { return JSON.parse(localStorage.getItem(SESI) || 'null'); } catch (e) { return null; } }
+  function catat(area, tab) {
+    try {
+      var u = aku();
+      if (!u || !u.userID) return;
+      sessionStorage.setItem(KUNCI, JSON.stringify({ uid: String(u.userID), area: area, tab: tab || '', t: Date.now() }));
+    } catch (e) {}
+  }
+  function lupakan() { try { sessionStorage.removeItem(KUNCI); } catch (e) {} }
+  function isAdmin(role) { return role === 'Admin' || role === 'Guru'; }
+  /** Rekaman yang layak dipulihkan untuk sesi tersimpan (null bila tidak). */
+  function rencana() {
+    var s = sesi(), h = baca();
+    if (!s || !s.userID || !s.token || !h || String(h.uid) !== String(s.userID)) return null;
+    if (h.area === 'ujian') return null;
+    if (isAdmin(s.role)) return h.area === 'admin' ? { s: s, h: h } : null;
+    return h.area === 'siswa' ? { s: s, h: h } : null;
+  }
+  window.sipSesiHalamanRencana_ = rencana;
+
+  function tampilLogin() { var l = el('page-login'), g = el('global-loading'); if (g) g.classList.add('hidden'); if (l) l.classList.remove('hidden'); }
+  function tampilMemuat() { var l = el('page-login'), g = el('global-loading'); if (l) l.classList.add('hidden'); if (g) g.classList.remove('hidden'); }
+
+  /* ------------------------------------------------------------- PENCATAT */
+  function kait() {
+    var tab = window.showAdminTab;
+    if (typeof tab === 'function' && !tab.__sipSesiHalaman) {
+      var ft = function (tabId, elMenu) {
+        /* Pemulihan: initAdminPanel memanggil Dashboard (tanpa elemen menu) 2x.
+           Panggilan ke-1 (panel baru tampil) dibiarkan ke Dashboard; panggilan ke-2
+           (setelah daftar ujian termuat) diarahkan SEKALI ke menu terakhir, sehingga
+           menu yang memerlukan daftar ujian/editor (Bank Soal) dirender satu kali. */
+        if (tabId === 'dash-home' && !elMenu && st.pulihAdmin && Date.now() < st.pulihSampai && ++st.pulihKe >= 2) {
+          var tujuan = st.pulihAdmin, m = document.querySelector('.sidebar-item[onclick*="\'' + tujuan + '\'"]');
+          if (m && !m.classList.contains('hidden')) {
+            var hasil;
+            st.mengarahkan = true;
+            st.pulihAdmin = '';
+            try { hasil = tab.call(this, tujuan, m); } finally { st.mengarahkan = false; }
+            catat('admin', tujuan);
+            return hasil;
+          }
+          st.pulihAdmin = '';
+        } else if (tabId === 'dash-home' && !elMenu) {
+          /* panggilan ke-1 pemulihan: Dashboard sementara, penanda menu tidak ditimpa */
+          if (st.pulihAdmin) return tab.apply(this, arguments);
+        } else if (!st.mengarahkan && (elMenu || tabId !== 'dash-home')) {
+          /* Pengguna sudah memilih menu sendiri: hentikan pengalihan pemulihan. */
+          st.pulihAdmin = '';
+        }
+        var r = tab.apply(this, arguments);
+        catat('admin', tabId);
+        return r;
+      };
+      Object.keys(tab).forEach(function (k) { if (!(k in ft)) ft[k] = tab[k]; });
+      ft.__sipSesiHalaman = true;
+      window.showAdminTab = ft;
+    }
+    var sw = window.showSiswaTab;
+    if (typeof sw === 'function' && !sw.__sipSesiHalaman) {
+      var fs = function (t) {
+        var r = sw.apply(this, arguments);
+        catat(t === 'ujian' ? 'ujian' : 'siswa', t || 'dash');
+        return r;
+      };
+      Object.keys(sw).forEach(function (k) { if (!(k in fs)) fs[k] = sw[k]; });
+      fs.__sipSesiHalaman = true;
+      window.showSiswaTab = fs;
+    }
+    var pg = window.switchPage;
+    if (typeof pg === 'function' && !pg.__sipSesiHalaman) {
+      var fp = function (id) {
+        var r = pg.apply(this, arguments);
+        if (HALAMAN_UJIAN.indexOf(id) >= 0) catat('ujian', id);
+        else if (id === 'page-gamefikasi') catat('siswa', 'game');
+        else if (id === 'page-login' && !st.memulihkan) lupakan();
+        return r;
+      };
+      Object.keys(pg).forEach(function (k) { if (!(k in fp)) fp[k] = pg[k]; });
+      fp.__sipSesiHalaman = true;
+      window.switchPage = fp;
+    }
+    var cek = window.checkSavedSession;
+    if (typeof cek === 'function' && !cek.__sipSesiHalaman) {
+      var fc = function () {
+        if (st.sudah) return;
+        /* Pengguna sudah masuk di halaman ini sebelum jeda pemulihan bawaan (± 4 detik)
+           berakhir: tidak ada yang perlu dipulihkan. Dulu sesi siswa justru dihapus di
+           sini sehingga refresh berikutnya kembali ke login. */
+        var kini = aku(), ss = sesi();
+        if (kini && kini.userID && kini.token && ss && String(ss.userID) === String(kini.userID) &&
+            ['page-admin', 'page-siswa-hub'].concat(HALAMAN_UJIAN).some(function (id) { var n = el(id); return n && !n.classList.contains('hidden'); })) { st.sudah = true; return; }
+        var rc = rencana();
+        if (st.tutupAwal) { st.tutupAwal = false; var g0 = el('global-loading'); if (g0 && (!rc || isAdmin(rc.s.role))) g0.classList.add('hidden'); }
+        if (!rc) { lupakanJikaBeda(); return cek.apply(this, arguments); }
+        st.sudah = true;
+        if (isAdmin(rc.s.role)) {
+          if (rc.h.tab && rc.h.tab !== 'dash-home') { st.pulihKe = 0; st.pulihAdmin = rc.h.tab; st.pulihSampai = Date.now() + 45000; }
+          return cek.apply(this, arguments);
+        }
+        return pulihkanSiswa(rc, cek, this, arguments);
+      };
+      fc.__sipSesiHalaman = true;
+      window.checkSavedSession = fc;
+    }
+  }
+  function lupakanJikaBeda() { var s = sesi(), h = baca(); if (h && (!s || String(h.uid) !== String(s.userID))) lupakan(); }
+
+  /* ------------------------------------------------------------- PEMULIH SISWA */
+  function pulihkanSiswa(rc, cekAsli, self, args) {
+    st.memulihkan = true;
+    tampilMemuat();
+    var selesai = function () { st.memulihkan = false; var g = el('global-loading'); if (g) g.classList.add('hidden'); };
+    var jaga = setTimeout(function () { if (st.memulihkan) { selesai(); tampilLogin(); } }, 30000);
+    var gsr = window.google && google.script && google.script.run;
+    if (!gsr) { clearTimeout(jaga); selesai(); return cekAsli.apply(self, args); }
+    gsr.withSuccessHandler(function (res) {
+      clearTimeout(jaga);
+      if (!st.memulihkan) return;
+      selesai();
+      if (res && res.success && !isAdmin(res.role)) {
+        try { currentUser = res; } catch (e) {}
+        window.currentUser = res;
+        window._pendingExamData = null;
+        window._siswaExamGateOk = false;
+        var t = String(rc.h.tab || 'dash');
+        if (t === 'ujian' || !el('siswa-tab-' + t)) t = 'dash';
+        /* Tab Pembelajaran digerbang profil: profil dimuat ulang setelah hub tampil,
+           jadi buka Dashboard dulu lalu pindah ke tab terakhir setelah profil terbaca. */
+        var gerbang = TAB_PROFIL.indexOf(t) >= 0 && typeof window.sipSiswaProfilSiap_ === 'function';
+        try { window.showStudentHub(gerbang ? 'dash' : t); }
+        catch (e) { try { window.showStudentHub('dash'); } catch (e2) { tampilLogin(); } return; }
+        if (gerbang) tungguProfil(t, String(res.userID));
+        return;
+      }
+      if (res && res.success) { st.sudah = false; return cekAsli.apply(self, args); }
+      try { localStorage.removeItem(SESI); } catch (e) {}
+      lupakan();
+      tampilLogin();
+    }).withFailureHandler(function () {
+      clearTimeout(jaga);
+      selesai();
+      tampilLogin();
+    }).checkSession(rc.s.userID, rc.s.token);
+  }
+
+  var TAB_PROFIL = ['materi', 'tugas', 'jurnal', 'kisi'];
+  function tungguProfil(t, uid) {
+    var mulaiT = Date.now();
+    (function cek() {
+      var u = aku(), dash = el('siswa-tab-dash'), hub = el('page-siswa-hub');
+      if (!u || String(u.userID) !== uid || !hub || hub.classList.contains('hidden')) return;
+      if (dash && dash.classList.contains('hidden')) return; /* pengguna sudah pindah menu */
+      if (window._siswaProfilCache) {
+        if (window.sipSiswaProfilSiap_()) window.showSiswaTab(t);
+        return;
+      }
+      if (Date.now() - mulaiT < 20000) setTimeout(cek, 250);
+    })();
+  }
+
+  /* Cegah kedipan form login selama jeda pemulihan bawaan (± 4 detik). */
+  function tutupLoginAwal() {
+    if (!rencana()) return;
+    st.tutupAwal = true;
+    tampilMemuat();
+    setTimeout(function () {
+      var hub = el('page-siswa-hub'), adm = el('page-admin'), l = el('page-login');
+      var tampak = function (n) { return n && !n.classList.contains('hidden'); };
+      if (!st.memulihkan && !tampak(hub) && !tampak(adm) && l && l.classList.contains('hidden')) tampilLogin();
+    }, 40000);
+  }
+
+  function mulai() { kait(); tutupLoginAwal(); }
+  window.SIPINTAR_SESI_HALAMAN_VERSI = '1.0.0';
+  window.sipSesiHalamanCatat_ = catat;
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mulai); else mulai();
+  /* Modul lain dapat membungkus ulang fungsi navigasi setelah ini: pasang ulang penanda. */
+  setTimeout(kait, 1500);
+})();
+
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5834359a82cbae9',t:'MTc5NDI5NDg5NQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5834359a82cbae9',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 <!-- Lisensi MathJax tertanam:
 
                                  Apache License
