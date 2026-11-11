@@ -24693,7 +24693,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
 
   <!-- MATERI WAJIB, JENIS TETAP DAN PERBAIKAN SOAL AI · sumber: web/bank-soal-materi.js -->
   <script id="sipintar-bank-materi">
-/* Bank Soal Materi v3.2.0 — Pensil Magic / Terapkan + verifikasi independen. Tambahan pada editor asli.
+/* Bank Soal Materi v3.3.0 — Pensil Magic / Terapkan + verifikasi independen. Tambahan pada editor asli.
    6 Nov 2026: cabang katalog Pramuka (SKU Penggalang) untuk ujian ber-mapel Pramuka.
    Preferensi hanya jenis/topik/target, bukan isi soal, jawaban atau token. */
 (function(){
@@ -24709,7 +24709,33 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
  function eid(){return val('select-exam-q')||val('input-exam-id');}
  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
  function message(t,m,i){return Swal.fire(t,m,i||'warning');}
- function api(action,args){return new Promise(function(resolve,reject){try{var run=google.script.run.withSuccessHandler(function(r){if(!r||r.success===false||r.error)return reject(new Error(r&&r.message||r&&r.error||'Permintaan belum berhasil.'));resolve(r);}).withFailureHandler(function(e){var m=e&&e.message||String(e);if(/tidak terdaftar|not a function/i.test(m))m='Versi backend belum sesuai. Pasang 1-GAS-code.gs terbaru dan deploy New version; perbarui app.html, api-client.js dan api-actions.js. Jangan aktifkan ALLOW_ALL.';reject(new Error(m));});var returned=run[action].apply(run,(args||[]).concat([currentUser.userID,currentUser.token]));if(returned&&returned.catch)returned.catch(function(){});}catch(e){reject(e);}});}
+ function api(action,args,opts){
+  opts=opts||{};
+  function hasil(r){if(!r||r.success===false||r.error){var e=new Error(r&&r.message||r&&r.error||'Permintaan belum berhasil.');e.code=r&&r.code||'';throw e;}return r;}
+  if(opts.magic&&window.SIPINTAR_API&&typeof SIPINTAR_API.request==='function'){
+   var wire=(args||[]).concat([currentUser.userID,currentUser.token]),o={timeout:opts.timeout,signal:opts.signal,cid:'magic-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)};
+   try{o.bytes=JSON.stringify(wire).length;}catch(e){}
+   return SIPINTAR_API.request(action,wire,o).then(function(h){return hasil(h.data);});
+  }
+  return new Promise(function(resolve,reject){try{var run=google.script.run.withSuccessHandler(function(r){try{resolve(hasil(r));}catch(e){reject(e);}}).withFailureHandler(function(e){var m=e&&e.message||String(e);if(/tidak terdaftar|not a function/i.test(m))m='Versi backend belum sesuai. Pasang 1-GAS-code.gs terbaru dan deploy New version; perbarui app.html, api-client.js dan api-actions.js. Jangan aktifkan ALLOW_ALL.';reject(new Error(m));});var returned=run[action].apply(run,(args||[]).concat([currentUser.userID,currentUser.token]));if(returned&&returned.catch)returned.catch(function(){});}catch(e){reject(e);}});
+ }
+ var MAGIC_TOTAL_MS=90000,MAGIC_TAHAP_MS=35000;
+ window.SIPINTAR_PENSIL_MAGIC_BATAS={totalMs:MAGIC_TOTAL_MS,tahapMs:MAGIC_TAHAP_MS};
+ function habisMagic(total){var e=new Error(total?'Batas menunggu total 90 detik tercapai. Proses tidak diulang lagi; draf dan Bank Soal tetap utuh.':'Tahap AI melewati batas 35 detik. Tidak mencoba ulang/pindah jalur otomatis. Draf dan Bank Soal tetap utuh.');e.magicTimeout=true;return e;}
+ function tahapMagic(action,args,ctx){
+  var sisa=ctx.deadline-Date.now();if(sisa<=0)return Promise.reject(habisMagic(true));
+  var ms=Math.min(MAGIC_TAHAP_MS,sisa);
+  return new Promise(function(resolve,reject){
+   var selesai=false,timer,ctl=null;try{if(typeof AbortController==='function')ctl=new AbortController();}catch(e){}
+   function bersih(){clearTimeout(timer);if(ctx.abortTahap===batal)ctx.abortTahap=null;}
+   function gagal(e){if(selesai)return;selesai=true;bersih();try{if(ctl)ctl.abort();}catch(x){}reject(e);}
+   function batal(){var e=new Error('Menunggu dibatalkan. Hasil terlambat tidak diterapkan.');e.cancelled=true;gagal(e);}
+   ctx.abortTahap=batal;
+   timer=setTimeout(function(){gagal(habisMagic(ms<MAGIC_TAHAP_MS));},ms);
+   try{api(action,args,{magic:true,timeout:ms,signal:ctl&&ctl.signal}).then(function(r){if(selesai)return;selesai=true;bersih();resolve(r);},function(e){gagal(e.timeout?habisMagic(ms<MAGIC_TAHAP_MS):e);});}catch(e){gagal(e);}
+  });
+ }
+
  window.sipSoalMateriAPI_=api;
  function key(){return 'sip_soal_pref_v3:'+String(window.currentUser&&currentUser.userID||'')+':'+eid();}
  function pref(){var k=key(),p=memory[k];if(!p)try{p=JSON.parse(localStorage.getItem(k)||'{}');}catch(e){}if(!p||typeof p!=='object')p={};if(types.indexOf(p.type)<0)p.type='PG';return p;}
@@ -24769,17 +24795,18 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
  function verHTML(h){var v=h.ver;return '<div class="sip-ai-verif sip-ai-verif-ok" id="sip-ai-verifikasi"><b>Level terverifikasi: '+esc(h.draft.targetC)+'</b><p>Pemeriksa AI independen (panggilan terpisah, tidak diberi target maupun klaim pembuat) menilai usulan <b>'+esc(v.levelC)+(v.namaLevel?' · '+esc(v.namaLevel):'')+'</b>: '+esc(v.alasan)+'</p>'+(v.masalah?'<p class="sip-ai-masalah">Catatan pemeriksa: '+esc(v.masalah)+'</p>':'')+riwayatHTML(h.riwayat)+'</div>';}
  /* Diagnosis beda versi: AI (aksi lambat) berjalan lewat URL GAS langsung (config.js),
     sedangkan tabel/Simpan lewat proxy Vercel. Bandingkan keduanya tanpa menulis apa pun. */
- function diagnosaVersi(draft,versi){
+ function diagnosaVersi(draft,versi,batas){
   var A=window.SIPINTAR_API,base={versi:versi,jenis:versi==='hash-kosong'?'hash-kosong':'tidak-diketahui'};
   if(versi==='hash-kosong'||!A||typeof A.request!=='function')return Promise.resolve(base);
   var cfg={};try{cfg=A.config()||{};}catch(e){}
-  function ambil(ch){return A.request('getQuestionsByExam',[draft.examId,currentUser.userID,currentUser.token],{channel:ch,timeout:45000,cid:'diag-'+ch+'-'+Date.now()}).then(function(h){var list=h&&Array.isArray(h.data)?h.data:[],q=list.filter(function(x){return String(x.id)===String(draft.questionId);})[0];return {ok:true,saluran:h.channel,hash:q?String(q.sourceHash||''):null};},function(e){return {ok:false,error:String(e&&e.message||e)};});}
-  return Promise.all([ambil('proxy'),cfg.hasDirect?ambil('direct'):Promise.resolve(null)]).then(function(x){
+  function ambil(ch){return A.request('getQuestionsByExam',[draft.examId,currentUser.userID,currentUser.token],{channel:ch,timeout:3000,cid:'diag-'+ch+'-'+Date.now()}).then(function(h){var list=h&&Array.isArray(h.data)?h.data:[],q=list.filter(function(x){return String(x.id)===String(draft.questionId);})[0];return {ok:true,saluran:h.channel,hash:q?String(q.sourceHash||''):null};},function(e){return {ok:false,error:String(e&&e.message||e)};});}
+  var semua=Promise.all([ambil('proxy'),cfg.hasDirect?ambil('direct'):Promise.resolve(null)]).then(function(x){
    var p=x[0],d=x[1],f=String(draft.sourceHash||'');base.proxy=p;base.direct=d;
    if(p&&p.ok&&d&&d.ok&&p.saluran!==d.saluran&&p.hash!==d.hash)base.jenis='saluran-berbeda';
    else if(p&&p.ok&&(!d||!d.ok||d.hash===p.hash)&&p.hash!==f)base.jenis='soal-berubah';
    return base;
   },function(){return base;});
+  return new Promise(function(resolve){var done=false,timer=setTimeout(function(){if(!done){done=true;resolve(base);}},Math.max(1,Math.min(3000,Number(batas)||3000)));semua.then(function(r){if(!done){done=true;clearTimeout(timer);resolve(r);}},function(){if(!done){done=true;clearTimeout(timer);resolve(base);}});});
  }
  function pesanDiagnosa(g){
   if(!g)return '';
@@ -24830,42 +24857,48 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
   if(!bolehAI()||S.busy||S.inflight||S.asking)return;mount();if(!validTopic())return message('Lengkapi materi/bab','Pilih topik pembelajaran terlebih dahulu.');
   var draft=snapshot(),ctx={uid:currentUser.userID,token:currentUser.token,form:document.querySelector('#form-add-q form'),fingerprint:JSON.stringify(draft)},seq=++S.seq;
   S.asking=true;var consent,consentVerified=false;
-  try{consent=await Swal.fire({icon:'question',title:'Pensil Magic · Minta usulan perbaikan soal?',html:'<div class="sip-magic-consent"><p>Sesuaikan tuntutan berpikir <b>satu soal</b>; materi/bab dan bentuk soal tetap.</p><label for="sip-magic-target">Level kognitif yang diinginkan Admin</label><select id="sip-magic-target" class="swal2-select"><option value="">— Pilih C1–C6 —</option>'+Object.keys(T.levelC).map(function(c){return '<option value="'+c+'"'+(draft.targetC===c?' selected':'')+'>'+c+' · '+esc(T.levelC[c])+' / '+esc(T.petaCL[c])+'</option>';}).join('')+'</select><p>Teks, opsi tanpa kunci lama/pemetaan pasangan, topik, target, dan gambar yang dapat dibaca akan dikirim ke AI yang dikonfigurasi. AI menyusun kunci BARU untuk Anda periksa. Usulan diperiksa oleh pemeriksa AI independen yang tidak diberi target; bila belum lolos, usulan dibuat ulang otomatis maksimal 2 kali (paling banyak '+(MAKS_PERCOBAAN*2)+' panggilan AI/kuota).</p><p><b>Periksa → Terapkan ke draf → Simpan manual.</b> Tidak ada penyimpanan atau rilis otomatis. Batal tidak mengirim permintaan ke AI.</p></div>',showCancelButton:true,confirmButtonText:'Setuju, buat usulan',cancelButtonText:'Batal',preConfirm:function(){var c=(el('sip-magic-target')||{}).value;if(!T.levelC[c]){Swal.showValidationMessage('Pilih level kognitif C1–C6 terlebih dahulu.');return false;}if(!same(ctx)){Swal.showValidationMessage('Draf/akun/ujian berubah. Tutup dialog lalu buka Pensil Magic lagi.');return false;}consentVerified=true;return c;}});}finally{S.asking=false;}
+  try{consent=await Swal.fire({icon:'question',title:'Pensil Magic · Minta usulan perbaikan soal?',html:'<div class="sip-magic-consent"><p>Sesuaikan tuntutan berpikir <b>satu soal</b>; materi/bab dan bentuk soal tetap.</p><label for="sip-magic-target">Level kognitif yang diinginkan Admin</label><select id="sip-magic-target" class="swal2-select"><option value="">— Pilih C1–C6 —</option>'+Object.keys(T.levelC).map(function(c){return '<option value="'+c+'"'+(draft.targetC===c?' selected':'')+'>'+c+' · '+esc(T.levelC[c])+' / '+esc(T.petaCL[c])+'</option>';}).join('')+'</select><p>Teks, opsi tanpa kunci lama/pemetaan pasangan, topik, target, dan gambar yang dapat dibaca akan dikirim ke AI yang dikonfigurasi. AI menyusun kunci BARU untuk Anda periksa. Usulan diperiksa oleh pemeriksa AI independen yang tidak diberi target; bila belum lolos, usulan dibuat ulang otomatis maksimal 2 kali hanya selama sisa waktu cukup. Setiap percobaan memakai kuota pembuat dan pemeriksa, dengan paling banyak satu cadangan kompatibilitas per tahap—bukan putaran banyak model.</p><p><b>Batas menunggu: 90 detik total, 35 detik tiap tahap AI.</b> Jika layanan lambat/kuota habis, proses berhenti dengan pesan, bukan menunggu puluhan menit. Waktu membaca tinjauan Admin tidak dihitung.</p><p><b>Periksa → Terapkan ke draf → Simpan manual.</b> Tidak ada penyimpanan atau rilis otomatis. Batal tidak mengirim permintaan ke AI.</p></div>',showCancelButton:true,confirmButtonText:'Setuju, buat usulan',cancelButtonText:'Batal',preConfirm:function(){var c=(el('sip-magic-target')||{}).value;if(!T.levelC[c]){Swal.showValidationMessage('Pilih level kognitif C1–C6 terlebih dahulu.');return false;}if(!same(ctx)){Swal.showValidationMessage('Draf/akun/ujian berubah. Tutup dialog lalu buka Pensil Magic lagi.');return false;}consentVerified=true;return c;}});}finally{S.asking=false;}
   if(!consent||!consent.isConfirmed||!same(ctx))return;
   var pilihan=consent.value;if(!consentVerified||!T.levelC[pilihan])return message('Usulan belum diterapkan','Dialog belum memverifikasi pemilihan level dan persetujuan pengiriman. Draf asli tidak diubah.');
   el('sip-soal-target').value=pilihan;draft.targetC=pilihan;ctx.fingerprint=JSON.stringify(snapshot());remember();
   clearHasil();S.busy=true;S.inflight=true;S.ctx=ctx;el('sip-soal-ai-batal').hidden=false;var b=el('sip-soal-ai');if(b)b.disabled=true;var st=el('sip-soal-ai-status');
-  function status(t){if(st&&st.isConnected)st.textContent=t;}
-  function masihSama(){if(seq!==S.seq||!same(ctx))throw new Error('Draf/akun/ujian berubah saat AI bekerja. Usulan tidak diterapkan; perubahan Anda tetap utuh.');}
+  var mulai=Date.now(),fase='',workTick=null;ctx.deadline=mulai+MAGIC_TOTAL_MS;
+  function jam(){if(st&&st.isConnected)st.textContent=fase+' · '+Math.floor((Date.now()-mulai)/1000)+(workTick?' detik berjalan':' detik proses')+' (batas proses 90 detik).';}
+  function status(t){fase=t;jam();}
+  function hentikanJam(){if(workTick){clearInterval(workTick);workTick=null;}}
+  workTick=setInterval(jam,1000);
+  function masihSama(){if(seq!==S.seq||ctx.cancelled||!same(ctx))throw new Error('Draf/akun/ujian berubah saat AI bekerja. Usulan tidak diterapkan; perubahan Anda tetap utuh.');if(Date.now()>=ctx.deadline)throw habisMagic(true);}
+
   try{
    var wire={examId:draft.examId,questionId:draft.questionId,sourceHash:draft.sourceHash,type:draft.type,content:draft.content,image:draft.image,materi:draft.materi,babId:draft.babId,bab:draft.bab,targetC:draft.targetC,setujuKirim:true,clientRef:String(seq)};
    // Pemetaan q→a Menjodohkan dan kunci lama tidak dikirim dari browser pun.
    wire.options=draft.type==='JODOH'?draft.options.map(function(o){return {q:o.q};}):draft.options;
    var r=null,ver=null,lolos=false,riwayat=[],umpan='',diagnosa=null;
    for(var n=1;n<=MAKS_PERCOBAAN&&!lolos;n++){
+    masihSama();if(n>1&&ctx.deadline-Date.now()<15000)throw new Error('Sisa waktu dalam batas 90 detik tidak cukup untuk membuat DAN memeriksa ulang. Tidak diterapkan; coba lagi nanti atau revisi manual.');
     status('Percobaan '+n+' dari '+MAKS_PERCOBAAN+': AI menyusun usulan menuju '+draft.targetC+'. Anda boleh membaca/menyunting draf; hasil lama tidak akan menimpa perubahan baru.');
     wire.umpanBalik=umpan;wire.clientRef=seq+':'+n;
-    r=await api('perbaikiSoalKognitifAI',[wire]);masihSama();ver=null;
-    if(!diagnosa&&r.versi&&['berbeda','tidak-ditemukan','hash-kosong'].indexOf(r.versi)>=0){status('Memeriksa penyebab beda versi soal antara editor dan server AI...');diagnosa=await diagnosaVersi(draft,r.versi);masihSama();}
+    r=await tahapMagic('perbaikiSoalKognitifAI',[wire],ctx);masihSama();ver=null;
+    if(!diagnosa&&r.versi&&['berbeda','tidak-ditemukan','hash-kosong'].indexOf(r.versi)>=0){status('Memeriksa penyebab beda versi soal antara editor dan server AI...');diagnosa=await diagnosaVersi(draft,r.versi,ctx.deadline-Date.now());masihSama();}
     if(!r.usulan||!r.usulan.sesuaiTarget||r.usulan.levelC!==draft.targetC){
      riwayat.push({n:n,pembuat:r.usulan&&r.usulan.levelC||'-',pemeriksa:'',lolos:false});
      umpan='Percobaan '+n+': pembuat sendiri menilai usulannya '+(r.usulan&&r.usulan.levelC||'-')+', belum '+draft.targetC+'. '+plain(r.usulan&&r.usulan.alasan).slice(0,500);continue;
     }
     status('Percobaan '+n+' dari '+MAKS_PERCOBAAN+': pemeriksa AI independen menilai level usulan (tanpa diberi target)...');
     var u=r.usulan;
-    ver=await api('verifikasiLevelKognitifAI',[{examId:draft.examId,type:draft.type,content:u.content,options:u.options,correct:u.correct,image:draft.image,materi:draft.materi,babId:draft.babId,bab:draft.bab,targetC:draft.targetC,setujuKirim:true}]);masihSama();
+    ver=await tahapMagic('verifikasiLevelKognitifAI',[{examId:draft.examId,type:draft.type,content:u.content,options:u.options,correct:u.correct,image:draft.image,materi:draft.materi,babId:draft.babId,bab:draft.bab,targetC:draft.targetC,setujuKirim:true}],ctx);masihSama();
     var struktur=r.usulan.options.length===draft.options.length&&(draft.type!=='JODOH'||r.usulan.options.filter(function(o){return o.q;}).length===draft.options.filter(function(o){return o.q;}).length);
     if(!struktur){ver=Object.assign({},ver,{cocok:false,masalah:((ver.masalah||'')+' Pertahankan jumlah opsi/pernyataan/pasangan dan pengacoh asli agar struktur serta poin tidak berubah.').trim()});}
     lolos=!!(ver&&ver.cocok&&ver.levelC===draft.targetC&&!String(ver.masalah||'').trim()&&struktur);
     riwayat.push({n:n,pembuat:u.levelC,pemeriksa:ver.levelC,lolos:lolos});
     if(!lolos)umpan='Percobaan '+n+': '+(ver.levelC===draft.targetC?'level sesuai '+draft.targetC+', tetapi pemeriksaan isi/struktur belum lolos.':'penilai independen menilai usulan '+ver.levelC+', belum '+draft.targetC+'.')+' Alasan: '+ver.alasan+(ver.masalah?' Masalah: '+ver.masalah:'');
    }
-   var h={r:r,ver:ver,lolos:lolos,riwayat:riwayat,draft:draft,ctx:ctx,diterapkan:false,diagnosa:diagnosa};S.hasil=h;renderHasil();
+   hentikanJam();var h={r:r,ver:ver,lolos:lolos,riwayat:riwayat,draft:draft,ctx:ctx,diterapkan:false,diagnosa:diagnosa,durasiMs:Date.now()-mulai};S.hasil=h;renderHasil();
    if(!lolos){var last=riwayat[riwayat.length-1]||{};status('Usulan belum lolos pemeriksaan setelah '+riwayat.length+' percobaan. Terapkan tidak aktif; draf tetap utuh.');return message('Target belum tercapai','Setelah '+riwayat.length+' percobaan otomatis, '+((last.pemeriksa||last.pembuat)===draft.targetC?'level dilaporkan sesuai '+draft.targetC+', tetapi ada masalah isi/kunci atau struktur yang belum diselesaikan.':'usulan masih dinilai '+(last.pemeriksa||last.pembuat||'-')+(last.pemeriksa?' oleh pemeriksa independen':' oleh AI pembuat')+', belum '+draft.targetC+'.')+' Tombol Terapkan tidak diaktifkan dan draf tidak diubah. '+umpan+(diagnosa?' '+pesanDiagnosa(diagnosa):''));}
    status('Usulan '+draft.targetC+' terverifikasi pemeriksa independen. Periksa lalu tekan Terapkan.');
    await review(h);
-  }catch(e){if(!ctx.cancelled&&bolehAI()&&currentUser.userID===ctx.uid&&currentUser.token===ctx.token){if(st&&st.isConnected)st.textContent=e.message;await message('Usulan belum diterapkan',e.message);}}
-  finally{S.busy=false;S.inflight=false;S.ctx=null;var cancel=el('sip-soal-ai-batal');if(cancel)cancel.hidden=true;if(b&&b.isConnected)b.disabled=false;}
+  }catch(e){hentikanJam();if(!ctx.cancelled&&bolehAI()&&currentUser.userID===ctx.uid&&currentUser.token===ctx.token){if(st&&st.isConnected)st.textContent=e.message;await message('Usulan belum diterapkan',e.message);}}
+  finally{hentikanJam();S.busy=false;S.inflight=false;S.ctx=null;var cancel=el('sip-soal-ai-batal');if(cancel)cancel.hidden=true;if(b&&b.isConnected)b.disabled=false;}
  }
  async function terapkanTersimpan(){
   if(!bolehAI()||S.busy||!S.hasil)return;var h=S.hasil;S.busy=true;
@@ -24881,11 +24914,11 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
  });
  document.addEventListener('input',function(e){if(admin()&&/^sip-soal-(materi|bab)$/.test(e.target.id))remember();});
  var hasilTimer=0;function cekHasil(){if(!S.hasil||S.hasil.diterapkan||!S.hasil.lolos||S.busy)return;clearTimeout(hasilTimer);hasilTimer=setTimeout(renderHasil,250);}document.addEventListener('input',cekHasil,true);document.addEventListener('change',cekHasil,true);
- document.addEventListener('click',function(e){if(e.target.closest('#sip-soal-ai'))requestAI();if(e.target.closest('#sip-soal-ai-terapkan'))terapkanTersimpan();if(e.target.closest('#sip-soal-ai-batal')&&S.ctx){S.ctx.cancelled=true;S.seq++;S.busy=false;el('sip-soal-ai-batal').hidden=true;el('sip-soal-ai-status').textContent='Menunggu dibatalkan. Tidak ada usulan diterapkan. Panggilan provider mungkin tetap memakai kuota sampai selesai; permintaan AI baru menunggu panggilan itu berakhir. Anda boleh menyimpan draf sendiri.';}});
+ document.addEventListener('click',function(e){if(e.target.closest('#sip-soal-ai'))requestAI();if(e.target.closest('#sip-soal-ai-terapkan'))terapkanTersimpan();if(e.target.closest('#sip-soal-ai-batal')&&S.ctx){S.ctx.cancelled=true;if(S.ctx.abortTahap)S.ctx.abortTahap();S.seq++;S.busy=false;el('sip-soal-ai-batal').hidden=true;el('sip-soal-ai-status').textContent='Menunggu dibatalkan. Tidak ada usulan diterapkan. Panggilan yang telanjur diterima provider mungkin masih memakai kuota. Server mencegah pengiriman ganda selama panggilan sebelumnya berjalan. Anda boleh menyimpan draf sendiri.';}});
  var css=document.createElement('style');css.id='sip-soal-materi-css';css.textContent='.sip-ai-hasil{margin-top:10px;border:1px solid #cbd5e1;border-radius:12px;padding:12px 14px;font-size:12px;line-height:1.6;color:#334155;background:#fff}.sip-ai-hasil p{margin:4px 0 8px}.sip-ai-hasil-ok{border-color:#86efac;background:#f0fdf4}.sip-ai-hasil-gagal{border-color:#fca5a5;background:#fef2f2}.sip-ai-hasil-selesai{border-color:#a5b4fc;background:#eef2ff}.sip-ai-hasil button{border:0;border-radius:9px;padding:9px 18px;font-weight:800;background:#059669;color:#fff;cursor:pointer}.sip-ai-hasil button:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed}.sip-ai-riwayat{margin:6px 0 8px 18px;list-style:decimal;font-size:11.5px}.sip-ai-verif{text-align:left;border:1px solid #86efac;background:#f0fdf4;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:13px;color:#14532d}.sip-ai-masalah{color:#92400e}.sip-ai-peringatan{text-align:left;border:1px solid #fcd34d;background:#fffbeb;color:#78350f;border-radius:10px;padding:9px 12px;margin:6px 0 10px;font-size:12px;line-height:1.6}.sip-soal-meta{border:1px solid #c7d2fe;background:#f8faff;border-radius:14px;padding:18px;margin:4px 0 22px;min-width:0}.sip-soal-meta legend{font-weight:800;color:#273b62;padding:0 7px;font-size:15px}.sip-soal-meta p{font-size:12px;color:#526480;line-height:1.7;margin-bottom:12px}.sip-soal-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.sip-soal-grid label{font-size:12px;font-weight:700;color:#334766}.sip-soal-grid input,.sip-soal-grid select{display:block;width:100%;min-width:0;border:1px solid #cbd5e1;border-radius:9px;padding:10px;margin:6px 0 12px;background:#fff;font-size:13px;color:#172033}.sip-soal-grid b{color:#b91c1c}.sip-soal-ai-row{align-items:end}.sip-soal-ai-row button{border:1px solid #6366f1;background:#eef2ff;border-radius:10px;padding:12px;color:#3730a3;font-weight:700;font-size:12px;margin-bottom:12px}.sip-soal-ai-row button:disabled{opacity:.5}.sip-soal-note{font-size:12px;line-height:1.7;color:#526480;background:#eff4fb;padding:12px;border-radius:10px}.sip-ai-review{text-align:left;font-size:14px;line-height:1.7;overflow-wrap:anywhere}.sip-ai-review h4{font-weight:800;margin:16px 0 7px}.sip-ai-review ol{padding-left:22px}.sip-ai-review pre{white-space:pre-wrap;background:#f1f5f9;padding:12px;border-radius:9px}.sip-ai-check{display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;color:#166534;padding:14px;margin-top:18px;font-size:13px;border-radius:10px}.sip-ai-check input{flex-shrink:0;margin-top:5px}@media(max-width:650px){.sip-soal-grid{grid-template-columns:1fr}.sip-soal-meta{padding:13px}}';document.head.appendChild(css);
- function start(){mount();if(window.MutationObserver){new MutationObserver(function(){if(admin()&&document.querySelector('#form-add-q form')&&!el('sip-soal-metadata'))mount();}).observe(document.body,{childList:true,subtree:true});var page=el('page-admin');if(page)new MutationObserver(function(){if(!admin()){S.seq++;if(S.ctx)S.ctx.cancelled=true;if(el('sip-ai-check')||el('sip-magic-target'))Swal.close();}}).observe(page,{attributes:true,attributeFilter:['class']});}}
+ function start(){mount();if(window.MutationObserver){new MutationObserver(function(){if(admin()&&document.querySelector('#form-add-q form')&&!el('sip-soal-metadata'))mount();}).observe(document.body,{childList:true,subtree:true});var page=el('page-admin');if(page)new MutationObserver(function(){if(!admin()){S.seq++;if(S.ctx){S.ctx.cancelled=true;if(S.ctx.abortTahap)S.ctx.abortTahap();}if(el('sip-ai-check')||el('sip-magic-target'))Swal.close();}}).observe(page,{attributes:true,attributeFilter:['class']});}}
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
- window.SIPINTAR_BANK_MATERI_VERSI='3.2.0';
+ window.SIPINTAR_BANK_MATERI_VERSI='3.3.0';
 })();
 
   </script>
@@ -29070,7 +29103,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
 })();
 
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a589dc2b4b62fcf8',t:'MTc5NDM2NDA2OQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a589dc2b4b62fcf8',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a58a3d70f968072d',t:'MTc5NDM2ODA1Mw=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a58a3d70f968072d',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 <!-- Lisensi MathJax tertanam:
 
                                  Apache License
