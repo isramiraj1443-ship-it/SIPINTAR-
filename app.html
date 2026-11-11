@@ -11500,7 +11500,7 @@ function editQuestion(qStr) {
     try {
       google.script.run.withSuccessHandler(function (rP) {
         const selP = document.getElementById('input-image-pos');
-        if (selP) selP.value = (rP && rP.success && rP.posisi) ? rP.posisi : 'akhir';
+        if (selP && q._sipPosisiDraf == null) selP.value = (rP && rP.success && rP.posisi) ? rP.posisi : 'akhir';
       }).getPosisiGambarSoal(q.id, currentUser.userID, currentUser.token);
     } catch (ePp) {}
 
@@ -24693,7 +24693,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
 
   <!-- MATERI WAJIB, JENIS TETAP DAN PERBAIKAN SOAL AI · sumber: web/bank-soal-materi.js -->
   <script id="sipintar-bank-materi">
-/* Bank Soal Materi v3.1.0 — 23 Oktober 2026 (Terapkan + verifikasi level independen). Tambahan pada editor asli.
+/* Bank Soal Materi v3.2.0 — Pensil Magic / Terapkan + verifikasi independen. Tambahan pada editor asli.
    6 Nov 2026: cabang katalog Pramuka (SKU Penggalang) untuk ujian ber-mapel Pramuka.
    Preferensi hanya jenis/topik/target, bukan isi soal, jawaban atau token. */
 (function(){
@@ -24704,6 +24704,8 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
  function el(id){return document.getElementById(id);}
  function val(id){return (el(id)||{}).value||'';}
  function admin(){return !!(window.currentUser&&currentUser.role==='Admin');}
+ /* Peran Admin kosmetik milik Tim bukan izin memakai Pensil Magic. */
+ function bolehAI(){return admin()&&!currentUser._sipPeranTampilan;}
  function eid(){return val('select-exam-q')||val('input-exam-id');}
  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
  function message(t,m,i){return Swal.fire(t,m,i||'warning');}
@@ -24754,9 +24756,9 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
   if(type==='PG'||type==='PG_KOMPLEKS'){for(var i=0;i<5;i++){var v=content('opt-'+i);if(v.replace(/<[^>]*>/g,'').trim()||/<img\b/i.test(v))options.push(v);}}
   else if(type==='BS'){correct={};document.querySelectorAll('#bs-container .bs-row').forEach(function(row){var s=row.querySelector('.bs-text').value;if(s.trim()){correct[options.length]=row.querySelector('.bs-key').value;options.push(s);}});}
   else if(type==='JODOH'){document.querySelectorAll('#pairs-container .pair-row').forEach(function(row){var q=row.querySelector('.pair-left').value,a=row.querySelector('.pair-right').value;if(q.trim()&&a.trim())options.push({q:q,a:a});var middle=row.querySelector('.pair-middle').value;if(middle.trim()&&middle.trim()!==a.trim())options.push({q:'',a:middle});});correct='';}
-  return {examId:eid(),questionId:val('input-question-id'),sourceHash:val('sip-soal-source-hash'),type:type,content:content('editor-content'),image:val('input-image-ac'),options:options,correct:correct,materi:val('sip-soal-materi'),babId:val('sip-soal-bab-id'),bab:val('sip-soal-bab'),targetC:val('sip-soal-target'),point:val('input-point'),isRequired:(document.querySelector('select[name="isRequired"]')||{}).value||'TRUE'};
+  return {examId:eid(),questionId:val('input-question-id'),sourceHash:val('sip-soal-source-hash'),type:type,content:content('editor-content'),image:val('input-image-ac'),options:options,correct:correct,materi:val('sip-soal-materi'),babId:val('sip-soal-bab-id'),bab:val('sip-soal-bab'),targetC:val('sip-soal-target'),point:val('input-point'),imageSize:val('input-image-size'),imagePosition:val('input-image-pos'),rowFields:Array.from(document.querySelectorAll(type==='BS'?'#bs-container .bs-row':type==='JODOH'?'#pairs-container .pair-row':'#sip-tidak-ada')).map(function(row){return Array.from(row.querySelectorAll('input,textarea,select')).map(function(n){return [n.className,n.value];});}),rowPoints:Array.from(document.querySelectorAll(type==='BS'?'#bs-container .bs-row':type==='JODOH'?'#pairs-container .pair-row':'#sip-tidak-ada')).filter(function(row){var n=row.querySelector(type==='BS'?'.bs-text':'.pair-left');return n&&n.value.trim();}).map(function(row){return (row.querySelector('.sip-poin-bs,.sip-poin-pair')||{}).value||'1';}),isRequired:(document.querySelector('select[name="isRequired"]')||{}).value||'TRUE'};
  }
- function same(ctx){return admin()&&currentUser.userID===ctx.uid&&currentUser.token===ctx.token&&document.querySelector('#form-add-q form')===ctx.form&&JSON.stringify(snapshot())===ctx.fingerprint;}
+ function same(ctx){return bolehAI()&&currentUser.userID===ctx.uid&&currentUser.token===ctx.token&&document.querySelector('#form-add-q form')===ctx.form&&JSON.stringify(snapshot())===ctx.fingerprint;}
  function rich(s){if(window.SIPINTAR_MATEMATIKA)return SIPINTAR_MATEMATIKA.html(s);var t=document.createElement('template');t.innerHTML=String(s||'');t.content.querySelectorAll('script,style,iframe,object,embed,link,meta,base,form,input,button').forEach(function(n){n.remove();});t.content.querySelectorAll('*').forEach(function(n){Array.from(n.attributes).forEach(function(a){if(/^on/i.test(a.name)||a.name==='srcdoc'||/^(src|href|xlink:href)$/i.test(a.name)&&/^\s*(javascript:|data:(?!image\/))/i.test(a.value))n.removeAttribute(a.name);});});return t.innerHTML;}
  function mathText(s){var text=String(s||''),out='',last=0; text.replace(/<math\b[\s\S]*?<\/math>/gi,function(m,pos){out+=esc(text.slice(last,pos))+rich(m);last=pos+m.length;return m;});return out+esc(text.slice(last));}
  function proposedHTML(r){var u=r.usulan;var opts=u.options.map(function(o,i){return typeof o==='string'?'<li><b>'+String.fromCharCode(65+i)+'.</b> '+rich(o)+'</li>':'<li>'+rich(o.q)+' → '+rich(o.a)+'</li>';}).join('');return '<div class="sip-ai-review"><p class="sip-soal-note">USULAN — belum mengubah soal asli atau Bank Soal. Periksa kebenaran solusi, gambar, dan tuntutan berpikir.</p><h4>Soal yang diusulkan</h4><div id="sip-ai-usulan">'+rich(u.content)+'</div>'+(r.image?'<p>Gambar utama tetap dari draf:</p><img alt="Gambar utama draf" style="max-width:100%;max-height:280px;object-fit:contain" src="'+esc(r.image)+'">':'')+(opts?'<ol>'+opts+'</ol>':'')+'<h4>Kunci / pedoman baru (khusus Admin)</h4><div class="sip-ai-key">'+rich(typeof u.correct==='string'?u.correct:JSON.stringify(u.correct))+'</div><h4>Alasan kognitif</h4><p>'+esc(u.targetC)+' → penilaian usulan '+esc(u.levelC)+': '+rich(u.alasan)+'</p><h4>Pembahasan kunci</h4><p>'+rich(u.pembahasan)+'</p><label class="sip-ai-check"><input type="checkbox" id="sip-ai-check"> Saya telah memeriksa soal, opsi/pasangan, gambar, kunci baru dan kecocokan level. Terapkan hanya ke draf editor; belum simpan/rilis.</label></div>';}
@@ -24790,19 +24792,19 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
  function renderHasil(){
   var box=hasilBox(),h=S.hasil;if(!box)return;if(!h){box.hidden=true;box.innerHTML='';return;}
   box.hidden=false;
-  if(!h.lolos){box.className='sip-ai-hasil sip-ai-hasil-gagal';box.innerHTML='<b>Usulan belum sesuai target '+esc(h.draft.targetC)+'</b><p>Setelah '+h.riwayat.length+' percobaan otomatis, level usulan belum terverifikasi. Draf tidak diubah. Ubah konteks/materi draf atau revisi manual, lalu minta usulan lagi.</p>'+riwayatHTML(h.riwayat)+diagHTML(h)+'<button type="button" id="sip-soal-ai-terapkan" disabled title="Aktif hanya bila level terverifikasi sesuai target">Terapkan</button>';return;}
+  if(!h.lolos){box.className='sip-ai-hasil sip-ai-hasil-gagal';box.innerHTML='<b>Usulan belum lolos pemeriksaan target '+esc(h.draft.targetC)+'</b><p>Setelah '+h.riwayat.length+' percobaan otomatis, usulan belum lolos pemeriksaan level, isi atau struktur. Draf tidak diubah. Ubah konteks/materi draf atau revisi manual, lalu minta usulan lagi.</p>'+riwayatHTML(h.riwayat)+diagHTML(h)+'<button type="button" id="sip-soal-ai-terapkan" disabled title="Aktif hanya bila level terverifikasi sesuai target">Terapkan</button>';return;}
   var berubah=!h.diterapkan&&!same(h.ctx);
   box.className='sip-ai-hasil '+(h.diterapkan?'sip-ai-hasil-selesai':berubah?'sip-ai-hasil-gagal':'sip-ai-hasil-ok');
   box.innerHTML='<b>'+(h.diterapkan?'Usulan sudah diterapkan ke draf':'Usulan '+esc(h.draft.targetC)+' terverifikasi — siap diterapkan')+'</b><p>Pembuat: '+esc(h.r.usulan.levelC)+' · Pemeriksa independen: '+esc(h.ver.levelC)+' · '+h.riwayat.length+' percobaan. '+(h.diterapkan?'Periksa lalu tekan Simpan Pertanyaan.':berubah?'Draf berubah sejak usulan dibuat; minta usulan baru agar tidak menimpa suntingan Anda.':'Terapkan hanya mengisi draf editor; Bank Soal belum berubah sampai Anda menekan Simpan.')+'</p>'+diagHTML(h)+'<button type="button" id="sip-soal-ai-terapkan"'+(h.diterapkan||berubah?' disabled':'')+'>Terapkan</button>';
  }
- function clearHasil(){var had=!!S.hasil;S.hasil=null;renderHasil();var st=el('sip-soal-ai-status');if(had&&st)st.textContent='';}
+ function clearHasil(){S.hasil=null;renderHasil();var st=el('sip-soal-ai-status');if(st)st.textContent='';}
  async function review(h){
   var r=h.r,draft=h.draft,ctx=h.ctx,st=el('sip-soal-ai-status');
   if(!h.lolos||h.diterapkan)return false;
   if(!same(ctx)){renderHasil();await message('Draf berubah','Draf/akun/ujian berubah sejak usulan dibuat. Usulan tidak diterapkan; minta usulan baru.');return false;}
   var approvalVerified=false,mathReviewPromise=null;
   function checkMath(){var root=document.querySelector('.sip-ai-review');if(!root||!window.SIPINTAR_MATEMATIKA)return Promise.resolve({ok:false,errors:['Pratinjau matematika belum tersedia. Muat versi aplikasi terbaru.']});return SIPINTAR_MATEMATIKA.check(root);}
-  var accept=await Swal.fire({title:'Periksa usulan menuju '+draft.targetC,html:diagHTML(h)+verHTML(h)+proposedHTML(r),width:900,showCancelButton:true,confirmButtonText:'Terapkan ke draf',cancelButtonText:'Nanti / pertahankan draf asli',didOpen:function(){mathReviewPromise=checkMath();},preConfirm:async function(){
+  var accept=await Swal.fire({title:'Periksa usulan menuju '+draft.targetC,html:diagHTML(h)+verHTML(h)+'<details class="sip-ai-asli"><summary>Bandingkan dengan draf sebelum perubahan</summary><div class="sip-ai-original-content">'+rich(draft.content)+'</div></details>'+proposedHTML(r),width:900,showCancelButton:true,confirmButtonText:'Terapkan ke draf',cancelButtonText:'Nanti / pertahankan draf asli',didOpen:function(){if(window.SIPINTAR_MATEMATIKA)SIPINTAR_MATEMATIKA.render(document.querySelector('.sip-ai-asli'));mathReviewPromise=checkMath();},preConfirm:async function(){
    approvalVerified=false;
    if(!h.lolos||!h.ver||!h.ver.cocok||h.ver.levelC!==draft.targetC||r.usulan.levelC!==draft.targetC){Swal.showValidationMessage('Level belum terverifikasi sesuai target; tidak dapat diterapkan.');return false;}
    if(!same(ctx)){Swal.showValidationMessage('Draf/akun telah berubah; usulan tidak diterapkan.');return false;}
@@ -24813,17 +24815,25 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
   }});
   if(!accept.isConfirmed||!same(ctx)){renderHasil();if(st&&st.isConnected&&!h.diterapkan)st.textContent=same(ctx)?'Usulan terverifikasi disimpan sementara di bawah. Tekan Terapkan bila sudah siap; draf belum diubah.':'Draf berubah; usulan tidak diterapkan.';return false;}
   if(!approvalVerified)throw new Error('Dialog belum memverifikasi persetujuan dan pratinjau rumus. Draf asli tidak diubah.');
-  var u=r.usulan,newKey=typeof u.correct==='string'?u.correct:JSON.stringify(u.correct),q={id:draft.questionId,examId:draft.examId,type:draft.type,content:u.content,image:draft.image,options:JSON.stringify(u.options),key:newKey,point:draft.point,isRequired:draft.isRequired,materi:draft.materi,babId:draft.babId,bab:draft.bab,targetKognitif:draft.targetC,sourceHash:draft.sourceHash};
-  native.edit(q);setMeta(q,draft.sourceHash);document.dispatchEvent(new Event('sip-soal-ai-applied'));if(!draft.questionId){el('input-question-id').value='';var save=ctx.form.querySelector('button[type="submit"]');if(save)save.innerHTML='<i class="fas fa-save"></i> Simpan Pertanyaan';}
+  var u=r.usulan,newKey=typeof u.correct==='string'?u.correct:JSON.stringify(u.correct),q={id:draft.questionId,examId:draft.examId,type:draft.type,content:u.content,image:draft.image,options:JSON.stringify(u.options),key:newKey,point:draft.point,isRequired:draft.isRequired,materi:draft.materi,babId:draft.babId,bab:draft.bab,targetKognitif:draft.targetC,sourceHash:draft.sourceHash,_sipPosisiDraf:draft.imagePosition};
+  native.edit(q);setMeta(q,draft.sourceHash);
+  /* Pensil Magic tidak mengubah bobot per baris atau pengaturan gambar. */
+  var baris=Array.from(document.querySelectorAll(draft.type==='BS'?'#bs-container .bs-row':draft.type==='JODOH'?'#pairs-container .pair-row':'#sip-tidak-ada')).filter(function(row){var n=row.querySelector(draft.type==='BS'?'.bs-text':'.pair-left');return n&&n.value.trim();});
+  baris.forEach(function(row,i){var n=row.querySelector('.sip-poin-bs,.sip-poin-pair');if(n&&draft.rowPoints[i]!=null){n.value=draft.rowPoints[i];n.dispatchEvent(new Event('input',{bubbles:true}));}});
+  if(el('input-image-size'))el('input-image-size').value=draft.imageSize;if(el('input-image-pos'))el('input-image-pos').value=draft.imagePosition;
+  document.dispatchEvent(new Event('sip-soal-ai-applied'));if(!draft.questionId){el('input-question-id').value='';var save=ctx.form.querySelector('button[type="submit"]');if(save)save.innerHTML='<i class="fas fa-save"></i> Simpan Pertanyaan';}
   h.diterapkan=true;renderHasil();
   if(st)st.textContent='Usulan '+draft.targetC+' terverifikasi diterapkan hanya ke draf. Periksa sekali lagi dan tekan Simpan Pertanyaan bila sudah benar. Analisis/persetujuan kisi-kisi tetap wajib setelah disimpan.';
   return true;
  }
  async function requestAI(){
-  if(!admin()||S.busy||S.inflight)return;mount();if(!validTopic())return message('Lengkapi materi/bab','Pilih topik pembelajaran terlebih dahulu.');if(!val('sip-soal-target'))return message('Pilih target kognitif','Tentukan target Admin C1–C6 sebelum meminta perbaikan AI.');
+  if(!bolehAI()||S.busy||S.inflight||S.asking)return;mount();if(!validTopic())return message('Lengkapi materi/bab','Pilih topik pembelajaran terlebih dahulu.');
   var draft=snapshot(),ctx={uid:currentUser.userID,token:currentUser.token,form:document.querySelector('#form-add-q form'),fingerprint:JSON.stringify(draft)},seq=++S.seq;
-  var consent=await Swal.fire({icon:'question',title:'Minta usulan perbaikan soal?',text:'Teks, opsi tanpa kunci lama/pemetaan pasangan, topik, target, dan gambar yang dapat dibaca akan dikirim ke AI yang dikonfigurasi. AI menyusun kunci BARU untuk Anda periksa. Usulan lalu diperiksa oleh pemeriksa AI independen yang tidak diberi target; bila level belum '+draft.targetC+', usulan dibuat ulang otomatis maksimal 2 kali (paling banyak '+(MAKS_PERCOBAAN*2)+' panggilan AI/kuota). Tombol Terapkan hanya aktif bila level terverifikasi. Tidak ada penyimpanan atau rilis otomatis.',showCancelButton:true,confirmButtonText:'Setuju, buat usulan',cancelButtonText:'Batal'});
-  if(!consent.isConfirmed||!same(ctx))return;
+  S.asking=true;var consent,consentVerified=false;
+  try{consent=await Swal.fire({icon:'question',title:'Pensil Magic · Minta usulan perbaikan soal?',html:'<div class="sip-magic-consent"><p>Sesuaikan tuntutan berpikir <b>satu soal</b>; materi/bab dan bentuk soal tetap.</p><label for="sip-magic-target">Level kognitif yang diinginkan Admin</label><select id="sip-magic-target" class="swal2-select"><option value="">— Pilih C1–C6 —</option>'+Object.keys(T.levelC).map(function(c){return '<option value="'+c+'"'+(draft.targetC===c?' selected':'')+'>'+c+' · '+esc(T.levelC[c])+' / '+esc(T.petaCL[c])+'</option>';}).join('')+'</select><p>Teks, opsi tanpa kunci lama/pemetaan pasangan, topik, target, dan gambar yang dapat dibaca akan dikirim ke AI yang dikonfigurasi. AI menyusun kunci BARU untuk Anda periksa. Usulan diperiksa oleh pemeriksa AI independen yang tidak diberi target; bila belum lolos, usulan dibuat ulang otomatis maksimal 2 kali (paling banyak '+(MAKS_PERCOBAAN*2)+' panggilan AI/kuota).</p><p><b>Periksa → Terapkan ke draf → Simpan manual.</b> Tidak ada penyimpanan atau rilis otomatis. Batal tidak mengirim permintaan ke AI.</p></div>',showCancelButton:true,confirmButtonText:'Setuju, buat usulan',cancelButtonText:'Batal',preConfirm:function(){var c=(el('sip-magic-target')||{}).value;if(!T.levelC[c]){Swal.showValidationMessage('Pilih level kognitif C1–C6 terlebih dahulu.');return false;}if(!same(ctx)){Swal.showValidationMessage('Draf/akun/ujian berubah. Tutup dialog lalu buka Pensil Magic lagi.');return false;}consentVerified=true;return c;}});}finally{S.asking=false;}
+  if(!consent||!consent.isConfirmed||!same(ctx))return;
+  var pilihan=consent.value;if(!consentVerified||!T.levelC[pilihan])return message('Usulan belum diterapkan','Dialog belum memverifikasi pemilihan level dan persetujuan pengiriman. Draf asli tidak diubah.');
+  el('sip-soal-target').value=pilihan;draft.targetC=pilihan;ctx.fingerprint=JSON.stringify(snapshot());remember();
   clearHasil();S.busy=true;S.inflight=true;S.ctx=ctx;el('sip-soal-ai-batal').hidden=false;var b=el('sip-soal-ai');if(b)b.disabled=true;var st=el('sip-soal-ai-status');
   function status(t){if(st&&st.isConnected)st.textContent=t;}
   function masihSama(){if(seq!==S.seq||!same(ctx))throw new Error('Draf/akun/ujian berubah saat AI bekerja. Usulan tidak diterapkan; perubahan Anda tetap utuh.');}
@@ -24844,19 +24854,21 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     status('Percobaan '+n+' dari '+MAKS_PERCOBAAN+': pemeriksa AI independen menilai level usulan (tanpa diberi target)...');
     var u=r.usulan;
     ver=await api('verifikasiLevelKognitifAI',[{examId:draft.examId,type:draft.type,content:u.content,options:u.options,correct:u.correct,image:draft.image,materi:draft.materi,babId:draft.babId,bab:draft.bab,targetC:draft.targetC,setujuKirim:true}]);masihSama();
-    lolos=!!(ver&&ver.cocok&&ver.levelC===draft.targetC);
+    var struktur=r.usulan.options.length===draft.options.length&&(draft.type!=='JODOH'||r.usulan.options.filter(function(o){return o.q;}).length===draft.options.filter(function(o){return o.q;}).length);
+    if(!struktur){ver=Object.assign({},ver,{cocok:false,masalah:((ver.masalah||'')+' Pertahankan jumlah opsi/pernyataan/pasangan dan pengacoh asli agar struktur serta poin tidak berubah.').trim()});}
+    lolos=!!(ver&&ver.cocok&&ver.levelC===draft.targetC&&!String(ver.masalah||'').trim()&&struktur);
     riwayat.push({n:n,pembuat:u.levelC,pemeriksa:ver.levelC,lolos:lolos});
-    if(!lolos)umpan='Percobaan '+n+': penilai independen menilai usulan '+ver.levelC+', belum '+draft.targetC+'. Alasan: '+ver.alasan+(ver.masalah?' Masalah: '+ver.masalah:'');
+    if(!lolos)umpan='Percobaan '+n+': '+(ver.levelC===draft.targetC?'level sesuai '+draft.targetC+', tetapi pemeriksaan isi/struktur belum lolos.':'penilai independen menilai usulan '+ver.levelC+', belum '+draft.targetC+'.')+' Alasan: '+ver.alasan+(ver.masalah?' Masalah: '+ver.masalah:'');
    }
    var h={r:r,ver:ver,lolos:lolos,riwayat:riwayat,draft:draft,ctx:ctx,diterapkan:false,diagnosa:diagnosa};S.hasil=h;renderHasil();
-   if(!lolos){var last=riwayat[riwayat.length-1]||{};status('Level belum terverifikasi setelah '+riwayat.length+' percobaan. Terapkan tidak aktif; draf tetap utuh.');return message('Target belum tercapai','Setelah '+riwayat.length+' percobaan otomatis, usulan masih dinilai '+(last.pemeriksa||last.pembuat||'-')+(last.pemeriksa?' oleh pemeriksa independen':' oleh AI pembuat')+', belum '+draft.targetC+'. Tombol Terapkan tidak diaktifkan dan draf tidak diubah. '+umpan+(diagnosa?' '+pesanDiagnosa(diagnosa):''));}
+   if(!lolos){var last=riwayat[riwayat.length-1]||{};status('Usulan belum lolos pemeriksaan setelah '+riwayat.length+' percobaan. Terapkan tidak aktif; draf tetap utuh.');return message('Target belum tercapai','Setelah '+riwayat.length+' percobaan otomatis, '+((last.pemeriksa||last.pembuat)===draft.targetC?'level dilaporkan sesuai '+draft.targetC+', tetapi ada masalah isi/kunci atau struktur yang belum diselesaikan.':'usulan masih dinilai '+(last.pemeriksa||last.pembuat||'-')+(last.pemeriksa?' oleh pemeriksa independen':' oleh AI pembuat')+', belum '+draft.targetC+'.')+' Tombol Terapkan tidak diaktifkan dan draf tidak diubah. '+umpan+(diagnosa?' '+pesanDiagnosa(diagnosa):''));}
    status('Usulan '+draft.targetC+' terverifikasi pemeriksa independen. Periksa lalu tekan Terapkan.');
    await review(h);
-  }catch(e){if(!ctx.cancelled&&admin()&&currentUser.userID===ctx.uid&&currentUser.token===ctx.token){if(st&&st.isConnected)st.textContent=e.message;await message('Usulan belum diterapkan',e.message);}}
+  }catch(e){if(!ctx.cancelled&&bolehAI()&&currentUser.userID===ctx.uid&&currentUser.token===ctx.token){if(st&&st.isConnected)st.textContent=e.message;await message('Usulan belum diterapkan',e.message);}}
   finally{S.busy=false;S.inflight=false;S.ctx=null;var cancel=el('sip-soal-ai-batal');if(cancel)cancel.hidden=true;if(b&&b.isConnected)b.disabled=false;}
  }
  async function terapkanTersimpan(){
-  if(!admin()||S.busy||!S.hasil)return;var h=S.hasil;S.busy=true;
+  if(!bolehAI()||S.busy||!S.hasil)return;var h=S.hasil;S.busy=true;
   try{await review(h);}catch(e){await message('Usulan belum diterapkan',e.message);}finally{S.busy=false;renderHasil();}
  }
  window.sipSoalTerapkanUsulan_=terapkanTersimpan;
@@ -24871,9 +24883,9 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
  var hasilTimer=0;function cekHasil(){if(!S.hasil||S.hasil.diterapkan||!S.hasil.lolos||S.busy)return;clearTimeout(hasilTimer);hasilTimer=setTimeout(renderHasil,250);}document.addEventListener('input',cekHasil,true);document.addEventListener('change',cekHasil,true);
  document.addEventListener('click',function(e){if(e.target.closest('#sip-soal-ai'))requestAI();if(e.target.closest('#sip-soal-ai-terapkan'))terapkanTersimpan();if(e.target.closest('#sip-soal-ai-batal')&&S.ctx){S.ctx.cancelled=true;S.seq++;S.busy=false;el('sip-soal-ai-batal').hidden=true;el('sip-soal-ai-status').textContent='Menunggu dibatalkan. Tidak ada usulan diterapkan. Panggilan provider mungkin tetap memakai kuota sampai selesai; permintaan AI baru menunggu panggilan itu berakhir. Anda boleh menyimpan draf sendiri.';}});
  var css=document.createElement('style');css.id='sip-soal-materi-css';css.textContent='.sip-ai-hasil{margin-top:10px;border:1px solid #cbd5e1;border-radius:12px;padding:12px 14px;font-size:12px;line-height:1.6;color:#334155;background:#fff}.sip-ai-hasil p{margin:4px 0 8px}.sip-ai-hasil-ok{border-color:#86efac;background:#f0fdf4}.sip-ai-hasil-gagal{border-color:#fca5a5;background:#fef2f2}.sip-ai-hasil-selesai{border-color:#a5b4fc;background:#eef2ff}.sip-ai-hasil button{border:0;border-radius:9px;padding:9px 18px;font-weight:800;background:#059669;color:#fff;cursor:pointer}.sip-ai-hasil button:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed}.sip-ai-riwayat{margin:6px 0 8px 18px;list-style:decimal;font-size:11.5px}.sip-ai-verif{text-align:left;border:1px solid #86efac;background:#f0fdf4;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:13px;color:#14532d}.sip-ai-masalah{color:#92400e}.sip-ai-peringatan{text-align:left;border:1px solid #fcd34d;background:#fffbeb;color:#78350f;border-radius:10px;padding:9px 12px;margin:6px 0 10px;font-size:12px;line-height:1.6}.sip-soal-meta{border:1px solid #c7d2fe;background:#f8faff;border-radius:14px;padding:18px;margin:4px 0 22px;min-width:0}.sip-soal-meta legend{font-weight:800;color:#273b62;padding:0 7px;font-size:15px}.sip-soal-meta p{font-size:12px;color:#526480;line-height:1.7;margin-bottom:12px}.sip-soal-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.sip-soal-grid label{font-size:12px;font-weight:700;color:#334766}.sip-soal-grid input,.sip-soal-grid select{display:block;width:100%;min-width:0;border:1px solid #cbd5e1;border-radius:9px;padding:10px;margin:6px 0 12px;background:#fff;font-size:13px;color:#172033}.sip-soal-grid b{color:#b91c1c}.sip-soal-ai-row{align-items:end}.sip-soal-ai-row button{border:1px solid #6366f1;background:#eef2ff;border-radius:10px;padding:12px;color:#3730a3;font-weight:700;font-size:12px;margin-bottom:12px}.sip-soal-ai-row button:disabled{opacity:.5}.sip-soal-note{font-size:12px;line-height:1.7;color:#526480;background:#eff4fb;padding:12px;border-radius:10px}.sip-ai-review{text-align:left;font-size:14px;line-height:1.7;overflow-wrap:anywhere}.sip-ai-review h4{font-weight:800;margin:16px 0 7px}.sip-ai-review ol{padding-left:22px}.sip-ai-review pre{white-space:pre-wrap;background:#f1f5f9;padding:12px;border-radius:9px}.sip-ai-check{display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;color:#166534;padding:14px;margin-top:18px;font-size:13px;border-radius:10px}.sip-ai-check input{flex-shrink:0;margin-top:5px}@media(max-width:650px){.sip-soal-grid{grid-template-columns:1fr}.sip-soal-meta{padding:13px}}';document.head.appendChild(css);
- function start(){mount();if(window.MutationObserver){new MutationObserver(function(){if(admin()&&document.querySelector('#form-add-q form')&&!el('sip-soal-metadata'))mount();}).observe(document.body,{childList:true,subtree:true});var page=el('page-admin');if(page)new MutationObserver(function(){if(!admin()){S.seq++;if(S.ctx)S.ctx.cancelled=true;if(el('sip-ai-check'))Swal.close();}}).observe(page,{attributes:true,attributeFilter:['class']});}}
+ function start(){mount();if(window.MutationObserver){new MutationObserver(function(){if(admin()&&document.querySelector('#form-add-q form')&&!el('sip-soal-metadata'))mount();}).observe(document.body,{childList:true,subtree:true});var page=el('page-admin');if(page)new MutationObserver(function(){if(!admin()){S.seq++;if(S.ctx)S.ctx.cancelled=true;if(el('sip-ai-check')||el('sip-magic-target'))Swal.close();}}).observe(page,{attributes:true,attributeFilter:['class']});}}
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
- window.SIPINTAR_BANK_MATERI_VERSI='3.1.1';
+ window.SIPINTAR_BANK_MATERI_VERSI='3.2.0';
 })();
 
   </script>
@@ -26923,7 +26935,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
   var PERAN = /^dewan\s*penggalang$/i;
   var POLL_MS = 8000;
   var adm = { data: null, tab: 'ruang', examId: '', ruang: [], tim: [], ubah: false, cari: '' };
-  var ptg = { tunda: null, terakhir: null, hubAsli: null, res: null, view: '', examId: '', ruangId: '', mon: null, filter: 'semua', cari: '', timer: null, sibuk: false, peranAsli: '', peranObj: null, acAsli: null };
+  var ptg = { tunda: null, terakhir: null, hubAsli: null, res: null, view: '', examId: '', ruangId: '', mon: null, filter: 'semua', cari: '', timer: null, profilTimer: null, giliran: 0, sibuk: false, peranAsli: '', peranObj: null, acAsli: null };
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -26932,6 +26944,9 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     });
   }
   function aku() { return window.currentUser || null; }
+  function bekalSesi() { var u=aku()||{};return {uid:u.userID,token:u.token}; }
+  function sesiMasih(s) { var u=aku();return !!(s&&u&&u.userID===s.uid&&u.token===s.token&&PERAN.test(String(u._sipPeranTampilan?ptg.peranAsli:u.role||''))); }
+  function batalProfilTertunda() { if(ptg.profilTimer){clearTimeout(ptg.profilTimer);ptg.profilTimer=null;} }
   function run(nama, args) {
     return new Promise(function (ok, gagal) {
       try {
@@ -27489,6 +27504,8 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
   }
 
   function bukaPanel(res, hubAsli) {
+    var sesi=bekalSesi();if(!sesiMasih(sesi)||!res||String(res.userID)!==String(sesi.uid))return;
+    batalProfilTertunda();
     ptg.res = res; ptg.hubAsli = hubAsli; ptg.terakhir = res; ptg.tunda = null;
     var p = panel(), u = aku() || {};
     var adaMon = (res.pengawas || []).length > 0, adaTim = (res.tim || []).length > 0;
@@ -27505,6 +27522,8 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
       '<main class="sip-ptg-main"><div class="sip-ptg-atas"><button type="button" class="sip-ptg-menu" aria-label="Menu"><i class="fas fa-bars"></i></button>' +
         '<h1 id="sip-ptg-judul">Panel Petugas</h1></div><div id="sip-ptg-konten"></div></main>';
     p.hidden = false;
+    /* Panel adalah halaman aktif; form login tidak dibiarkan terbuka di bawahnya. */
+    if($('page-login'))$('page-login').classList.add('hidden');
     try { document.body.style.overflow = 'hidden'; document.body.classList.add('sip-ptg-panel-buka'); } catch (e) {}
     p.querySelector('.sip-ptg-menu').addEventListener('click', function () { p.classList.toggle('buka-menu'); });
     if (!window.__sipPtgPeranJaga) {
@@ -27525,7 +27544,8 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
         tampil(v);
       });
     });
-    tampil(adaMon ? 'monitor' : 'bank');
+    var pulih=window._sipPtgPulihHalaman;window._sipPtgPulihHalaman=null;
+    tampil(pulih&&String(pulih.uid)===String(res.userID)?pulih.view:(adaMon?'monitor':'bank'));
   }
   function tutupPanel() {
     berhentiPoll(); lepasEditor(); pulihkanPeran();
@@ -27551,6 +27571,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     var judul = $('sip-ptg-judul');
     if (v === 'monitor') { judul.textContent = 'Monitor Ujian'; gambarMonitorKerangka(); }
     else if (v === 'bank') { judul.textContent = 'Bank Soal — Tim Pembuat Soal'; gambarBank(); }
+    if(typeof window.sipSesiHalamanCatat_==='function')window.sipSesiHalamanCatat_('petugas',v);
   }
   var VIEW_TIM = ['bank'];
   /* Editor TinyMCE Bank Soal di panel dilepas sebelum konten panel diganti, agar
@@ -27734,6 +27755,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     if (typeof asli !== 'function' || asli.__sipPetugas) return;
     var fn = function () {
       var u = aku(), self = this, args = arguments;
+      var sesi=bekalSesi(),giliran=++ptg.giliran;
       var hubAsli = function (tab) { return asli.call(self, tab); };
       if (window._sipPtgLewati || !u || !u.userID || !PERAN.test(String(u._sipPeranTampilan ? ptg.peranAsli : u.role || ''))) {
         if (!window._sipPtgLewati) { ptg.tunda = null; ptg.terakhir = null; }
@@ -27743,6 +27765,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
       }
       memuat(true);
       run('getPetugasSaya', [u.userID, u.token]).then(function (res) {
+        if(giliran!==ptg.giliran||!sesiMasih(sesi))return;
         memuat(false);
         if (res && res.success && res.petugas) {
           ptg.terakhir = res; ptg.hubAsli = hubAsli;
@@ -27756,7 +27779,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
           }
           bukaPanel(res, hubAsli);
         } else { ptg.tunda = null; ptg.terakhir = null; asli.apply(self, args); pasangTombolPanel(); }
-      }, function () { memuat(false); asli.apply(self, args); pasangTombolPanel(); });
+      }, function () { if(giliran!==ptg.giliran||!sesiMasih(sesi))return;memuat(false); asli.apply(self, args); pasangTombolPanel(); });
     };
     fn.__sipPetugas = true;
     window.showStudentHub = fn;
@@ -27789,12 +27812,13 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
       if (typeof window.showSiswaTab === 'function') window.showSiswaTab('profil');
       return;
     }
-    memuat(true);
+    var sesi=bekalSesi();memuat(true);
     run('getPetugasSaya', kred()).then(function (res) {
+      if(!sesiMasih(sesi))return;
       memuat(false);
       if (res && res.success && res.petugas) { ptg.terakhir = res; bukaPanel(res, ptg.hubAsli); }
       else { ptg.terakhir = null; pasangTombolPanel(); pesan('info', 'Tidak ada tugas', (res && res.message) || 'Anda tidak sedang ditugaskan sebagai petugas ujian.'); }
-    }, function (e) { memuat(false); pesan('error', 'Gagal', e.message); });
+    }, function (e) { if(!sesiMasih(sesi))return;memuat(false); pesan('error', 'Gagal', e.message); });
   }
   /* Dipanggil Mode Pramuka (web/cdp-pramuka.js) setiap gerbang profil menyatakan lengkap. */
   window.sipPtgSetelahProfil_ = function () {
@@ -27803,11 +27827,19 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     ptg.tunda = null;
     if (!u || String(res.userID) !== String(u.userID)) return;
     res.profilLengkap = true;
-    setTimeout(function () {
+    batalProfilTertunda();var sesi=bekalSesi();
+    ptg.profilTimer=setTimeout(function () {
+      ptg.profilTimer=null;
+      if(!sesiMasih(sesi))return;
       var pn = $('sip-ptg-panel');
       if (pn && !pn.hidden) return;
-      bukaPanel(res, ptg.hubAsli);
-    }, 1700);
+      /* Ambil ulang tugas: Admin mungkin mencabut tugas saat profil diisi. */
+      run('getPetugasSaya',[sesi.uid,sesi.token]).then(function(baru){
+        if(!sesiMasih(sesi))return;
+        if(baru&&baru.success&&baru.petugas&&baru.profilLengkap!==false){ptg.terakhir=baru;bukaPanel(baru,ptg.hubAsli);}
+        else{ptg.terakhir=null;pasangTombolPanel();}
+      },function(){/* Profil tetap tersimpan; pengguna boleh membuka Panel lagi dari beranda. */});
+    },1700);
   };
   function kaitAdmin() {
     var asli = window.initAdminPanel;
@@ -27828,6 +27860,15 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     pasangMenuAdmin();
     kaitHub();
     kaitAdmin();
+    /* Logout lama mengganti kelas halaman secara langsung. Bersihkan panel dan
+       semua callback tertunda SESUDAH sesi benar-benar diakhiri, bukan saat
+       dialog Keluar baru dibuka (Batal keluar harus tetap aman). */
+    var login=$('page-login');
+    if(login&&typeof MutationObserver==='function')new MutationObserver(function(){
+      if(login.classList.contains('hidden')||aku())return;
+      ptg.giliran++;batalProfilTertunda();ptg.tunda=null;ptg.terakhir=null;ptg.res=null;
+      window._sipPtgPulihHalaman=null;tutupPanel();memuat(false);pasangTombolPanel();
+    }).observe(login,{attributes:true,attributeFilter:['class']});
   }
   window.SIPINTAR_PETUGAS_VERSI = VERSI;
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mulai);
@@ -27905,7 +27946,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
   /* ============================================================ MODE PRAMUKA */
   var TAB_PRAMUKA = ['dash', 'profil', 'ujian', 'nilai'];
   var LARANG = ['materi', 'tugas', 'jurnal', 'kisi', 'game'];
-  var prm = { asliTab: null, asliGerbang: null, asliForm: null, paksaUid: '' };
+  var prm = { asliTab: null, asliGerbang: null, asliForm: null, paksaUid: '', tundaTab: null };
   /** '' bila bukan akun Pramuka; 'CDP' atau 'Dewan Penggalang'. */
   function peranPramuka(u) {
     u = u || window.currentUser;
@@ -27979,10 +28020,15 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
       var ft = function (t) {
         if (!terapkanPramuka()) return prm.asliTab.apply(this, arguments);
         t = String(t || 'dash');
+        if (t === 'dash' || t === 'profil' || profilDiketahui()) prm.tundaTab = null;
         if (t !== 'profil') {
           if (profilDiketahui() && !profilSiap()) { pesanProfil(); t = 'profil'; }
           else if (TAB_PRAMUKA.indexOf(t) < 0) t = profilDiketahui() ? 'dash' : 'profil';
-          else if (!profilDiketahui() && t !== 'dash') t = 'dash';
+          else if (!profilDiketahui() && t !== 'dash') {
+            /* Login ulang Ujian memuat profil secara asinkron. Simpan niat tab,
+               bukan melewati profil/gerbang login ulang yang sudah ada. */
+            var u=window.currentUser||{};prm.tundaTab={uid:String(u.userID||''),token:u.token,tab:t,izinUjian:t==='ujian'&&window._siswaExamGateOk===true};t='dash';
+          }
         }
         return prm.asliTab.call(this, t);
       };
@@ -27996,13 +28042,24 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
         var ok = prm.asliGerbang.apply(this, arguments);
         if (!terapkanPramuka() || !profilDiketahui()) return ok;
         if (!profilSiap()) {
+          prm.tundaTab=null;
           var uid = String((window.currentUser || {}).userID || '');
           if (tabAktif() !== 'profil' && prm.asliTab) {
             if (prm.paksaUid !== uid) { prm.paksaUid = uid; pesanProfil(); }
             prm.asliTab.call(window, 'profil');
           }
-        } else if (typeof window.sipPtgSetelahProfil_ === 'function') {
-          try { window.sipPtgSetelahProfil_(); } catch (e) {}
+        } else {
+          var tunggu=prm.tundaTab,u=window.currentUser||{};prm.tundaTab=null;
+          if(tunggu&&tunggu.uid===String(u.userID||'')&&tunggu.token===u.token&&tabAktif()==='dash') {
+            /* Dashboard sementara menghapus flag login ulang pada kode asli.
+               Pulihkan HANYA izin yang sudah sah saat permintaan awal, terikat
+               UserID/token yang sama dan profil lengkap; bukan membuat izin baru. */
+            if(tunggu.tab==='ujian'&&tunggu.izinUjian===true)window._siswaExamGateOk=true;
+            window.showSiswaTab(tunggu.tab);
+          }
+          if (typeof window.sipPtgSetelahProfil_ === 'function') {
+            try { window.sipPtgSetelahProfil_(); } catch (e) {}
+          }
         }
         return ok;
       };
@@ -28024,7 +28081,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
       var fh = function () {
         var u = window.currentUser, s = window.__sipPramuka;
         if (s && (!u || String(u.userID) !== s.uid)) window.__sipPramuka = null;
-        prm.paksaUid = '';
+        prm.paksaUid = '';prm.tundaTab=null;
         terapkanPramuka();
         return hub.apply(this, arguments);
       };
@@ -28716,7 +28773,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     if (!s || !s.userID || !s.token || !h || String(h.uid) !== String(s.userID)) return null;
     if (h.area === 'ujian') return null;
     if (isAdmin(s.role)) return h.area === 'admin' ? { s: s, h: h } : null;
-    return h.area === 'siswa' ? { s: s, h: h } : null;
+    return h.area === 'siswa' || (h.area === 'petugas' && /^dewan\s*penggalang$/i.test(String(s.role||''))) ? { s: s, h: h } : null;
   }
   window.sipSesiHalamanRencana_ = rencana;
 
@@ -28791,7 +28848,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
            sini sehingga refresh berikutnya kembali ke login. */
         var kini = aku(), ss = sesi();
         if (kini && kini.userID && kini.token && ss && String(ss.userID) === String(kini.userID) &&
-            ['page-admin', 'page-siswa-hub'].concat(HALAMAN_UJIAN).some(function (id) { var n = el(id); return n && !n.classList.contains('hidden'); })) { st.sudah = true; return; }
+            (['page-admin', 'page-siswa-hub'].concat(HALAMAN_UJIAN).some(function (id) { var n = el(id); return n && !n.classList.contains('hidden'); }) || (el('sip-ptg-panel')&&!el('sip-ptg-panel').hidden))) { st.sudah = true; return; }
         var rc = rencana();
         if (st.tutupAwal) { st.tutupAwal = false; var g0 = el('global-loading'); if (g0 && (!rc || isAdmin(rc.s.role))) g0.classList.add('hidden'); }
         if (!rc) { lupakanJikaBeda(); return cek.apply(this, arguments); }
@@ -28825,11 +28882,13 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
         window.currentUser = res;
         window._pendingExamData = null;
         window._siswaExamGateOk = false;
-        var t = String(rc.h.tab || 'dash');
+        if(rc.h.area==='petugas')window._sipPtgPulihHalaman={uid:String(res.userID),view:rc.h.tab};
+        var t = rc.h.area==='petugas'?'dash':String(rc.h.tab || 'dash');
         if (t === 'ujian' || !el('siswa-tab-' + t)) t = 'dash';
         /* Tab Pembelajaran digerbang profil: profil dimuat ulang setelah hub tampil,
            jadi buka Dashboard dulu lalu pindah ke tab terakhir setelah profil terbaca. */
-        var gerbang = TAB_PROFIL.indexOf(t) >= 0 && typeof window.sipSiswaProfilSiap_ === 'function';
+        var pramuka=/^cdp$/i.test(String(res.peranAsli||res.role||''))||/^dewan\s*penggalang$/i.test(String(res.role||''));
+        var gerbang = (TAB_PROFIL.indexOf(t) >= 0 || (pramuka && t === 'nilai')) && typeof window.sipSiswaProfilSiap_ === 'function';
         try { window.showStudentHub(gerbang ? 'dash' : t); }
         catch (e) { try { window.showStudentHub('dash'); } catch (e2) { tampilLogin(); } return; }
         if (gerbang) tungguProfil(t, String(res.userID));
@@ -28869,7 +28928,8 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
     setTimeout(function () {
       var hub = el('page-siswa-hub'), adm = el('page-admin'), l = el('page-login');
       var tampak = function (n) { return n && !n.classList.contains('hidden'); };
-      if (!st.memulihkan && !tampak(hub) && !tampak(adm) && l && l.classList.contains('hidden')) tampilLogin();
+      var panel=el('sip-ptg-panel');
+      if (!st.memulihkan && !tampak(hub) && !tampak(adm) && !(panel&&!panel.hidden) && l && l.classList.contains('hidden')) tampilLogin();
     }, 40000);
   }
 
@@ -28882,7 +28942,135 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
 })();
 
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5834359a82cbae9',t:'MTc5NDI5NDg5NQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5834359a82cbae9',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+  <!-- PENSIL MAGIC UNTUK PERBAIKAN SATU SOAL SESUAI LEVEL KOGNITIF · sumber: web/pensil-magic.js -->
+  <script id="sipintar-pensil-magic">
+/* PENSIL MAGIC v1.0.0 — tambahan antarmuka perbaikan SATU soal.
+   Mesin, API dan pemeriksa level yang sudah ada tetap dipakai. Tidak menyimpan
+   soal, mengubah paket/jawaban, atau memberi AI kepada Tim Pembuat Soal.
+   Tombol lama dipindah/diberi rupa baru (ID kompatibel), bukan diduplikasi.
+   Sumber gas/index.html tidak disentuh. */
+(function () {
+  'use strict';
+  var preview = null, timer = 0;
+  var IKON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 16 10-10 4 4L8 20l-5 1 1-5Z"/><path d="m12 8 4 4m0-8 1-1a2 2 0 0 1 3 3l-1 1M5 3v4M3 5h4m13 9v4m-2-2h4"/></svg>';
+  function el(id) { return document.getElementById(id); }
+  function nilai(id) { return (el(id) || {}).value || ''; }
+  function akun() { return window.currentUser || null; }
+  function boleh() {
+    var u = akun();
+    return !!(u && u.userID && u.token && u.role === 'Admin' && !u._sipPeranTampilan);
+  }
+  function bankAktif() {
+    var p = el('page-admin');
+    return boleh() && p && !p.classList.contains('hidden') && !!document.querySelector('#form-add-q form');
+  }
+  function tombol(b, id) {
+    b.type = 'button'; if (id) b.id = id;
+    if (b.className !== 'sip-magic-button') b.className = 'sip-magic-button';
+    b.setAttribute('data-sip-pensil-magic', '1');
+    b.setAttribute('title', 'Pensil Magic: usulkan perbaikan satu soal sesuai level C1–C6, tanpa simpan otomatis');
+    b.setAttribute('aria-label', 'Pensil Magic — sesuaikan level kognitif soal');
+    if (b.getAttribute('data-sip-magic-rupa') !== '1') {
+      b.innerHTML = IKON + '<span>Pensil Magic</span>';
+      b.setAttribute('data-sip-magic-rupa', '1');
+    }
+  }
+  function hapusPreview() {
+    preview = null;
+    var n = el('sip-magic-preview'); if (n) n.remove();
+  }
+  function pasang() {
+    var bar = el('sip-magic-editor');
+    if (!boleh()) { if (bar) bar.hidden = true; hapusPreview(); return; }
+    var teks = el('editor-content'), b = el('sip-soal-ai');
+    if (!teks || !b || !teks.closest('#form-add-q form')) return;
+    if (!bar) {
+      bar = document.createElement('section');
+      bar.id = 'sip-magic-editor'; bar.className = 'sip-magic-tools';
+      bar.setAttribute('aria-label', 'Bantuan Pensil Magic untuk soal ini');
+      bar.innerHTML = '<div class="sip-magic-actions"></div><p class="sip-magic-steps">Pilih level → Periksa usulan → Terapkan ke draf → Simpan manual</p>';
+      teks.parentNode.insertBefore(bar, teks);
+    }
+    if (bar.hidden) bar.hidden = false;
+    tombol(b);
+    var actions = bar.querySelector('.sip-magic-actions');
+    if (b.parentNode !== actions) actions.appendChild(b);
+    var batal = el('sip-soal-ai-batal');
+    if (batal && batal.parentNode !== actions) actions.appendChild(batal);
+    ['sip-soal-ai-status', 'sip-soal-ai-hasil'].forEach(function (id) {
+      var n = el(id); if (n && n.parentNode !== bar) bar.appendChild(n);
+    });
+  }
+  function sesiSama(p) {
+    var u = akun();
+    return bankAktif() && p && u.userID === p.uid && u.token === p.token && nilai('select-exam-q') === p.examId;
+  }
+  async function dariPreview() {
+    var p = preview;
+    if (!sesiSama(p)) { hapusPreview(); return; }
+    var box = el('form-add-q'), sama = nilai('input-question-id') === String(p.q.id || '') && nilai('input-exam-id') === p.examId;
+    var terbuka = box && !box.classList.contains('hidden');
+    /* Jangan menimpa draf soal lain (termasuk draf baru yang belum punya ID). */
+    if (terbuka && !sama) {
+      var c = await Swal.fire({ icon: 'warning', title: 'Draf editor sedang terbuka', text: 'Membuka soal dari pratinjau akan mengganti draf editor yang belum disimpan. Bank Soal tidak berubah. Pilih Batal bila draf tersebut masih diperlukan.', showCancelButton: true, confirmButtonText: 'Buka soal dari pratinjau', cancelButtonText: 'Batal, pertahankan draf', focusCancel: true });
+      if (!c.isConfirmed || !sesiSama(p)) return;
+    }
+    var ed = window.tinymce && tinymce.get('editor-content');
+    if (ed && (!ed.initialized || ed.getElement() !== el('editor-content'))) {
+      await Swal.fire('Editor sedang disiapkan', 'Tunggu editor Bank Soal selesai dimuat, lalu buka Pensil Magic kembali.', 'info');
+      return;
+    }
+    if (!sesiSama(p)) return;
+    if (typeof window.closePreviewModal === 'function') window.closePreviewModal();
+    else { var modal = el('modal-preview'); if (modal) modal.classList.add('hidden'); }
+    if (sama) { box.classList.remove('hidden'); box.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
+    else window.editQuestion(p.q);
+    pasang();
+    if (sesiSama(p) && typeof window.sipSoalMintaPerbaikan_ === 'function') await window.sipSoalMintaPerbaikan_();
+  }
+  function pasangPreview(q) {
+    hapusPreview();
+    if (!bankAktif() || !q || !q.id || !q.examId || String(q.examId) !== nilai('select-exam-q')) return;
+    var modal = el('modal-preview'), area = el('preview-content-area'), u = akun();
+    if (!modal || !area) return;
+    preview = { uid: u.userID, token: u.token, examId: String(q.examId), q: JSON.parse(JSON.stringify(q)) };
+    var n = document.createElement('div'); n.id = 'sip-magic-preview'; n.className = 'sip-magic-preview';
+    var info = document.createElement('p');
+    info.textContent = 'Ingin menyesuaikan level soal ini? Pensil Magic membuka draf editor untuk ditinjau. Tidak ada simpan otomatis.';
+    var b = document.createElement('button'); tombol(b, 'sip-magic-preview-button');
+    b.addEventListener('click', function () { dariPreview().catch(function () { Swal.fire('Belum diproses', 'Pensil Magic belum dapat dibuka. Draf dan Bank Soal tidak disimpan otomatis.', 'warning'); }); });
+    n.appendChild(info); n.appendChild(b); area.parentNode.insertBefore(n, area);
+  }
+  function kait(nama, sesudah) {
+    var asli = window[nama];
+    if (typeof asli !== 'function' || asli.__sipPensilMagic) return;
+    var fn = function () { var r = asli.apply(this, arguments); sesudah.apply(this, arguments); return r; };
+    Object.keys(asli).forEach(function (k) { if (!(k in fn)) fn[k] = asli[k]; });
+    fn.__sipPensilMagic = true; window[nama] = fn;
+  }
+  function mulai() {
+    ['renderQuestionBank', 'openManualQuestionForm', 'editQuestion', 'resetQuestionForm', 'sipPasangMateriSoal'].forEach(function (n) { kait(n, pasang); });
+    kait('showQuestionPreview', function (q) {
+      try { q = typeof q === 'object' ? q : JSON.parse(decodeURIComponent(q)); pasangPreview(q); } catch (e) { hapusPreview(); }
+    });
+    kait('previewAllQuestions', hapusPreview);
+    kait('closePreviewModal', hapusPreview);
+    pasang();
+    if (typeof MutationObserver === 'function') new MutationObserver(function () {
+      if (timer) return;
+      timer = setTimeout(function () { timer = 0; pasang(); }, 60);
+    }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+  }
+  var css = document.createElement('style'); css.id = 'sip-pensil-magic-css';
+  css.textContent = '.sip-magic-tools{margin:9px 0 12px;padding:12px 14px;border:1px solid #c7d2fe;border-radius:12px;background:#f5f7ff;min-width:0}.sip-magic-tools[hidden],body.sip-ptg-tim .sip-magic-tools,body.sip-ptg-tim [data-sip-pensil-magic]{display:none!important}.sip-magic-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px}.sip-magic-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid #a5b4fc;border-radius:10px;padding:10px 14px;min-height:44px;background:#312e81;color:#fff;font:700 13px/1.4 system-ui;cursor:pointer;flex-shrink:0}.sip-magic-button:hover{background:#4338ca}.sip-magic-button:focus-visible{outline:3px solid #818cf8;outline-offset:3px}.sip-magic-button:disabled{opacity:.5;cursor:wait}.sip-magic-steps{font:12px/1.6 system-ui;color:#475569;margin:7px 0 0}.sip-magic-actions #sip-soal-ai-batal{border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;background:#fff;color:#475569;font-size:12px}.sip-magic-tools #sip-soal-ai-status{font:12px/1.7 system-ui;margin-top:7px;color:#334155}.sip-magic-preview{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 24px;border-bottom:1px solid #c7d2fe;background:#eef2ff;flex-shrink:0}.sip-magic-preview p{font:12px/1.7 system-ui;color:#37305f;max-width:660px}.sip-magic-consent{text-align:left;font:14px/1.7 system-ui;color:#334155}.sip-magic-consent p{margin:10px 0}.sip-magic-consent label{display:block;font-weight:700;margin-top:15px}.sip-magic-consent select{display:block!important;box-sizing:border-box;width:100%;margin:7px 0 16px!important;max-width:100%;font-size:14px}.sip-ai-asli{text-align:left;border:1px solid #cbd5e1;border-radius:10px;padding:10px 12px;margin:12px 0;background:#f8fafc;font:13px/1.7 system-ui}.sip-ai-asli summary{cursor:pointer;font-weight:700}.sip-ai-asli>div{margin-top:10px}@media(max-width:650px){.sip-magic-preview{align-items:flex-start;flex-direction:column;padding:12px 16px;gap:8px}.sip-magic-tools{padding:10px}.sip-magic-button{padding:9px 12px}.sip-magic-preview p{font-size:11px}}';
+  document.head.appendChild(css);
+  window.SIPINTAR_PENSIL_MAGIC_VERSI = '1.0.0';
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mulai); else mulai();
+})();
+
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a589dc2b4b62fcf8',t:'MTc5NDM2NDA2OQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a589dc2b4b62fcf8',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 <!-- Lisensi MathJax tertanam:
 
                                  Apache License
