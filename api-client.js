@@ -35,6 +35,9 @@
   var TIMEOUT_MS    = Number(CFG.API_TIMEOUT_MS) || 45000;
   var SLOW_MS       = Number(CFG.API_SLOW_TIMEOUT_MS) || 180000;
   var PROXY_MS      = Number(CFG.API_PROXY_TIMEOUT_MS) || 55000;
+  /* Pensil Magic satu soal bukan pekerjaan ekspor massal: setiap tahap dibatasi. */
+  var MAGIC_MS      = 35000;
+  function isMagic(action) { return action === 'perbaikiSoalKognitifAI' || action === 'verifikasiLevelKognitifAI'; }
   var VERBOSE       = CFG.API_DEBUG === true;
   var MAX_PROXY_BYTES = Number(CFG.API_PROXY_MAX_BYTES) || 3500000;
 
@@ -197,27 +200,38 @@
 
   /* ======================= HTTP ======================= */
 
-  function fetchWithTimeout(url, opts, ms) {
-    var ctl = null;
-    try { if (typeof AbortController === 'function') ctl = new AbortController(); } catch (e) {}
-    var timer = null;
-    if (ctl) {
-      opts.signal = ctl.signal;
-      timer = setTimeout(function () { try { ctl.abort(); } catch (e) {} }, ms);
-    }
-    return fetch(url, opts).then(function (res) {
-      if (timer) clearTimeout(timer);
-      return res;
-    }, function (err) {
-      if (timer) clearTimeout(timer);
-      var habisWaktu = !!(ctl && ctl.signal && ctl.signal.aborted);
-      var e2 = new Error(habisWaktu
-        ? ('Server tidak merespons dalam ' + Math.round(ms / 1000) + ' detik (timeout).')
-        : ((err && err.message) ? err.message : 'Gagal menghubungi server (jaringan/CORS).'));
-      e2.__transport = true;
-      e2.timeout = habisWaktu;
-      e2.cause = err;
-      throw e2;
+  function fetchWithTimeout(url, opts, ms, signal) {
+    /* fetch() selesai saat HEADER diterima, bukan saat JSON selesai dibaca.
+       Timer lama dilepas terlalu dini; res.text() yang macet tidak punya batas.
+       Lindungi SELURUH response, juga tanpa AbortController/browser lama. */
+    ms = Math.max(1, Number(ms) || TIMEOUT_MS);
+    return new Promise(function (resolve, reject) {
+      var ctl = null, timer = null, selesai = false, batal = null;
+      try { if (typeof AbortController === 'function') ctl = new AbortController(); } catch (e) {}
+      if (ctl) opts.signal = ctl.signal;
+      function bersih() {
+        if (timer) clearTimeout(timer);
+        if (signal && batal && signal.removeEventListener) signal.removeEventListener('abort', batal);
+      }
+      function gagal(err, timeout, cancelled) {
+        if (selesai) return; selesai = true; bersih();
+        try { if (ctl) ctl.abort(); } catch (e) {}
+        var e2 = new Error(cancelled ? 'Permintaan dibatalkan; hasil terlambat tidak digunakan.' : timeout
+          ? ('Server tidak merespons lengkap dalam ' + Math.ceil(ms / 1000) + ' detik (timeout).')
+          : ((err && err.message) ? err.message : 'Gagal menghubungi server (jaringan/CORS).'));
+        e2.__transport = true; e2.timeout = !!timeout; e2.cancelled = !!cancelled; e2.cause = err;
+        reject(e2);
+      }
+      batal = function () { gagal(null, false, true); };
+      if (signal && signal.aborted) return batal();
+      if (signal && signal.addEventListener) signal.addEventListener('abort', batal, { once: true });
+      timer = setTimeout(function () { gagal(null, true, false); }, ms);
+      Promise.resolve().then(function () { if (!selesai) return fetch(url, opts); }).then(function (res) {
+        if (selesai || !res) return;
+        return res.text().then(function (txt) {
+          if (selesai) return; selesai = true; bersih(); resolve({ response: res, body: txt });
+        });
+      }).catch(function (err) { gagal(err, false, false); });
     });
   }
 
@@ -276,8 +290,8 @@
       init.credentials = 'omit';
     }
 
-    return fetchWithTimeout(url, init, timeout).then(function (res) {
-      return res.text().then(function (txt) {
+    return fetchWithTimeout(url, init, timeout, opts.signal).then(function (hasilHTTP) {
+        var res = hasilHTTP.response, txt = hasilHTTP.body;
         if (!res.ok && !txt) {
           var e = new Error('HTTP ' + res.status + ' dari ' + (channel === 'proxy' ? 'proxy Vercel' : 'Apps Script'));
           e.__transport = true; e.status = res.status;
@@ -303,7 +317,6 @@
           throw e3;
         }
         return { data: revive(data.data), meta: data.meta || {}, channel: channel, bytes: bytes };
-      });
     });
   }
 
@@ -316,7 +329,8 @@
    * saluran otomatis bila jalur pertama gagal secara teknis.
    */
   function sipRequest(action, args, opts) {
-    opts = opts || {};
+    opts = Object.assign({}, opts || {});
+    if (isMagic(action)) opts.timeout = Math.min(MAGIC_MS, Math.max(1, Number(opts.timeout) || MAGIC_MS));
     var besar = (opts.bytes || 0) > MAX_PROXY_BYTES;
     var utama = saluranUtama();
 
@@ -335,6 +349,7 @@
       if (MEM.channel !== utama) simpanSaluran(utama);      /* hanya bila berubah */
       return hasil;
     }, function (err) {
+      if (err && err.cancelled) throw err; /* Batal bukan alasan mengirim ulang. */
       /* Jalur ini terhubung ke deployment Apps Script LAMA (aksi belum dikenal).
          Server menolak SEBELUM menjalankan apa pun, jadi aman dicoba di jalur lain
          untuk aksi apa saja; jalur yang berhasil diingat 10 menit. */
@@ -369,7 +384,7 @@
   function jalankan(action, args, runner) {
     var t0 = Date.now();
     var opts = {
-      timeout: isSlow(action) ? SLOW_MS : TIMEOUT_MS,
+      timeout: isMagic(action) ? MAGIC_MS : isSlow(action) ? SLOW_MS : TIMEOUT_MS,
       cid: uid()
     };
     /* Kredensial sesi ditambahkan pada kontrak tulis/penilaian v3. Backend
@@ -413,6 +428,7 @@
       e.status = err.status || 0;
       e.meta = err.meta || null;
       e.transport = !!err.__transport;
+      e.timeout = !!err.timeout; e.cancelled = !!err.cancelled;
       if (typeof runner._fail === 'function') {
         try { runner._fail.call(runner._user || null, e); }
         catch (eCb2) { warn('handler gagal error pada', action, eCb2); }
@@ -465,7 +481,7 @@
   /** Ringkas pesan galat supaya enak dibaca di layar. */
   function ringkasGalat(msg) {
     var m = String(msg || '');
-    if (m === 'timeout/abort' || /tidak merespons dalam/i.test(m)) return 'timeout';
+    if (m === 'timeout/abort' || /tidak merespons(?: lengkap)? dalam/i.test(m)) return 'timeout';
     if (/HTTP 4\d\d|HTTP 5\d\d/.test(m)) return m.match(/HTTP \d+/)[0];
     if (/not valid JSON|bukan JSON|Server mengembalikan HTML/i.test(m)) return 'jawaban bukan JSON';
     if (/Failed to fetch|NetworkError|Load failed|Network request failed/i.test(m)) return 'jaringan/CORS';
