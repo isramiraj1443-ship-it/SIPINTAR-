@@ -36,7 +36,7 @@
   var SLOW_MS       = Number(CFG.API_SLOW_TIMEOUT_MS) || 180000;
   var PROXY_MS      = Number(CFG.API_PROXY_TIMEOUT_MS) || 55000;
   /* Pensil Magic satu soal bukan pekerjaan ekspor massal: setiap tahap dibatasi. */
-  var MAGIC_MS      = 35000;
+  var MAGIC_MS      = 50000;
   function isMagic(action) { return action === 'perbaikiSoalKognitifAI' || action === 'verifikasiLevelKognitifAI'; }
   var VERBOSE       = CFG.API_DEBUG === true;
   var MAX_PROXY_BYTES = Number(CFG.API_PROXY_MAX_BYTES) || 3500000;
@@ -290,6 +290,9 @@
       init.credentials = 'omit';
     }
 
+    /* Jalur pekerjaan dicatat SEBELUM fetch: respons bisa hilang, tetapi status
+       harus dibaca dari deployment yang benar-benar menerima pekerjaan itu. */
+    if (typeof opts.onChannel === 'function') try { opts.onChannel(channel); } catch (eChannel) {}
     return fetchWithTimeout(url, init, timeout, opts.signal).then(function (hasilHTTP) {
         var res = hasilHTTP.response, txt = hasilHTTP.body;
         if (!res.ok && !txt) {
@@ -335,6 +338,10 @@
     var utama = saluranUtama();
 
     if (besar && hasDirect()) utama = 'direct';
+    /* Magic kecil: same-origin menghindari kegagalan CORS/redirect POST.
+       Polling mengambil hasil pekerjaan sama, bukan mengulang panggilan AI.
+       Mode direct eksplisit/deployment proxy usang tetap dihormati. */
+    else if (isMagic(action) && MODE === 'auto' && !MEM.proxyUsang) utama = 'proxy';
     else if (isSlow(action) && hasDirect() && MODE !== 'proxy') utama = 'direct';
 
     if (opts.channel) utama = opts.channel;
