@@ -24693,7 +24693,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
 
   <!-- MATERI WAJIB, JENIS TETAP DAN PERBAIKAN SOAL AI · sumber: web/bank-soal-materi.js -->
   <script id="sipintar-bank-materi">
-/* Bank Soal Materi v3.3.0 — Pensil Magic / Terapkan + verifikasi independen. Tambahan pada editor asli.
+/* Bank Soal Materi v3.4.0 — Pensil Magic / Terapkan + verifikasi independen. Tambahan pada editor asli.
    6 Nov 2026: cabang katalog Pramuka (SKU Penggalang) untuk ujian ber-mapel Pramuka.
    Preferensi hanya jenis/topik/target, bukan isi soal, jawaban atau token. */
 (function(){
@@ -24711,28 +24711,74 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
  function message(t,m,i){return Swal.fire(t,m,i||'warning');}
  function api(action,args,opts){
   opts=opts||{};
-  function hasil(r){if(!r||r.success===false||r.error){var e=new Error(r&&r.message||r&&r.error||'Permintaan belum berhasil.');e.code=r&&r.code||'';throw e;}return r;}
+  function hasil(r){if(!r||r.success===false||r.error){var e=new Error(r&&r.message||r&&r.error||'Permintaan belum berhasil.');e.code=r&&r.code||'';e.serverResult=true;throw e;}return r;}
   if(opts.magic&&window.SIPINTAR_API&&typeof SIPINTAR_API.request==='function'){
-   var wire=(args||[]).concat([currentUser.userID,currentUser.token]),o={timeout:opts.timeout,signal:opts.signal,cid:'magic-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)};
+   var wire=(args||[]).concat([currentUser.userID,currentUser.token]),o={timeout:opts.timeout,signal:opts.signal,channel:opts.channel,onChannel:opts.onChannel,cid:'magic-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)};
    try{o.bytes=JSON.stringify(wire).length;}catch(e){}
    return SIPINTAR_API.request(action,wire,o).then(function(h){return hasil(h.data);});
   }
   return new Promise(function(resolve,reject){try{var run=google.script.run.withSuccessHandler(function(r){try{resolve(hasil(r));}catch(e){reject(e);}}).withFailureHandler(function(e){var m=e&&e.message||String(e);if(/tidak terdaftar|not a function/i.test(m))m='Versi backend belum sesuai. Pasang 1-GAS-code.gs terbaru dan deploy New version; perbarui app.html, api-client.js dan api-actions.js. Jangan aktifkan ALLOW_ALL.';reject(new Error(m));});var returned=run[action].apply(run,(args||[]).concat([currentUser.userID,currentUser.token]));if(returned&&returned.catch)returned.catch(function(){});}catch(e){reject(e);}});
  }
- var MAGIC_TOTAL_MS=90000,MAGIC_TAHAP_MS=35000;
- window.SIPINTAR_PENSIL_MAGIC_BATAS={totalMs:MAGIC_TOTAL_MS,tahapMs:MAGIC_TAHAP_MS};
- function habisMagic(total){var e=new Error(total?'Batas menunggu total 90 detik tercapai. Proses tidak diulang lagi; draf dan Bank Soal tetap utuh.':'Tahap AI melewati batas 35 detik. Tidak mencoba ulang/pindah jalur otomatis. Draf dan Bank Soal tetap utuh.');e.magicTimeout=true;return e;}
+ var MAGIC_TOTAL_MS=90000,MAGIC_TAHAP_MS=50000;
+ window.SIPINTAR_PENSIL_MAGIC_BATAS={totalMs:MAGIC_TOTAL_MS,tahapMs:MAGIC_TAHAP_MS,pemulihanHasil:true};
+ function faseMagic(k){var p={'persiapan':'Persiapan server','membaca-bank':'Membaca Bank Soal','membaca-gambar':'Membaca gambar','menyiapkan-ai':'Menyiapkan permintaan AI','menunggu-ai':'Menunggu jawaban provider AI','validasi-hasil':'Memeriksa format dan rumus hasil','cek-bank-akhir':'Memeriksa ulang versi Bank Soal','selesai':'Hasil selesai di server','gagal':'Server menghentikan pekerjaan'};return p[k]||'Tahap server belum terkonfirmasi';}
+ function habisMagic(total,trace){var m=total?'Batas menunggu total 90 detik tercapai. Tidak ada pengiriman AI baru otomatis.':'Respons belum diterima dalam 50 detik dan pekerjaan server belum dapat dikonfirmasi. Tidak mengirim AI ulang.';
+  if(trace)m+=' Tahap server terakhir: '+faseMagic(trace.posisiGagal||trace.fase)+(trace.model?' ('+trace.model+')':'')+'.';
+  else m+=' Server belum memberikan rincian tahap; ini belum membuktikan bahwa Gemini yang lambat.';
+  var e=new Error(m+' Draf dan Bank Soal tetap utuh.');e.magicTimeout=true;return e;}
+ function refMagic(){try{if(window.crypto&&crypto.randomUUID)return 'm-'+crypto.randomUUID();}catch(e){}return 'm-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2);}
  function tahapMagic(action,args,ctx){
   var sisa=ctx.deadline-Date.now();if(sisa<=0)return Promise.reject(habisMagic(true));
-  var ms=Math.min(MAGIC_TAHAP_MS,sisa);
+  var ms=Math.min(MAGIC_TAHAP_MS,sisa),ref=refMagic();args[0].magicRef=ref;ctx.serverLabel='';
   return new Promise(function(resolve,reject){
-   var selesai=false,timer,ctl=null;try{if(typeof AbortController==='function')ctl=new AbortController();}catch(e){}
-   function bersih(){clearTimeout(timer);if(ctx.abortTahap===batal)ctx.abortTahap=null;}
-   function gagal(e){if(selesai)return;selesai=true;bersih();try{if(ctl)ctl.abort();}catch(x){}reject(e);}
+   var selesai=false,timer,pollTimer,pollGuard,pollAktif=false,ctl=null,pollCtl=null,trace=null,terlihat=false,recovery=false,networkError=null,tidakDitemukan=0,jobChannel;
+   try{if(typeof AbortController==='function')ctl=new AbortController();}catch(e){}
+   function bersih(){clearTimeout(timer);clearTimeout(pollTimer);clearTimeout(pollGuard);if(ctx.abortTahap===batal)ctx.abortTahap=null;
+    try{if(ctl)ctl.abort();if(pollCtl)pollCtl.abort();}catch(e){}
+   }
+   function kabar(k,ambil){ctx.serverLabel=faseMagic(k.posisiGagal||k.fase)+(k.model?' · '+k.model:'')+(ambil?' · mengambil hasil permintaan yang sama, bukan mengulang AI':'');if(ctx.onServer)ctx.onServer();}
+   function gagal(e){if(selesai)return;selesai=true;bersih();if(trace&&!e.magicTimeout)e.message+=' Tahap server: '+faseMagic(trace.posisiGagal||trace.fase)+(trace.model?' ('+trace.model+')':'')+'.';reject(e);}
+   function berhasil(r,asal){if(selesai)return;if(ctx.cancelled)return batal();
+    if(!r||r.success===false){var e=new Error(r&&r.message||'Hasil server belum berhasil.');e.code=r&&r.code||'';return gagal(e);}
+    if(r.pending){trace=r.kinerja||trace;terlihat=true;kabar(trace||{},true);return pulihkan();}
+    selesai=true;bersih();if(r.kinerja)r.kinerja.asalHasil=asal;resolve(r);
+   }
    function batal(){var e=new Error('Menunggu dibatalkan. Hasil terlambat tidak diterapkan.');e.cancelled=true;gagal(e);}
+   function batas(){if(terlihat&&Date.now()<ctx.deadline)return pulihkan();gagal(habisMagic(ms<MAGIC_TAHAP_MS,trace));}
+   function pulihkan(){if(selesai)return;if(Date.now()>=ctx.deadline)return gagal(habisMagic(true,trace));
+    if(!recovery){recovery=true;clearTimeout(timer);timer=setTimeout(function(){gagal(habisMagic(true,trace));},Math.max(1,ctx.deadline-Date.now()));
+     if(trace)kabar(trace,true);try{if(ctl)ctl.abort();}catch(e){}
+    }
+    if(!pollAktif){clearTimeout(pollTimer);pollTimer=setTimeout(poll,0);}
+   }
+   function poll(){
+    if(selesai||ctx.cancelled||pollAktif)return;
+    if(Date.now()>=ctx.deadline)return gagal(habisMagic(true,trace));
+    clearTimeout(pollTimer);pollAktif=true;var sudah=false;
+    try{if(typeof AbortController==='function')pollCtl=new AbortController();}catch(e){}
+    function terima(r,e){if(sudah)return;sudah=true;clearTimeout(pollGuard);pollAktif=false;if(selesai)return;
+     if(r&&r.found){trace=r.kinerja||{};terlihat=true;kabar(trace,recovery);
+      if(r.hasil)return berhasil(r.hasil,'cache-permintaan-sama');
+      if(networkError&&!recovery)pulihkan();
+     }else{
+      tidakDitemukan++;
+      if(networkError&&!terlihat&&tidakDitemukan>=2)return gagal(new Error('Respons jaringan terputus dan referensi pekerjaan belum ditemukan pada server. Periksa deployment/jalur GAS, bukan mengulang provider berkali-kali. Draf tetap utuh.'));
+     }
+     if(!selesai){clearTimeout(pollTimer);pollTimer=setTimeout(poll,6000);}
+    }
+    pollGuard=setTimeout(function(){try{if(pollCtl)pollCtl.abort();}catch(e){}terima(null,new Error('Status server belum merespons.'));},Math.min(7500,Math.max(1,ctx.deadline-Date.now())));
+    try{api('perbaikiSoalKognitifAI',[{mode:'status',magicRef:ref}],{magic:true,timeout:7000,channel:jobChannel,signal:pollCtl&&pollCtl.signal}).then(function(r){terima(r,null);},function(e){terima(null,e);});}catch(e){terima(null,e);}
+   }
    ctx.abortTahap=batal;
-   timer=setTimeout(function(){gagal(habisMagic(ms<MAGIC_TAHAP_MS));},ms);
-   try{api(action,args,{magic:true,timeout:ms,signal:ctl&&ctl.signal}).then(function(r){if(selesai)return;selesai=true;bersih();resolve(r);},function(e){gagal(e.timeout?habisMagic(ms<MAGIC_TAHAP_MS):e);});}catch(e){gagal(e);}
+   timer=setTimeout(batas,ms);pollTimer=setTimeout(poll,6000);
+   try{api(action,args,{magic:true,timeout:ms,signal:ctl&&ctl.signal,onChannel:function(ch){jobChannel=ch;}}).then(function(r){berhasil(r,'respons-langsung');},function(e){
+    if(selesai||e.cancelled&&recovery)return;
+    if(e.cancelled)return gagal(e);
+    if(e.serverResult||e.__appError)return gagal(e);
+    networkError=e;
+    if(terlihat)return pulihkan();
+    clearTimeout(pollTimer);if(!pollAktif)pollTimer=setTimeout(poll,0);
+   });}catch(e){gagal(e);}
   });
  }
 
@@ -24857,15 +24903,15 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
   if(!bolehAI()||S.busy||S.inflight||S.asking)return;mount();if(!validTopic())return message('Lengkapi materi/bab','Pilih topik pembelajaran terlebih dahulu.');
   var draft=snapshot(),ctx={uid:currentUser.userID,token:currentUser.token,form:document.querySelector('#form-add-q form'),fingerprint:JSON.stringify(draft)},seq=++S.seq;
   S.asking=true;var consent,consentVerified=false;
-  try{consent=await Swal.fire({icon:'question',title:'Pensil Magic · Minta usulan perbaikan soal?',html:'<div class="sip-magic-consent"><p>Sesuaikan tuntutan berpikir <b>satu soal</b>; materi/bab dan bentuk soal tetap.</p><label for="sip-magic-target">Level kognitif yang diinginkan Admin</label><select id="sip-magic-target" class="swal2-select"><option value="">— Pilih C1–C6 —</option>'+Object.keys(T.levelC).map(function(c){return '<option value="'+c+'"'+(draft.targetC===c?' selected':'')+'>'+c+' · '+esc(T.levelC[c])+' / '+esc(T.petaCL[c])+'</option>';}).join('')+'</select><p>Teks, opsi tanpa kunci lama/pemetaan pasangan, topik, target, dan gambar yang dapat dibaca akan dikirim ke AI yang dikonfigurasi. AI menyusun kunci BARU untuk Anda periksa. Usulan diperiksa oleh pemeriksa AI independen yang tidak diberi target; bila belum lolos, usulan dibuat ulang otomatis maksimal 2 kali hanya selama sisa waktu cukup. Setiap percobaan memakai kuota pembuat dan pemeriksa, dengan paling banyak satu cadangan kompatibilitas per tahap—bukan putaran banyak model.</p><p><b>Batas menunggu: 90 detik total, 35 detik tiap tahap AI.</b> Jika layanan lambat/kuota habis, proses berhenti dengan pesan, bukan menunggu puluhan menit. Waktu membaca tinjauan Admin tidak dihitung.</p><p><b>Periksa → Terapkan ke draf → Simpan manual.</b> Tidak ada penyimpanan atau rilis otomatis. Batal tidak mengirim permintaan ke AI.</p></div>',showCancelButton:true,confirmButtonText:'Setuju, buat usulan',cancelButtonText:'Batal',preConfirm:function(){var c=(el('sip-magic-target')||{}).value;if(!T.levelC[c]){Swal.showValidationMessage('Pilih level kognitif C1–C6 terlebih dahulu.');return false;}if(!same(ctx)){Swal.showValidationMessage('Draf/akun/ujian berubah. Tutup dialog lalu buka Pensil Magic lagi.');return false;}consentVerified=true;return c;}});}finally{S.asking=false;}
+  try{consent=await Swal.fire({icon:'question',title:'Pensil Magic · Minta usulan perbaikan soal?',html:'<div class="sip-magic-consent"><p>Sesuaikan tuntutan berpikir <b>satu soal</b>; materi/bab dan bentuk soal tetap.</p><label for="sip-magic-target">Level kognitif yang diinginkan Admin</label><select id="sip-magic-target" class="swal2-select"><option value="">— Pilih C1–C6 —</option>'+Object.keys(T.levelC).map(function(c){return '<option value="'+c+'"'+(draft.targetC===c?' selected':'')+'>'+c+' · '+esc(T.levelC[c])+' / '+esc(T.petaCL[c])+'</option>';}).join('')+'</select><p>Teks, opsi tanpa kunci lama/pemetaan pasangan, topik, target, dan gambar yang dapat dibaca akan dikirim ke AI yang dikonfigurasi. AI menyusun kunci BARU untuk Anda periksa. Usulan diperiksa oleh pemeriksa AI independen yang tidak diberi target; bila belum lolos, usulan dibuat ulang otomatis maksimal 2 kali hanya selama sisa waktu cukup. Setiap percobaan memakai kuota pembuat dan pemeriksa, dengan paling banyak satu cadangan kompatibilitas per tahap—bukan putaran banyak model.</p><p><b>Batas menunggu: 90 detik total. Respons jaringan ditunggu sampai 50 detik; bila server masih bekerja, aplikasi mengambil hasil dari permintaan yang sama dalam sisa waktu—bukan mengirim ulang AI.</b> Jika layanan lambat/kuota habis, proses berhenti dengan pesan, bukan menunggu puluhan menit. Waktu membaca tinjauan Admin tidak dihitung.</p><p><b>Periksa → Terapkan ke draf → Simpan manual.</b> Tidak ada penyimpanan atau rilis otomatis. Batal tidak mengirim permintaan ke AI.</p></div>',showCancelButton:true,confirmButtonText:'Setuju, buat usulan',cancelButtonText:'Batal',preConfirm:function(){var c=(el('sip-magic-target')||{}).value;if(!T.levelC[c]){Swal.showValidationMessage('Pilih level kognitif C1–C6 terlebih dahulu.');return false;}if(!same(ctx)){Swal.showValidationMessage('Draf/akun/ujian berubah. Tutup dialog lalu buka Pensil Magic lagi.');return false;}consentVerified=true;return c;}});}finally{S.asking=false;}
   if(!consent||!consent.isConfirmed||!same(ctx))return;
   var pilihan=consent.value;if(!consentVerified||!T.levelC[pilihan])return message('Usulan belum diterapkan','Dialog belum memverifikasi pemilihan level dan persetujuan pengiriman. Draf asli tidak diubah.');
   el('sip-soal-target').value=pilihan;draft.targetC=pilihan;ctx.fingerprint=JSON.stringify(snapshot());remember();
   clearHasil();S.busy=true;S.inflight=true;S.ctx=ctx;el('sip-soal-ai-batal').hidden=false;var b=el('sip-soal-ai');if(b)b.disabled=true;var st=el('sip-soal-ai-status');
   var mulai=Date.now(),fase='',workTick=null;ctx.deadline=mulai+MAGIC_TOTAL_MS;
-  function jam(){if(st&&st.isConnected)st.textContent=fase+' · '+Math.floor((Date.now()-mulai)/1000)+(workTick?' detik berjalan':' detik proses')+' (batas proses 90 detik).';}
-  function status(t){fase=t;jam();}
-  function hentikanJam(){if(workTick){clearInterval(workTick);workTick=null;}}
+  function jam(){if(st&&st.isConnected)st.textContent=fase+(ctx.serverLabel?' — '+ctx.serverLabel:'')+' · '+Math.floor((Date.now()-mulai)/1000)+(workTick?' detik berjalan':' detik proses')+' (batas proses 90 detik).';}
+  function status(t){fase=t;ctx.serverLabel='';jam();}ctx.onServer=jam;
+  function hentikanJam(){if(workTick){clearInterval(workTick);workTick=null;}ctx.onServer=null;}
   workTick=setInterval(jam,1000);
   function masihSama(){if(seq!==S.seq||ctx.cancelled||!same(ctx))throw new Error('Draf/akun/ujian berubah saat AI bekerja. Usulan tidak diterapkan; perubahan Anda tetap utuh.');if(Date.now()>=ctx.deadline)throw habisMagic(true);}
 
@@ -29103,7 +29149,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
 })();
 
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a58a3d70f968072d',t:'MTc5NDM2ODA1Mw=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a58a3d70f968072d',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 <!-- Lisensi MathJax tertanam:
 
                                  Apache License
