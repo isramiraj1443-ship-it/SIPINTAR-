@@ -24214,6 +24214,9 @@ function sipSisipTandaGambar_() {
     e.stopImmediatePropagation();
   }
   function tombol(e) {
+    /* Saat ujian aktif, aturan integritas mendahului lapisan peringatan
+       screenshot lama. Hasil/nilai di luar ujian tetap hanya mitigasi. */
+    if (typeof window.sipUjianPintasan_ === 'function' && window.sipUjianPintasan_(e)) return;
     if (!periksa()) return;
     var k = String(e.key || e.code || '').toLowerCase();
     var prtsc = k === 'printscreen' || k === 'prtsc' || e.keyCode === 44;
@@ -24244,6 +24247,7 @@ function sipSisipTandaGambar_() {
     var fn = function (alasan) {
       var s = String(alasan || '');
       var jenisLunak = /Pindah Tab|Minimize Browser|Membuka Aplikasi Lain|Start Menu|Fullscreen|Tombol Windows/i.test(s);
+      if (window.SIPINTAR_UJIAN_INTEGRITAS && window.SIPINTAR_UJIAN_INTEGRITAS.aktif()) return asli.apply(this, arguments);
       if (periksa() && (/screenshot|printscreen|tangkapan layar|snipping|mencetak/i.test(s) ||
           jenisLunak && Date.now() < tenggangTangkapan)) {
         sembunyikan('Peringatan tangkapan layar/cetak. Kembali ke aplikasi untuk melanjutkan.', false);
@@ -25059,6 +25063,7 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
  window.sipKisiMuatExam_=async function(){var id=(el('kisi-select-exam')||{}).value||'',out=await (old.load&&old.load.apply(this,arguments));if(!admin()||!id||!el('sip-paket-kisi-status'))return out;try{var r=await api('getPaketMateri',[id]);if((el('kisi-select-exam')||{}).value!==id)return out;plans[id]=r;var label=el('sip-paket-kisi-status');if(label)label.textContent=r.aktif?' · '+(r.draft?r.draft.total:0)+' soal tiap peserta; '+(r.rilis?'kisi/paket sudah dirilis.':'perlu rilis valid setelah review.'):' · Belum memakai mode materi. Ujian lama tidak dikonversi otomatis.';}catch(e){var label=el('sip-paket-kisi-status');if(label)label.textContent=e.message;}return out;};
  window.sipKisiRenderTable_=function(){var out=old.table&&old.table.apply(this,arguments);if(admin()){var items=window._sipKisiItems||[];document.querySelectorAll('[data-kisi-row]').forEach(function(card){var r=items[Number(card.dataset.kisiRow)];if(!r)return;if(r.topikDariBank){card.querySelectorAll('[data-kisi-edit="materi"],[data-kisi-edit="babId"],[data-kisi-edit="bab"]').forEach(function(n){n.disabled=true;});}if(r.targetC){var note=document.createElement('p');note.className='sip-soal-note';note.textContent='Target Admin: '+r.targetC+' · Hasil analisis/review: '+(r.levelC||'belum ditentukan')+'. Target harus dibuktikan oleh tuntutan soal, bukan sekadar mengganti label.';card.appendChild(note);}});}return out;};
  function aggregateForPlan(rows,p){return p.kuota.map(function(g){var source=rows.filter(function(r){return r.materi===g.materi&&r.bab===g.bab;}),cs=Array.from(new Set(source.reduce(function(all,r){return all.concat(r.levelsC||[r.levelC]);},[]))).filter(function(c){return !!T.levelC[c];}).sort(),ls=Array.from(new Set(cs.map(function(c){return T.petaCL[c];}))).sort();return {materi:g.materi,bab:g.bab,levelC:cs.join(' / '),levelL:ls.join(' / '),levelsC:cs,levelsL:ls,jumlahSoal:g.jumlah,indikator:'Kompetensi umum sesuai bab dan tuntutan kognitif yang telah diperiksa Admin.'};});}
+ window.sipKisiRencanaRows_=function(rows){var p=admin()&&plans[window._sipKisiExam];return p&&p.aktif&&p.draft&&!(rows||[]).some(function(r){return Array.isArray(r.levelsC);})?aggregateForPlan(rows||[],p.draft):(rows||[]);};
  window.sipKisiTabelItemsHtml_=function(rows){
   rows=rows||[];var p=admin()&&plans[window._sipKisiExam];if(p&&p.aktif&&p.draft&&!rows.some(function(r){return Array.isArray(r.levelsC);}))rows=aggregateForPlan(rows,p.draft);
   if(!rows.some(function(r){return Array.isArray(r.levelsC);}))return old.publicTable&&old.publicTable.call(this,rows);
@@ -28647,8 +28652,8 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
   function kotak(r, i) {
     var t = String(r.topikSoal || ''), salah = cekTopik(t);
     return '<div class="sip-kts" data-kts-box="' + i + '">' +
-      '<label class="sip-kts-label">Topik soal untuk redaksi kisi <small>(dipakai pada kolom Indikator Soal: “Peserta didik dapat &lt;kata kerja level&gt; <i>topik</i>.” Tanpa angka, rumus, kutipan soal, pilihan, atau jawaban)</small>' +
-      '<input type="text" maxlength="90" aria-label="Topik soal ' + (i + 1) + '" data-kisi-edit="topikSoal" data-index="' + i + '" value="' + e(t) + '" placeholder="contoh: hasil perkalian dua bentuk aljabar"></label>' +
+      '<label class="sip-kts-label">Topik / sasaran yang ditanyakan <small>(melengkapi “Siswa menentukan &lt;sasaran pertanyaan&gt; (level kognitif sesuai review).” Contoh: luas persegi panjang, bukan angka ukuran atau kalimat soal. Tanpa rumus, kutipan, pilihan, atau jawaban)</small>' +
+      '<input type="text" maxlength="90" aria-label="Topik soal ' + (i + 1) + '" data-kisi-edit="topikSoal" data-index="' + i + '" value="' + e(t) + '" placeholder="contoh: luas persegi panjang"></label>' +
       '<p class="sip-kts-galat" data-kts-galat="' + i + '"' + (salah ? '' : ' hidden') + '>' + e(salah) + '</p>' +
       '<div class="sip-kts-baris"><label class="sip-kts-ok"><input type="checkbox" data-kts-ok="' + i + '"' + (r.topikDisetujui && t ? ' checked' : '') + (t ? '' : ' disabled') + '> Topik ini sesuai soal dan aman ditampilkan</label>' +
       '<span class="sip-kts-status" data-kts-status="' + i + '">' + e(statusTeks(r)) + '</span></div></div>';
@@ -29190,7 +29195,299 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
 })();
 
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a59d26879805797e',t:'MTc5NDU2NjM0NA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a59d26879805797e',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+  <!-- INTEGRITAS UJIAN AKTIF DAN CATATAN KEJADIAN TAHAN REFRESH · sumber: web/ujian-integritas.js -->
+  <script id="sipintar-ujian-integritas">
+/* Integritas ujian v1.0.0 · paket 59. Hanya ujian Siswa/CDP yang benar-benar
+   mulai. Sanksi lama tetap Curang; tidak ada ambang baru. Keyboard HP/input
+   bukan keluar halaman. OS screenshot/foto/perangkat mati tidak bisa dijamin.
+   Pending hanya metadata tanpa token/soal/jawaban; draf memakai penyimpanan lama. */
+(function(){
+ 'use strict';
+ var S={ctx:null,finishing:false,finished:false,hiddenSince:0,blurSince:0,blurTimer:null,hiddenTimer:null,retry:null},old={security:window.handleSecurityTrigger,enable:window.enableAntiCheat,disable:window.disableAntiCheat};
+ var K='sip_ujian_keamanan_v1:';
+ function user(){return window.currentUser||null;}
+ function exam(){try{return typeof currentExam!=='undefined'?currentExam:null;}catch(e){return null;}}
+ function touch(){return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'')||navigator.maxTouchPoints>0&&!!(window.matchMedia&&window.matchMedia('(pointer: coarse)').matches);}
+ function hidden(){return document.hidden===true||document.visibilityState==='hidden';}
+ function visible(id){var n=document.getElementById(id);return !!(n&&!n.classList.contains('hidden')&&!n.hidden);}
+ function own(c){var u=user();return !!(c&&u&&u.role==='Siswa'&&u.userID===c.uid&&u.token===c.token&&S.ctx===c);}
+ function active(){var c=S.ctx,e=exam();try{return own(c)&&!c.locked&&!S.finishing&&!S.finished&&!!e&&String(e.id)===c.eid&&visible('page-exam')&&!visible('page-lobby')&&!visible('page-exam-info')&&typeof _examStrictMode!=='undefined'&&_examStrictMode===true&&typeof questions!=='undefined'&&questions.length>0;}catch(err){return false;}}
+ function key(c){return K+encodeURIComponent(c.uid)+':'+encodeURIComponent(c.eid);}
+ function read(c){try{var x=JSON.parse(localStorage.getItem(key(c))||'null');return x&&x.rid===c.rid?x:null;}catch(e){return null;}}
+ function write(c,m){try{localStorage.setItem(key(c),JSON.stringify(m));}catch(e){}}
+ function cancelTimers(){clearTimeout(S.blurTimer);clearTimeout(S.hiddenTimer);S.blurTimer=S.hiddenTimer=null;S.hiddenSince=0;S.blurSince=0;}
+ function cleanLayer(){var n=document.getElementById('sip-ujian-kunci');if(n)n.remove();var p=document.getElementById('page-exam');if(p)p.removeAttribute('inert');}
+ function status(c,msg){if(!own(c))return;var n=document.getElementById('sip-ujian-kunci-status');if(n)n.textContent=msg;}
+ /* Server sudah mencabut sesi saat sanksi. Menutup tab lama hanya lokal:
+    jangan logout by-UserID yang dapat mencabut token login baru/perangkat lain. */
+ function closeLocal(c){
+  if(!own(c))return;S.finishing=true;cancelTimers();clearTimeout(S.retry);
+  try{if(typeof persistLocalAnswers_==='function')persistLocalAnswers_();}catch(e){}
+  try{var saved=JSON.parse(localStorage.getItem('sipadu_session')||'null');if(saved&&saved.userID===c.uid&&saved.token===c.token)localStorage.removeItem('sipadu_session');}catch(e){}
+  try{if(typeof _syncTimer!=='undefined')clearTimeout(_syncTimer);if(typeof timerInterval!=='undefined')clearInterval(timerInterval);if(typeof stopExamMusic==='function')stopExamMusic();if(typeof window.disableAntiCheat==='function')window.disableAntiCheat();}catch(e){}
+  try{if(typeof currentExam!=='undefined')currentExam=null;if(typeof questions!=='undefined')questions=[];if(typeof answers!=='undefined')answers={};if(typeof violationCount!=='undefined')violationCount=0;}catch(e){}
+  window.currentUser=null;window._siswaProfilCache=null;window._siswaExamGateOk=false;window._sipintarCheatLock=false;
+  var examPage=document.getElementById('page-exam');try{if(examPage&&typeof initialExamHTML!=='undefined'&&initialExamHTML)examPage.innerHTML=initialExamHTML;}catch(e){}
+  ['page-admin','page-exam','page-result','page-exam-info','page-lobby','page-siswa-hub'].forEach(function(id){var n=document.getElementById(id);if(n)n.classList.add('hidden');});
+  var login=document.getElementById('page-login');if(login)login.classList.remove('hidden');var loading=document.getElementById('global-loading');if(loading)loading.classList.add('hidden');var form=document.getElementById('loginForm');if(form)form.reset();
+  S.ctx=null;cleanLayer();try{if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(function(){});}catch(e){}window.scrollTo(0,0);
+ }
+ function layer(c){
+  if(!own(c))return;var n=document.getElementById('sip-ujian-kunci');
+  if(!n){n=document.createElement('section');n.id='sip-ujian-kunci';n.setAttribute('role','alertdialog');n.setAttribute('aria-modal','true');n.setAttribute('aria-labelledby','sip-ujian-kunci-judul');n.innerHTML='<div><h2 id="sip-ujian-kunci-judul">Ujian dikunci</h2><p id="sip-ujian-kunci-alasan"></p><p id="sip-ujian-kunci-status" role="status" aria-live="assertive"></p><p>Jawaban yang sudah tersimpan dan paket soal tidak dihapus. Sesuai aturan ujian, kejadian yang terdeteksi diproses tanpa membedakan disengaja atau tidak. Hubungi petugas berwenang.</p><button type="button" id="sip-ujian-kirim-ulang">Kirim ulang catatan</button> <button type="button" id="sip-ujian-tutup">Tutup halaman ujian</button><small>Website tidak dapat mendeteksi semua screenshot OS, foto perangkat lain, atau kejadian yang tidak dilaporkan browser. Jangan hapus data situs saat catatan belum dikonfirmasi.</small></div>';document.body.appendChild(n);
+   n.querySelector('#sip-ujian-kirim-ulang').onclick=function(){if(own(c))send(c,false,true);};
+   n.querySelector('#sip-ujian-tutup').onclick=function(){closeLocal(c);};
+  }
+  var p=document.getElementById('page-exam');if(p)p.setAttribute('inert','');
+  document.getElementById('sip-ujian-kunci-alasan').textContent=c.memo.reason;
+  status(c,c.memo.acked?'Pelanggaran dikonfirmasi server. Status ujian: '+(c.memo.status||'Curang')+'.':'Akses lokal dikunci. Menunggu konfirmasi pencatatan server; jangan menghapus data situs.');
+  if(!c.focused){c.focused=true;var b=document.getElementById('sip-ujian-kirim-ulang');if(b)b.focus();}
+ }
+ function wire(c,unload){
+  var a=null;try{if(typeof persistLocalAnswers_==='function')persistLocalAnswers_();a=JSON.parse(JSON.stringify(typeof answers!=='undefined'?answers:{}));}catch(e){}
+  var args=[c.uid,c.eid,1,c.memo.reason,a,false,c.token,{eventId:c.memo.id,responseId:c.rid,eventAt:c.memo.at}];
+  if(unload){try{var size=new Blob([JSON.stringify(args)]).size;if(size>54000)args[4]=null;}catch(e){args[4]=null;}}
+  return args;
+ }
+ function send(c,unload,manual){
+  if(!own(c)||!c.locked||c.memo.acked||c.sending&&!unload)return;
+  if(!unload&&navigator.onLine===false){status(c,'Jaringan offline. Catatan menunggu di perangkat; akses tetap dikunci. Kirim ulang saat online.');return;}
+  if(manual)c.tries=0;c.sending=true;c.tries=(c.tries||0)+1;
+  var args=wire(c,unload),request;
+  try{
+   if(window.SIPINTAR_API&&typeof SIPINTAR_API.request==='function')request=SIPINTAR_API.request('logViolation',args,{timeout:12000,channel:c.channel,keepalive:!!unload,bytes:JSON.stringify(args).length,cid:c.memo.id}).then(function(h){return h.data;});
+   else request=new Promise(function(resolve,reject){google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).logViolation.apply(null,args);});
+  }catch(e){request=Promise.reject(e);}
+  request.then(function(r){
+   c.sending=false;if(!own(c))return;
+   if(r&&r.success&&r.eventAck===c.memo.id&&(r.duplicate||/^(Curang|Completed|Selesai|Waktu Habis)$/i.test(String(r.status||'')))){
+    c.memo.acked=true;c.memo.status=r.status;write(c,c.memo);
+    if(!/^curang$/i.test(String(r.status||''))&&r.duplicate){status(c,'Catatan lama sudah diproses dan status server berubah. Tutup halaman lalu ikuti izin melanjutkan dari petugas; tidak mengunci ulang respons baru.');return;}
+    layer(c);status(c,'Pencatatan dikonfirmasi server. Status: '+r.status+'. Hanya petugas berwenang yang dapat mengizinkan kelanjutan.');return;
+   }
+   if(r&&r.stale){status(c,'Catatan berasal dari percobaan ujian berbeda. Respons baru tidak diubah; hubungi petugas.');return;}
+   status(c,'Catatan belum dikonfirmasi server. Akses tetap dikunci; '+String(r&&r.message||'kirim ulang saat jaringan tersedia.'));retry(c,unload);
+  },function(){c.sending=false;if(!own(c))return;status(c,'Koneksi pencatatan belum berhasil. Akses tetap dikunci; catatan tidak dihapus.');retry(c,unload);});
+ }
+ function retry(c,unload){if(unload||!own(c)||c.memo.acked||c.tries>=3)return;clearTimeout(S.retry);S.retry=setTimeout(function(){send(c,false,false);},c.tries===1?4000:10000);}
+ function trigger(reason,unload){
+  if(!active())return false;var c=S.ctx;cancelTimers();c.locked=true;S.finished=false;window._sipintarCheatLock=true;
+  c.memo={v:'1.0.0',uid:c.uid,eid:c.eid,rid:c.rid,id:'sec-'+(window.crypto&&crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2)),reason:String(reason).slice(0,300),at:new Date().toISOString(),acked:false};
+  write(c,c.memo);try{if(typeof persistLocalAnswers_==='function')persistLocalAnswers_();if(typeof _syncTimer!=='undefined')clearTimeout(_syncTimer);if(typeof timerInterval!=='undefined')clearInterval(timerInterval);}catch(e){}
+  try{if(typeof window.disableAntiCheat==='function')window.disableAntiCheat();if(typeof stopExamMusic==='function')stopExamMusic();}catch(e){}
+  if(!unload)layer(c);send(c,!!unload,false);return true;
+ }
+ function visibility(){
+  if(!active()){if(!hidden())cancelTimers();return;}
+  if(hidden()){
+   if(!S.hiddenSince)S.hiddenSince=Date.now();clearTimeout(S.hiddenTimer);
+   S.hiddenTimer=setTimeout(function(){if(active()&&hidden())trigger('Pindah Tab / Minimize Browser',false);},Math.max(1,2500-(Date.now()-S.hiddenSince)));
+  }else{
+   var elapsed=S.hiddenSince?Date.now()-S.hiddenSince:0;clearTimeout(S.hiddenTimer);S.hiddenTimer=null;S.hiddenSince=0;
+   /* Timer background boleh dibekukan browser HP. Lama tersembunyi tetap
+      diperiksa saat kembali, bukan dibatalkan begitu saja. */
+   if(elapsed>=2500)trigger('Pindah Tab / Minimize Browser',false);
+  }
+ }
+ function blur(e){
+  if(e.target!==window||!active()||touch())return;clearTimeout(S.blurTimer);var focused=true;try{focused=document.hasFocus();}catch(err){}if(focused)return;S.blurSince=Date.now();
+  S.blurTimer=setTimeout(function(){if(!active()||hidden())return;var f=true;try{f=document.hasFocus();}catch(e){}if(!f)trigger('Membuka Aplikasi Lain / Start Menu',false);},2000);
+ }
+ function shortcuts(e){
+  var c=S.ctx;if(!own(c)||!visible('page-exam')||!active()&&!c.locked)return false;
+  var k=String(e.key||e.code||'').toLowerCase(),ss=k==='printscreen'||k==='prtsc'||e.keyCode===44||e.shiftKey&&(e.metaKey&&/^(s|3|4|5|6)$/.test(k)||e.ctrlKey&&k==='s'),print=(e.ctrlKey||e.metaKey)&&k==='p',meta=e.type==='keydown'&&(/^(meta|os)$/.test(k)||e.metaKey&&!/^(shift|control|alt)$/.test(k));
+  if(e.type==='keyup'&&!ss)return false;
+  if(!ss&&!print&&!meta)return false;if(e.cancelable)e.preventDefault();e.stopImmediatePropagation();
+  if(!c.locked)trigger(ss?'Pintasan tangkapan layar diterima browser':print?'Pintasan cetak saat ujian':'Menekan Tombol Windows',false);return true;
+ }
+ window.sipUjianPintasan_=shortcuts;
+ window.handleSecurityTrigger=function(reason){if(active())return trigger(reason,false);/* Loading, petunjuk, hasil, dan akun lain bukan pelanggaran ujian aktif. */return;};
+ /* Lapisan privasi lama tidak boleh mengubah kejadian ujian menjadi warning. */
+ window.handleSecurityTrigger.__sipLindungLayar=true;
+ window.enableAntiCheat=function(){var was=false;try{was=_examStrictMode;}catch(e){}if(old.disable)old.disable();try{_examStrictMode=was;}catch(e){}var r=old.enable&&old.enable.apply(this,arguments);if(hidden()&&active())visibility();return r;};
+ window.disableAntiCheat=function(){cancelTimers();return old.disable&&old.disable.apply(this,arguments);};
+ function apiResult(action,args,r,channel){
+  if(action==='submitExam'&&S.ctx&&own(S.ctx)){
+   if(r&&r.success!==false&&r.status){S.finished=true;S.finishing=false;cancelTimers();}
+   else S.finishing=false;return r;
+  }
+  if(action!=='getExamQuestions'||!r||r.error||!Array.isArray(r.questions))return r;
+  var u=user(),e=exam();if(!u||u.role!=='Siswa'||String(args[1])!==String(u.userID)||!e||String(e.id)!==String(args[0]))return r;
+  var m=r.integritas;
+  if(!m||!m.responseId||String(m.userID)!==String(u.userID))return {error:'Versi pengamanan backend belum sesuai. Petugas perlu memasang code.gs/app.html/api-client.js paket yang sama dan New version. Jawaban tidak dihapus.'};
+  clearTimeout(S.retry);cancelTimers();cleanLayer();S.finishing=false;S.finished=false;
+  var c=S.ctx={uid:u.userID,token:u.token,eid:String(args[0]),rid:String(m.responseId),channel:channel,locked:false,tries:0};window._sipintarCheatLock=false;
+  var pending=read(c);
+  if(pending){
+   /* Backend hanya boleh mengirim soal jika status memang diizinkan. ACK
+      event lama + pemuatan sah berarti petugas sudah membuka akses. */
+   if((m.eventTercatat||[]).indexOf(pending.id)>=0){try{localStorage.removeItem(key(c));}catch(e){}return r;}
+   if(!pending.acked){c.memo=pending;c.locked=true;window._sipintarCheatLock=true;layer(c);send(c,false,false);return {error:'Ada kejadian meninggalkan ujian yang belum dikonfirmasi. Akses dikunci sampai pencatatan/peninjauan petugas.'};}
+   /* Status server mengizinkan tetapi ACK tersimpan lokal lama: jangan
+      otomatis menghukum kembali; izin sah server menjadi sumber kebenaran. */
+   try{localStorage.removeItem(key(c));}catch(e){}
+  }
+  return r;
+ }
+ window.sipUjianApiHasil_=apiResult;
+ function wrap(name,fn){var original=window[name];if(typeof original==='function')window[name]=function(){return fn.call(this,original,arguments);};}
+ wrap('initStudentExam',function(fn,args){var out=fn.apply(this,args);var box=document.getElementById('swal2-html-container');if(box){box.querySelectorAll('li').forEach(function(n){if(/Tidak ada petunjuk\/cara keluar/.test(n.textContent))n.textContent='Layar penuh digunakan bila didukung; jangan meninggalkan halaman ujian.';});var note=document.createElement('p');note.style.cssText='font-size:12px;line-height:1.6;margin-top:10px';note.textContent='Aturan berlaku untuk kejadian yang terdeteksi, baik sengaja maupun tidak. Website tidak dapat menjamin semua screenshot OS/foto perangkat lain diketahui. Saat koneksi putus, catatan menunggu konfirmasi; jawaban tersimpan tidak dihapus.';box.appendChild(note);}return out;});
+ wrap('executeSubmission',function(fn,args){if(S.ctx&&own(S.ctx)&&S.ctx.locked){layer(S.ctx);return;}S.finishing=true;cancelTimers();return fn.apply(this,args);});
+ wrap('switchPage',function(fn,args){if(args[0]!=='page-exam'&&active()){trigger('Meninggalkan halaman ujian',false);return;}return fn.apply(this,args);});
+ wrap('logout',function(fn,args){if(active()){trigger('Keluar akun saat ujian aktif',false);return;}return fn.apply(this,args);});
+ ['kickStudentSessionSilent','returnToLoginSilent'].forEach(function(n){wrap(n,function(fn,args){S.finishing=true;cancelTimers();var r=fn.apply(this,args);S.ctx=null;clearTimeout(S.retry);cleanLayer();return r;});});
+ document.addEventListener('visibilitychange',visibility,true);
+ window.addEventListener('blur',blur,false);
+ window.addEventListener('focus',function(e){if(e.target===window){var elapsed=S.blurSince?Date.now()-S.blurSince:0;clearTimeout(S.blurTimer);S.blurTimer=null;S.blurSince=0;if(elapsed>=2000&&active()&&!hidden()&&!touch())trigger('Membuka Aplikasi Lain / Start Menu',false);else if(!hidden())visibility();}},false);
+ ['fullscreenchange','webkitfullscreenchange'].forEach(function(type){document.addEventListener(type,function(){if(!active()||touch())return;var supported=document.fullscreenEnabled===true||document.webkitFullscreenEnabled===true;if(supported&&!document.fullscreenElement&&!document.webkitFullscreenElement)trigger('Keluar dari Mode Fullscreen',false);},true);});
+ window.addEventListener('pagehide',function(){if(active())trigger('Meninggalkan atau memuat ulang halaman ujian',true);else if(S.ctx&&S.ctx.locked&&own(S.ctx))send(S.ctx,true,false);},true);
+ window.addEventListener('pageshow',function(){if(S.ctx&&S.ctx.locked&&own(S.ctx)){layer(S.ctx);send(S.ctx,false,false);}else visibility();},true);
+ window.addEventListener('beforeprint',function(){if(active())trigger('Membuka pratinjau cetak saat ujian aktif',false);},true);
+ window.addEventListener('online',function(){if(S.ctx&&S.ctx.locked&&own(S.ctx)){S.ctx.tries=0;send(S.ctx,false,false);}});
+ ['click','keydown','input','change','submit'].forEach(function(type){document.addEventListener(type,function(e){if(S.ctx&&S.ctx.locked&&own(S.ctx)&&e.target&&e.target.closest&&!e.target.closest('#sip-ujian-kunci')){if(e.cancelable)e.preventDefault();e.stopImmediatePropagation();}},true);});
+ /* Akun lain/menu lain tidak mewarisi penutup atau catatan privat siswa. */
+ var timer=setInterval(function(){if(S.ctx&&!own(S.ctx)){cancelTimers();clearTimeout(S.retry);S.ctx=null;cleanLayer();}else if(active()&&hidden()&&!S.hiddenSince)visibility();},1000);
+ var css=document.createElement('style');css.id='sip-ujian-integritas-css';css.textContent='#sip-ujian-kunci{position:fixed;inset:0;z-index:2147483600;background:#0f172afa;display:flex;align-items:center;justify-content:center;padding:20px;color:#e2e8f0;overflow:auto}#sip-ujian-kunci>div{max-width:560px;border:1px solid #f87171;border-radius:18px;padding:26px;background:#172036}#sip-ujian-kunci h2{font:800 26px/1.3 system-ui;margin:0 0 14px;color:#fca5a5}#sip-ujian-kunci p{font:14px/1.7 system-ui;margin:10px 0}#sip-ujian-kunci button{font:700 13px system-ui;padding:11px 13px;border-radius:9px;border:1px solid #94a3b8;margin:8px 4px 6px 0;background:#f8fafc;color:#0f172a}#sip-ujian-kunci small{display:block;font:11px/1.6 system-ui;color:#cbd5e1;margin-top:12px}';document.head.appendChild(css);
+ function rules(){
+  var p=document.getElementById('page-exam-info');if(!p||p.querySelector('[data-sip-aturan-aktif]'))return;
+  p.querySelectorAll('li').forEach(function(n){if(/Tidak ada cara keluar dari layar penuh/.test(n.textContent))n.textContent='Tetap pada halaman ujian; layar penuh adalah bantuan tampilan, bukan pengunci sistem operasi.';});
+  var ul=p.querySelector('.bg-red-50 ul');if(ul){var li=document.createElement('li');li.setAttribute('data-sip-aturan-aktif','1');li.textContent='Perpindahan halaman/aplikasi dan pintasan screenshot/cetak yang terdeteksi diproses sesuai aturan, baik disengaja maupun tidak. Keyboard HP atau perpindahan antar-input bukan pelanggaran.';ul.appendChild(li);var note=document.createElement('p');note.style.cssText='font-size:11px;line-height:1.6;margin-top:8px';note.textContent='Tidak semua screenshot OS/foto perangkat lain dapat diketahui website. Catatan saat tab ditutup/offline dikirim sebaik mungkin; jawaban yang sudah tersimpan tidak dihapus.';ul.parentNode.appendChild(note);}
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',rules);else rules();
+ window.SIPINTAR_UJIAN_INTEGRITAS={versi:'1.0.0',aktif:active,batasKeluarMs:2500,batasBlurMs:2000};
+})();
+
+  </script>
+
+  <!-- KARTU PROGRES DAN PRATINJAU PAKET SISWA PADA MONITOR ADMIN · sumber: web/monitor-progres-ujian.js -->
+  <script id="sipintar-monitor-progres">
+/* Monitor progres per siswa v1.0.0 — tambahan pada Manajemen User/Monitor.
+   Polling daftar lama tetap 4 detik. Kartu hanya jawaban tersimpan, bukan nilai.
+   Pratinjau lazy per soal dari responseId/paket yang sama; khusus Admin asli.
+   Tidak menyimpan/menghapus jawaban, mengubah paket, atau membuka kunci. */
+(function(){
+ 'use strict';
+ var old={render:window.renderMonitorTable,load:window.loadMonitorData,stop:window.stopMonitorPolling},S={actor:'',gen:0,req:0,loading:false,channel:null,open:{},entries:{},preview:null,previewReq:0};
+ function el(id){return document.getElementById(id);}
+ function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+ function user(){return window.currentUser||null;}
+ function admin(){var u=user();return !!(u&&u.userID&&u.token&&u.role==='Admin'&&!u._sipPeranTampilan);}
+ function shown(n){if(!n||!n.isConnected)return false;for(var p=n;p&&p.nodeType===1;p=p.parentElement)if(p.hidden||p.classList.contains('hidden'))return false;return true;}
+ function active(){return admin()&&shown(el('page-admin'))&&shown(el('tab-panel-monitor'));}
+ function identity(){var u=user();return u?u.userID+'\n'+u.token:'';}
+ function closePreview(){S.preview=null;S.previewReq++;if(el('sip-monitor-soal-preview')&&window.Swal)Swal.close();}
+ function clear(){S.gen++;S.req++;S.loading=false;S.entries={};S.open={};S.channel=null;closePreview();document.querySelectorAll('.sip-monitor-progres').forEach(function(n){n.remove();});}
+ function check(){var id=identity();if(S.actor!==id){clear();S.actor=id;}return active();}
+ function api(args,opts){
+  if(window.SIPINTAR_API&&typeof SIPINTAR_API.request==='function')return SIPINTAR_API.request('getExamMonitorData',args,opts||{});
+  return new Promise(function(resolve,reject){google.script.run.withSuccessHandler(function(data){resolve({data:data,channel:null});}).withFailureHandler(reject).getExamMonitorData.apply(null,args);});
+ }
+ function label(s){return s==='sudah'?'Sudah diisi':s==='sebagian'?'Sebagian diisi':s==='belum'?'Belum diisi':'Data soal tidak tersedia';}
+ function cards(e){
+  var p=e.progres||{},rid=String(e.responseId),isOpen=S.open[rid]!==false;
+  if(!p.tersedia)return '<div class="sip-mon-belum">'+esc(p.pesan||'Paket/urutan belum terkonfirmasi; tidak menebak dari seluruh Bank Soal.')+'</div>';
+  return '<details data-sip-mon-open="'+esc(rid)+'"'+(isOpen?' open':'')+'><summary><span>Progres soal · '+esc(e.nama||e.userID)+'</span><span class="sip-mon-jumlah">'+Number(p.sudah||0)+'/'+Number(p.total||0)+' sudah diisi</span></summary>'+ 
+   '<div class="sip-mon-legenda"><span class="sudah">Sudah '+Number(p.sudah||0)+'</span><span class="belum">Belum '+Number(p.belum||0)+'</span><span class="sebagian">Sebagian '+Number(p.sebagian||0)+'</span></div>'+
+   (!p.urutanTerverifikasi?'<p class="sip-mon-lama">Urutan arsip lama belum dikonfirmasi sebagai nomor layar siswa.</p>':'')+
+   '<div class="sip-mon-grid">'+(p.kartu||[]).map(function(k){return '<button type="button" class="sip-mon-kartu '+esc(k.status)+'" data-sip-mon-rid="'+esc(rid)+'" data-sip-mon-qid="'+esc(k.questionId)+'" aria-label="'+esc((p.urutanTerverifikasi?'Soal ':'Arsip ')+k.no+': '+label(k.status))+'" title="'+esc(label(k.status)+(k.komponen>1?' · '+k.terisi+'/'+k.komponen+' komponen':'')+(k.naskahTerverifikasi?' · Buka isi soal paket siswa':' · Versi naskah belum terkonfirmasi'))+'"><b>'+(p.urutanTerverifikasi?'':'Arsip ')+Number(k.no)+'</b><small>'+esc(label(k.status))+'</small>'+(k.komponen>1?'<small>'+Number(k.terisi)+'/'+Number(k.komponen)+' komponen</small>':'')+'</button>';}).join('')+'</div><p class="sip-mon-catatan">'+esc(p.pesan||'')+' Pembaruan mengikuti penyimpanan siswa dan polling monitor, bukan pelacakan layar langsung.</p></details>';
+ }
+ window.renderMonitorTable=function(data){
+  var out=old.render&&old.render.apply(this,arguments);if(!check())return out;
+  S.entries={};(data||[]).forEach(function(e){if(e._status==='mengerjakan'&&e.responseId)S.entries[String(e.responseId)]=e;});
+  Object.keys(S.entries).forEach(function(rid){
+   var row=Array.from(document.querySelectorAll('#monitor-table-wrapper tr[data-response]')).filter(function(n){return n.getAttribute('data-response')===rid;})[0];if(!row)return;
+   var tr=document.createElement('tr');tr.className='sip-monitor-progres';tr.setAttribute('data-sip-mon-response',rid);var td=document.createElement('td');td.colSpan=10;td.innerHTML=cards(S.entries[rid]);tr.appendChild(td);row.parentNode.insertBefore(tr,row.nextSibling);
+  });
+  if(S.preview){
+   var e=S.entries[S.preview.rid];if(!e){closePreview();return out;}
+   var card=(e.progres&&e.progres.kartu||[]).filter(function(k){return k.questionId===S.preview.qid;})[0];
+   var badge=el('sip-monitor-soal-status');if(card&&badge)badge.textContent=label(card.status)+(card.komponen>1?' · '+card.terisi+'/'+card.komponen+' komponen':'');
+   if(!card||!card.naskahTerverifikasi)closePreview();
+  }
+  return out;
+ };
+ window.loadMonitorData=function(silent){
+  if(!admin()){var staff=user();if(staff&&staff.role==='Guru'&&shown(el('tab-panel-monitor')))return old.load&&old.load.apply(this,arguments);clear();if(old.stop)old.stop();return;}if(!check()||S.loading)return;
+  S.loading=true;var gen=S.gen,id=S.actor,ticket=++S.req,u=user(),wrapper=el('monitor-table-wrapper'),button=el('btn-refresh-monitor');
+  try{_monitorLoading=true;}catch(e){}
+  if(!silent&&wrapper)wrapper.innerHTML='<div class="sip-mon-loading">Memuat monitor dan progres jawaban tersimpan…</div>';
+  if(button)button.disabled=true;
+  function valid(){return check()&&S.gen===gen&&S.actor===id&&S.req===ticket;}
+  api([u.userID,u.token],{timeout:15000}).then(function(h){
+   if(!valid())return;var r=h.data;
+   if(!r||!r.success){if(wrapper)wrapper.innerHTML='<div class="sip-mon-belum">'+esc(r&&r.message||'Monitor belum dapat dimuat.')+'</div>';S.entries={};closePreview();return;}
+   S.channel=h.channel||S.channel;monitorRawData=r.data;
+   if(!silent){monitorSelected.clear();if(typeof updateMonitorBulkToolbar==='function')updateMonitorBulkToolbar();}
+   var ts=el('monitor-last-update');if(ts)ts.textContent='Data tersimpan · dibaca '+new Date().toLocaleTimeString('id-ID');
+   var counts={'count-belum-login':'belumLogin','count-login':'sudahLogin','count-mengerjakan':'mengerjakan','count-selesai':'selesai','count-curang':'curang'};
+   Object.keys(counts).forEach(function(n){if(el(n))el(n).textContent=(r.data[counts[n]]||[]).length;});
+   if(typeof populateMonitorDropdowns==='function')populateMonitorDropdowns(r.data,r.meta||{});
+   filterMonitorTab(monitorActiveTab);
+  },function(){
+   if(!valid())return;var ts=el('monitor-last-update');if(ts)ts.textContent='Pembaruan gagal — kartu yang tampil adalah data tersimpan sebelumnya, bukan status terbaru.';
+   if(!silent&&wrapper)wrapper.innerHTML='<div class="sip-mon-belum">Koneksi monitor belum berhasil. Tidak mengubah paket atau jawaban siswa.</div>';
+  }).finally(function(){if(S.req!==ticket)return;S.loading=false;try{_monitorLoading=false;}catch(e){}if(button&&button.isConnected)button.disabled=false;});
+ };
+ window.stopMonitorPolling=function(){clear();return old.stop&&old.stop.apply(this,arguments);};
+ function rich(v){if(window.SIPINTAR_MATEMATIKA&&typeof SIPINTAR_MATEMATIKA.html==='function')return SIPINTAR_MATEMATIKA.html(v);return '<p>'+esc(String(v||'').replace(/<[^>]*>/g,' '))+'</p>';}
+ function questionHTML(q){
+  var image='';if(q.image&&/^(https:\/\/|data:image\/(?:png|jpeg|webp|gif);base64,)/i.test(q.image))image='<img alt="Gambar soal dari paket siswa" src="'+esc(q.image)+'" style="max-width:100%;max-height:320px;object-fit:contain">';
+  var opts=q.type==='JODOH'?'<div class="sip-mon-jodoh"><section><h4>Pernyataan kiri</h4><ol>'+(q.kiri||[]).map(function(v){return '<li>'+rich(v)+'</li>';}).join('')+'</ol></section><section><h4>Pilihan kanan (tanpa pemetaan)</h4><ul>'+(q.kanan||[]).map(function(v){return '<li>'+rich(v)+'</li>';}).join('')+'</ul></section></div><p>'+esc(q.catatan||'')+'</p>':(q.options||[]).length?'<ol class="sip-mon-opsi">'+q.options.map(function(v){return '<li>'+rich(v)+'</li>';}).join('')+'</ol>':'';
+  return '<article id="sip-monitor-soal-preview"><p id="sip-monitor-soal-status"></p><div>'+rich(q.content)+'</div>'+image+opts+'<p class="sip-mon-catatan">Hanya isi soal paket siswa. Kunci, pemetaan jawaban benar, nilai dan jawaban siswa tidak ditampilkan.</p></article>';
+ }
+ async function preview(rid,qid){
+  if(!check())return;var e=S.entries[rid];if(!e)return;
+  var gen=S.gen,actor=S.actor,ticket=++S.previewReq,u=user();S.preview={rid:rid,qid:qid};
+  await Swal.fire({title:'Memuat soal paket siswa…',html:'<div id="sip-monitor-soal-preview">Membaca naskah yang tercatat untuk '+esc(e.nama||e.userID)+'. Tidak memilih ulang paket.</div>',showConfirmButton:false,allowOutsideClick:true,didOpen:function(){Swal.showLoading();
+   api([u.userID,u.token,{mode:'soal',responseId:rid,questionId:qid}],{channel:S.channel,timeout:10000}).then(function(h){
+    if(!check()||gen!==S.gen||actor!==S.actor||ticket!==S.previewReq||!el('sip-monitor-soal-preview'))return;
+    var r=h.data;if(!r||!r.success||!r.soal){Swal.hideLoading();Swal.update({title:'Naskah belum dapat ditampilkan',html:'<div id="sip-monitor-soal-preview">'+esc(r&&r.message||'Respons belum tersedia.')+'</div>',showConfirmButton:true,confirmButtonText:'Tutup'});return;}
+    Swal.hideLoading();Swal.update({title:'Soal '+r.no+' · '+esc(e.nama||e.userID),html:questionHTML(r.soal),showConfirmButton:true,confirmButtonText:'Tutup',width:850});
+    var card=(r.progres.kartu||[]).filter(function(k){return k.questionId===qid;})[0],b=el('sip-monitor-soal-status');if(card&&b)b.textContent=label(card.status)+(card.komponen>1?' · '+card.terisi+'/'+card.komponen+' komponen':'');
+    if(window.SIPINTAR_MATEMATIKA)SIPINTAR_MATEMATIKA.render(el('sip-monitor-soal-preview'));
+   },function(){if(check()&&ticket===S.previewReq&&el('sip-monitor-soal-preview')){Swal.hideLoading();Swal.update({title:'Koneksi pratinjau belum berhasil',html:'<div id="sip-monitor-soal-preview">Tidak ada soal/paket/jawaban yang diubah.</div>',showConfirmButton:true,confirmButtonText:'Tutup'});}});
+  }});if(ticket===S.previewReq){S.preview=null;S.previewReq++;}
+ }
+ document.addEventListener('click',function(ev){var n=ev.target.closest&&ev.target.closest('[data-sip-mon-rid]');if(n){ev.preventDefault();preview(n.getAttribute('data-sip-mon-rid'),n.getAttribute('data-sip-mon-qid'));}});
+ document.addEventListener('toggle',function(ev){var n=ev.target;if(n&&n.hasAttribute&&n.hasAttribute('data-sip-mon-open'))S.open[n.getAttribute('data-sip-mon-open')]=n.open;},true);
+ setInterval(function(){if(S.actor&&(!admin()||S.actor!==identity()||!active())){clear();S.actor=identity();}},800);
+ var css=document.createElement('style');css.id='sip-monitor-progres-css';css.textContent='.sip-monitor-progres>td{padding:0 22px 16px;background:#f8fafc}.sip-monitor-progres details{border:1px solid #dbe5f2;border-radius:12px;background:white;padding:12px}.sip-monitor-progres summary{cursor:pointer;display:flex;align-items:center;flex-wrap:wrap;justify-content:space-between;gap:8px;font:700 13px system-ui;color:#1e3a5f}.sip-mon-jumlah{font-size:12px;color:#047857}.sip-mon-legenda{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.sip-mon-legenda span{border-radius:7px;padding:4px 8px;font:600 11px system-ui}.sip-mon-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:7px}.sip-mon-kartu{min-height:70px;border:1px solid #cbd5e1;border-radius:9px;padding:7px;cursor:pointer;font:12px system-ui}.sip-mon-kartu b{display:block;font-size:17px}.sip-mon-kartu small{display:block;font-size:10px;line-height:1.5}.sip-mon-kartu.sudah,.sip-mon-legenda .sudah{color:#065f46;background:#ecfdf5;border-color:#86efac}.sip-mon-kartu.belum,.sip-mon-legenda .belum{color:#475569;background:#f8fafc}.sip-mon-kartu.sebagian,.sip-mon-legenda .sebagian{color:#92400e;background:#fffbeb;border-color:#fcd34d}.sip-mon-kartu:focus-visible{outline:3px solid #818cf8;outline-offset:2px}.sip-mon-catatan,.sip-mon-lama,.sip-mon-belum{font:11.5px/1.6 system-ui;color:#64748b;margin:10px 0 0}.sip-mon-lama{color:#92400e}.sip-mon-loading{padding:35px;text-align:center;color:#64748b}#sip-monitor-soal-preview{text-align:left;font:14px/1.7 system-ui;color:#1e293b;overflow-wrap:anywhere}#sip-monitor-soal-status{font-weight:700;color:#047857}.sip-mon-opsi{list-style:upper-alpha;padding-left:26px}.sip-mon-opsi li{margin:8px 0}.sip-mon-jodoh{display:grid;grid-template-columns:1fr 1fr;gap:20px}.sip-mon-jodoh ol{list-style:decimal;padding-left:22px}@media(max-width:560px){.sip-monitor-progres>td{padding:0 8px 12px}.sip-monitor-progres details,.sip-monitor-progres .sip-mon-belum{max-width:calc(100vw - 60px)}.sip-mon-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.sip-mon-kartu{min-width:0}.sip-mon-jodoh{grid-template-columns:1fr}.sip-mon-kartu small{font-size:9px}}';document.head.appendChild(css);
+ window.SIPINTAR_MONITOR_PROGRES_VERSI='1.0.0';
+})();
+
+  </script>
+
+  <!-- REDAKSI KISI SESUAI SASARAN PERTANYAAN TANPA MEMBOCORKAN SOAL · sumber: web/kisi-redaksi-sasaran.js -->
+  <script id="sipintar-kisi-sasaran">
+/* Redaksi sasaran pertanyaan v1.0.0 — lima kolom tetap. Tidak membaca redaksi
+   soal di browser publik. Topik berasal dari DTO publik/metadata yang ditinjau.
+   Pratinjau draf Admin hanya menggabungkan topik yang dicentang/disetujui. */
+(function(){
+ 'use strict';
+ function levels(r){var out=[];(r.levelsC||[r.levelC]).forEach(function(v){(String(v||'').match(/C[1-6]/g)||[]).forEach(function(c){if(out.indexOf(c)<0)out.push(c);});});return out;}
+ function clean(t){return String(t||'').replace(/\s+/g,' ').trim().replace(/[.;,:\s]+$/,'').replace(/^(?:(?:siswa|peserta didik)\s+(?:dapat\s+|mampu\s+)?)?(?:menentukan|menemukan|menghitung|mengidentifikasi|menyebutkan|menjelaskan|menganalisis|mengevaluasi|merancang)\s+/i,'');}
+ function bab(s){return String(s||'materi ini').trim().split(/\s+/).map(function(w){return /^[^A-Za-z0-9]*[A-Z0-9]{2,}[^A-Za-z0-9]*$/.test(w)?w:w.toLowerCase();}).join(' ');}
+ function redact(r){var t=r.topikDisetujui===false||r.disetujui===false?'':clean(r.topikSoal),c=levels(r).join(' / ')||'belum ditetapkan';return t?'Siswa menentukan '+t+' (level kognitif '+c+').':'Siswa menentukan konsep terkait '+bab(r.bab)+' (sasaran pertanyaan menunggu tinjauan Admin; level kognitif '+c+').';}
+ function combine(a){var u=[];a.forEach(function(v){v=String(v||'').trim();if(v&&!u.some(function(x){return x.toLowerCase()===v.toLowerCase();}))u.push(v);});var more=u.length>4;u=u.slice(0,4);if(more)return u.join(', ')+', atau topik sejenis';return u.length<2?(u[0]||''):u.slice(0,-1).join(', ')+(u.length>2?',':'')+' atau '+u[u.length-1];}
+ window.sipKisiRedaksiSasaran_=redact;
+ var old=window.sipKisiTabelItemsHtml_;
+ window.sipKisiTabelItemsHtml_=function(rows){
+  rows=rows||[];if(typeof window.sipKisiRencanaRows_==='function')rows=window.sipKisiRencanaRows_(rows);
+  if(!rows.length||typeof window.sipKisiTabel5Html_!=='function')return old&&old.apply(this,arguments);
+  var admin=window.currentUser&&currentUser.role==='Admin'&&!currentUser._sipPeranTampilan,items=admin?window._sipKisiItems||[]:[],plan=rows.some(function(r){return Array.isArray(r.levelsC);});
+  var view=rows.map(function(r){
+   var cs=levels(r),topik=combine(items.filter(function(i){return i.materi===r.materi&&i.bab===r.bab&&cs.indexOf(i.levelC)>=0&&i.disetujui===true&&i.topikDisetujui===true;}).map(function(i){return i.topikSoal;}));
+   var x=Object.assign({},r,{topikSoal:topik||(!admin&&r.topikSoal?r.topikSoal:''),bentuk:r.bentuk||(plan?'Bervariasi sesuai paket':'Sesuai Bank Soal'),nomor:Number(r.jumlahSoal||0)+(plan?' soal setiap peserta':' butir'),keteranganAcak:plan?'Nomor berbeda tiap peserta':''});
+   x.indikator=redact(x);return x;
+  });
+  return window.sipKisiTabel5Html_(view,'Pratinjau draf. Sasaran diambil dari topik yang telah ditinjau; tidak menyalin angka, kalimat, pilihan atau kunci soal.');
+ };
+ window.SIPINTAR_KISI_SASARAN_VERSI='1.0.0';
+})();
+
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5b59e0ffb5ef8d6',t:'MTc5NDgyMjg5OQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5b59e0ffb5ef8d6',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 <!-- Lisensi MathJax tertanam:
 
                                  Apache License
