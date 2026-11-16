@@ -285,6 +285,14 @@
       cache: 'no-store'
     };
 
+    /* keepalive hanya untuk catatan saat pagehide; browser membatasi 64 KiB.
+       Jangan memotong payload umum atau mengubah request biasa. */
+    if (opts.keepalive === true) {
+      var keepBytes = body.length * 3;
+      try { if (typeof Blob === 'function') keepBytes = new Blob([body]).size; } catch (eKeep) {}
+      if (keepBytes <= 60000) init.keepalive = true;
+    }
+
     if (channel === 'proxy' && API_BASE && API_BASE.indexOf('http') === 0
         && API_BASE.indexOf(location.origin) !== 0) {
       init.credentials = 'omit';
@@ -420,6 +428,11 @@
 
     return sipRequest(action, siapArgs, opts).then(function (hasil) {
       log('✓', action, (Date.now() - t0) + 'ms', hasil.channel);
+      /* Hook ujian hanya di app baru; klien/pemanggil lama tetap kompatibel. */
+      if (typeof window.sipUjianApiHasil_ === 'function') {
+        try { var guarded = window.sipUjianApiHasil_(action, inputArgs, hasil.data, hasil.channel); if (guarded !== undefined) hasil.data = guarded; }
+        catch (eGuard) { if (action === 'getExamQuestions') hasil.data = { error: 'Pengamanan sesi ujian belum siap. Hubungi petugas; jawaban tidak dihapus.' }; }
+      }
       if (typeof runner._ok === 'function') {
         try { runner._ok.call(runner._user || null, hasil.data); }
         catch (eCb) { warn('handler sukses error pada', action, eCb); }
