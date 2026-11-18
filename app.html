@@ -8624,6 +8624,7 @@ function renderInternalTable() {
       actionBtn = `<span class="text-slate-300 text-[10px] uppercase font-bold tracking-wider">-</span>`;
     }
 
+    if(currentUser&&currentUser.role==='Admin'&&!currentUser._sipPeranTampilan&&!isDone){actionBtn += `<button type="button" onclick="openGradingModal('${r.responseId}')" class="h-8 px-2 text-xs text-blue-700 border border-blue-200 rounded-lg" title="Lihat jawaban uraian tersimpan (hanya baca)">Lihat Uraian</button>`;}
     return `
        <tr class="border-b border-slate-50 hover:bg-slate-50/80 transition-colors duration-200 group">
           <td class="p-5 text-center text-slate-400 text-sm font-medium w-16">${realIndex}</td>
@@ -9188,8 +9189,8 @@ function viewStudentAnswers(responseId) {
           let pointClean = Number.isInteger(item.point) ? item.point : parseFloat(item.point).toFixed(2);
           
           // Badge poin ditampilkan untuk SEMUA tipe soal termasuk Esai
-          const isEssayGraded  = item.type === 'Esai' && item.point > 0;
-          const isEssayPending = item.type === 'Esai' && item.point === 0;
+          const isEssayGraded  = item.type === 'Esai' && (item.essayGraded === true || (item.essayGraded == null && item.point > 0));
+          const isEssayPending = item.type === 'Esai' && !isEssayGraded;
           let scoreBadge = '';
           if (isEssayPending) {
             scoreBadge = `<div class="ml-2 px-2 py-1 rounded bg-amber-50 text-amber-700 border border-amber-300 text-[10px] font-bold whitespace-nowrap">Menunggu Koreksi</div>`;
@@ -9204,7 +9205,7 @@ function viewStudentAnswers(responseId) {
             bgClass     = isEssayGraded ? 'bg-emerald-50/20'  : 'bg-white';
             const rawEsai = String(item.studentAns || '').trim();
             studentAnswerHTML = rawEsai
-              ? '<div class="whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto bg-slate-50 border border-slate-200 rounded-lg p-3 text-slate-800">' + rawEsai + '</div>'
+              ? '<div class="whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto bg-slate-50 border border-slate-200 rounded-lg p-3 text-slate-800">' + escapeGradeHtml(rawEsai) + '</div>'
               : '<i class="text-slate-400">(Tidak Dijawab)</i>';
             if (isEssayGraded) {
               keyAnswerHTML = `<span class="text-emerald-600 font-bold"><i class="fas fa-check-circle mr-1"></i>Sudah Dinilai: ${pointClean} / ${item.maxPoint} Poin</span>`;
@@ -9311,7 +9312,7 @@ function viewStudentAnswers(responseId) {
         const totalBobot      = res.data.reduce((s, i) => s + (Number(i.maxPoint) || 0), 0);
         const totalObjektif   = res.data.filter(i => i.type !== 'Esai').reduce((s, i) => s + (Number(i.point) || 0), 0);
         const totalEsai       = res.data.filter(i => i.type === 'Esai').reduce((s, i) => s + (Number(i.point) || 0), 0);
-        const adaEsaiBelumDinilai = res.data.some(i => i.type === 'Esai' && i.point === 0);
+        const adaEsaiBelumDinilai = res.data.some(i => i.type === 'Esai' && (i.essayGraded === false || (i.essayGraded == null && i.point === 0)));
 
         html += `
           <div class="mt-4 p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -15655,9 +15656,9 @@ function downloadSingleStudentAnswers(responseId, studentName) {
         ws_data.push(["", "", "", "", "", { v: "POIN OBJEKTIF (PG/BS/JODOH)", s: styleTotalLabel }, { v: Number(totalObjectivePoints.toFixed(2)), s: { font: { bold: true } } }]);
         
         // 2. Poin Esai (dari koreksi guru, proporsional)
-        const essayLabel = (!hasUngraded && essayBonus > 0) ? `POIN ESAI (KOREKSI GURU)` : `POIN ESAI (BELUM DIKOREKSI)`;
-        const essayColor = (!hasUngraded && essayBonus > 0) ? "2563EB" : "D97706";
-        const essayBg    = (!hasUngraded && essayBonus > 0) ? "EEF4FF" : "FFF3CD";
+        const essayLabel = (!hasUngraded) ? `POIN ESAI (KOREKSI GURU)` : `POIN ESAI (BELUM DIKOREKSI)`;
+        const essayColor = (!hasUngraded) ? "2563EB" : "D97706";
+        const essayBg    = (!hasUngraded) ? "EEF4FF" : "FFF3CD";
         ws_data.push(["", "", "", "", "", 
           { v: essayLabel, s: { font: { bold: true }, fill: { fgColor: { rgb: essayBg } } } }, 
           { v: Number(essayBonus.toFixed(2)), s: { font: { bold: true, color: { rgb: essayColor } } } }
@@ -29487,7 +29488,108 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
 })();
 
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5b59e0ffb5ef8d6',t:'MTc5NDgyMjg5OQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5b59e0ffb5ef8d6',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+  <!-- KOREKSI ADMIN DENGAN NILAI ANGKA PER NOMOR URAIAN SETELAH DIKUMPULKAN · sumber: web/koreksi-uraian.js -->
+  <script id="sipintar-koreksi-uraian">
+/* Koreksi uraian per nomor v1.0.0 — paket 62 berbasis 60.
+   Tidak memakai cache jawaban sebagai dasar simpan. Hanya Admin asli.
+   Tidak menjalankan AI, polling siswa, refresh ujian atau membuka sanksi. */
+(function(){
+ 'use strict';
+ var KEY='_manual_essay_detail',old={open:window.openGradingModal,close:window.closeGradingModal,submit:window.submitEssayGrade,render:window.renderEssayGrading,neighbor:window.gradeNeighbor,prefetch:window.prefetchEssayPack,table:window.renderInternalTable};
+ var S={seq:0,rid:'',actor:'',dto:null,loading:false,saving:false,dirty:false,timer:null};
+ function el(id){return document.getElementById(id);}
+ function user(){return window.currentUser||null;}
+ function admin(){var u=user();return !!(u&&u.role==='Admin'&&!u._sipPeranTampilan&&u.userID&&u.token);}
+ function identity(){var u=user();return u?u.userID+'\n'+u.token:'';}
+ function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+ function number(n){return Number(n).toLocaleString('id-ID',{maximumFractionDigits:4});}
+ function saveButton(){return document.querySelector('#modal-grading button[onclick="submitEssayGrade()"]');}
+ function alive(seq,rid,actor){return admin()&&S.seq===seq&&S.rid===rid&&identity()===actor&&S.actor===actor&&el('modal-grading')&&!el('modal-grading').classList.contains('hidden');}
+ function imageURL(v){return /^(?:https:\/\/|data:image\/(?:png|jpeg|webp|gif);base64,)/i.test(String(v||''))?String(v):'';}
+ /* HTML sumber tidak dipercaya. Tidak ada event/style/tautan aktif, iframe,
+    script, SVG atau atribut asing. Teks ketikan biasa selalu textContent. */
+ function rich(value){
+  var template=document.createElement('template');template.innerHTML=String(value||'');
+  var allowed='P BR DIV SPAN B STRONG I EM U S SUB SUP UL OL LI TABLE THEAD TBODY TR TD TH BLOCKQUOTE PRE CODE IMG MATH MROW MI MN MO MS MTEXT MFRAC MSQRT MROOT MSUP MSUB MSUBSUP MOVER MUNDER MUNDEROVER MFENCED MTABLE MTR MTD MSPACE MSTYLE SEMANTICS ANNOTATION'.split(' ');
+  function clean(root){Array.from(root.childNodes).forEach(function(n){
+   if(n.nodeType===8){n.remove();return;}if(n.nodeType!==1)return;
+   var tag=n.tagName.toUpperCase();if(allowed.indexOf(tag)<0){if(/^(SCRIPT|STYLE|IFRAME|OBJECT|EMBED|SVG|FORM|INPUT|BUTTON|LINK|META|BASE)$/.test(tag)){n.remove();return;}clean(n);n.replaceWith.apply(n,Array.from(n.childNodes));return;}
+   Array.from(n.attributes).forEach(function(a){var name=a.name.toLowerCase(),ok=tag==='IMG'&&(name==='alt'||name==='src')||['display','mathvariant','rowspan','colspan','encoding'].indexOf(name)>=0;if(!ok)n.removeAttribute(a.name);});
+   if(tag==='IMG'){var src=imageURL(n.getAttribute('src'));if(!src)n.remove();else{n.setAttribute('src',src);n.setAttribute('referrerpolicy','no-referrer');n.setAttribute('loading','lazy');n.setAttribute('alt',n.getAttribute('alt')||'Gambar tersimpan');}}
+   clean(n);
+  });}clean(template.content);return template.innerHTML;
+ }
+ function question(q){var image=imageURL(q.image),source=q.question||'',render=window.SIPINTAR_MATEMATIKA&&SIPINTAR_MATEMATIKA.html?SIPINTAR_MATEMATIKA.html(source):source,bottom=true;
+  if(typeof window.sipTerapkanTandaGambar_==='function'){var placed=sipTerapkanTandaGambar_(render,image);render=placed.content;bottom=placed.bawah;}
+  return rich(render)+(image&&bottom?'<img src="'+esc(image)+'" alt="Gambar soal uraian" referrerpolicy="no-referrer">':'');
+ }
+ function inputs(){return Array.from(document.querySelectorAll('#grading-content input[data-sip-uraian-id]'));}
+ function readValues(){var out=[],error=null;inputs().forEach(function(input){var raw=input.value.trim(),n=Number(raw),max=Number(input.max),valid=raw!==''&&isFinite(n)&&n>=0&&n<=max;if(!valid&&!error)error=input;out.push({id:input.getAttribute('data-sip-uraian-id'),score:valid?n:null});});return {items:out,error:error};}
+ function summary(){
+  var dto=S.dto,b=saveButton(),v=readValues(),count=v.items.filter(function(p){return p.score!==null;}).length,total=v.items.reduce(function(t,p){return t+(p.score||0);},0),max=dto?(dto.data||[]).reduce(function(t,q){return t+Number(q.maxPoint||0);},0):0;
+  if(el('sip-uraian-total'))el('sip-uraian-total').textContent=count+'/'+(dto?dto.totalEssay:0)+' nomor diisi · '+number(total)+' / '+number(max)+' poin uraian';
+  if(b){b.disabled=!dto||!dto.canGrade||!dto.totalEssay||S.loading||S.saving||!!v.error||count!==dto.totalEssay;b.textContent=S.saving?'Menyimpan nilai per nomor…':'Simpan nilai per nomor & hitung total';}
+ }
+ function reset(){S.seq++;S.rid='';S.actor='';S.dto=null;S.loading=false;S.saving=false;S.dirty=false;if(S.timer)clearInterval(S.timer);S.timer=null;var content=el('grading-content');if(content)content.replaceChildren();var name=el('grading-student-name');if(name)name.textContent='';if(el('modal-grading'))el('modal-grading').classList.add('hidden');try{currentGradingId=null;}catch(e){} }
+ function guard(fn){if(S.saving)return;if(!S.dirty){fn();return;}Swal.fire({title:'Nilai belum disimpan',text:'Isian nilai per nomor belum tersimpan. Tetap mengoreksi atau tinggalkan isian ini?',icon:'warning',showCancelButton:true,confirmButtonText:'Tinggalkan isian',cancelButtonText:'Tetap mengoreksi'}).then(function(r){if(r.isConfirmed){S.dirty=false;fn();}});}
+ function markButtons(){if(!admin())return;document.querySelectorAll('#res-table-container button[onclick^="openGradingModal("]').forEach(function(b){b.title='Lihat jawaban & koreksi uraian per nomor';b.setAttribute('aria-label',b.title);if(!b.querySelector('.sip-uraian-action')&&!/uraian/i.test(b.textContent)){b.classList.remove('w-8');b.classList.add('gap-1','px-2');var span=document.createElement('span');span.className='sip-uraian-action';span.textContent='Uraian';b.appendChild(span);}});}
+ function neighbors(){var rows=typeof filteredResults!=='undefined'?filteredResults:typeof allResultsData!=='undefined'?allResultsData:[];return (rows||[]).filter(function(r){return r&&r.responseId;}).map(function(r){return String(r.responseId);});}
+ function setNeighbors(){var order=neighbors(),i=order.indexOf(S.rid),prev=el('btn-grade-prev'),next=el('btn-grade-next');if(prev){prev.classList.toggle('hidden',!(i>0));prev.disabled=S.loading||S.saving;}if(next){next.classList.toggle('hidden',!(i>=0&&i<order.length-1));next.disabled=S.loading||S.saving;}}
+ function render(dto){
+  S.dto=dto;S.loading=false;S.dirty=false;var content=el('grading-content'),name=el('grading-student-name'),legacy=el('input-essay-score');
+  if(legacy){legacy.disabled=true;legacy.value='';legacy.parentElement.style.display='none';}
+  if(name)name.textContent='Siswa: '+(dto.studentName||dto.userId)+' · '+dto.status;
+  var html='<div class="sip-uraian-panel"><div class="sip-uraian-note '+(dto.canGrade?'':'sip-uraian-warning')+'">'+(dto.canGrade?'Berikan nilai angka untuk <b>setiap nomor</b>, sesuai bobot maksimum. <b>0 adalah nilai sah</b>; kosong berarti belum dinilai. Semua nomor disimpan bersama untuk siswa ini.':esc(dto.readOnlyReason||'Hanya baca.'))+'</div>';
+  html+='<button type="button" id="sip-uraian-refresh" class="sip-uraian-refresh">Muat ulang panel koreksi</button><p class="sip-uraian-small">Membaca jawaban yang sudah tersimpan, bukan ketikan yang belum terkirim. Tombol ini hanya memuat panel Admin, tidak me-refresh ujian siswa.</p>';
+  if(!dto.urutanTerverifikasi)html+='<p class="sip-uraian-warning sip-uraian-note">Nomor mengikuti arsip paket/bank lama; urutan nomor layar siswa dahulu belum terekam. ID soal tetap dicantumkan. Tidak meminta siswa refresh.</p>';
+  if(dto.legacyTotal!==null&&dto.legacyTotal!==undefined)html+='<p class="sip-uraian-note">Total koreksi lama: <b>'+esc(number(dto.legacyTotal))+' poin</b>. Tidak dibagikan otomatis ke nomor. Total lama tetap sampai Admin menyimpan nilai lengkap setiap nomor.</p>';
+  if(!(dto.data||[]).length)html+='<p class="sip-uraian-note">Tidak ada soal uraian pada paket peserta ini.</p>';
+  (dto.data||[]).forEach(function(q,i){
+   var label=(dto.urutanTerverifikasi?'Nomor ':'Nomor arsip ')+q.number,prior=q.needsReview&&q.previousScore!==null?'Nilai sebelumnya '+number(q.previousScore)+' perlu ditinjau ulang karena jawaban/soal/bobot berubah.':q.graded?'Sudah dinilai, termasuk jika nilainya 0.':'Belum dinilai.';
+   html+='<article class="sip-uraian-card" data-sip-uraian-q="'+esc(q.id)+'"><header><h4>'+esc(label)+'</h4><span>Maksimum '+esc(number(q.maxPoint))+' poin</span></header><p class="sip-uraian-id">ID soal: '+esc(q.id)+'</p><section class="sip-uraian-soal">'+question(q)+'</section><h5>Jawaban yang diketik siswa</h5><div class="sip-uraian-answer" id="sip-uraian-answer-'+i+'"></div>'+(q.emptyAnswer?'<p class="sip-uraian-small">Nomor ini belum dijawab / jawaban tersimpan kosong.</p>':'')+'<details class="sip-uraian-raw"><summary>Lihat data jawaban tersimpan</summary><pre id="sip-uraian-raw-'+i+'"></pre></details><label class="sip-uraian-label" for="sip-uraian-score-'+i+'">Nilai '+esc(label.toLowerCase())+' (0–'+esc(number(q.maxPoint))+')</label><input id="sip-uraian-score-'+i+'" data-sip-uraian-id="'+esc(q.id)+'" type="number" min="0" max="'+esc(q.maxPoint)+'" step="any" inputmode="decimal" placeholder="Belum dinilai" value="'+(q.graded?esc(q.score):'')+'"'+(!dto.canGrade?' disabled':'')+' aria-describedby="sip-uraian-state-'+i+'"><p id="sip-uraian-state-'+i+'" class="sip-uraian-small">'+esc(prior)+'</p></article>';
+  });
+  html+='<p class="sip-uraian-total" id="sip-uraian-total" aria-live="polite"></p><p class="sip-uraian-small">Penyimpanan tidak mengubah jawaban siswa, soal/paket, waktu pengumpulan, status ujian, atau validasi hasil. Validasi bukan pengganti koreksi nilai.</p></div>';content.innerHTML=html;
+  (dto.data||[]).forEach(function(q,i){var answer=el('sip-uraian-answer-'+i);if(q.answerFormat==='html')answer.innerHTML=rich(q.answer);else{var pre=document.createElement('pre');pre.textContent=q.answer==null?'':String(q.answer);answer.appendChild(pre);}el('sip-uraian-raw-'+i).textContent=typeof q.answerRaw==='string'?q.answerRaw:JSON.stringify(q.answerRaw,null,2);});
+  el('sip-uraian-refresh').addEventListener('click',function(){guard(function(){load(S.rid);});});inputs().forEach(function(n){n.addEventListener('input',function(){S.dirty=true;summary();});});summary();setNeighbors();
+  if(window.SIPINTAR_MATEMATIKA)SIPINTAR_MATEMATIKA.render(content);
+ }
+ function load(rid){
+  if(!admin()){reset();return;}var u=user();S.seq++;S.rid=String(rid);S.actor=identity();S.dto=null;S.loading=true;S.saving=false;S.dirty=false;var seq=S.seq,actor=S.actor;try{currentGradingId=S.rid;}catch(e){}
+  var modal=el('modal-grading'),content=el('grading-content');if(!modal||!content)return;modal.classList.remove('hidden');modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');
+  var heading=modal.querySelector('h3');if(heading)heading.textContent='Koreksi Uraian per Nomor';var legacy=el('input-essay-score');if(legacy){legacy.disabled=true;legacy.parentElement.style.display='none';}
+  content.innerHTML='<div class="sip-uraian-note" role="status">Memuat jawaban tersimpan dari server… Nilai belum dapat disimpan sebelum data segar terkonfirmasi.</div>';if(el('grading-student-name'))el('grading-student-name').textContent='Membaca respons '+rid;summary();setNeighbors();
+  if(S.timer)clearInterval(S.timer);S.timer=setInterval(function(){if(!admin()||S.actor!==identity())reset();},300);
+  google.script.run.withSuccessHandler(function(dto){if(!alive(seq,String(rid),actor))return;if(!dto||!dto.success||dto.schema!=='1.0.0'||!dto.perNomor||String(dto.responseId)!==String(rid)){S.loading=false;content.innerHTML='<div class="sip-uraian-note sip-uraian-warning">'+esc(dto&&dto.message||'Panel per nomor belum tersedia. Pastikan backend paket 62 sudah dipasang. Tidak memakai data cache untuk mengoreksi.')+'</div>';summary();setNeighbors();return;}render(dto);}).withFailureHandler(function(err){if(!alive(seq,String(rid),actor))return;S.loading=false;content.innerHTML='<div class="sip-uraian-note sip-uraian-warning">'+esc(err&&err.message||'Koneksi gagal. Tutup dan buka lagi panel Admin; jawaban siswa tidak diubah.')+'</div>';summary();setNeighbors();}).getEssayData(String(rid),u.userID,u.token);
+ }
+ window.openGradingModal=function(rid){if(!admin()){reset();if(window.Swal)Swal.fire('Khusus Admin','Panel jawaban dan nilai uraian memerlukan sesi Admin asli.','warning');return;}guard(function(){load(String(rid));});};
+ window.closeGradingModal=function(){if(!S.rid)return old.close&&old.close.apply(this,arguments);guard(reset);};
+ window.renderEssayGrading=function(dto){if(S.rid&&admin()&&dto&&dto.perNomor)return render(dto);if(!admin())return old.render&&old.render.apply(this,arguments);};
+ window.gradeNeighbor=function(dir){if(!S.rid)return old.neighbor&&old.neighbor.apply(this,arguments);var order=neighbors(),i=order.indexOf(S.rid),n=i+Number(dir);if(i>=0&&n>=0&&n<order.length)guard(function(){load(order[n]);});};
+ window.prefetchEssayPack=function(){if(admin())return;return old.prefetch&&old.prefetch.apply(this,arguments);};
+ window.renderInternalTable=function(){var result=old.table&&old.table.apply(this,arguments);markButtons();return result;};
+ window.submitEssayGrade=function(){
+  if(!S.rid)return;if(!admin()||S.loading||S.saving||!S.dto||!S.dto.canGrade)return;
+  var values=readValues();if(values.error||values.items.length!==S.dto.totalEssay){if(values.error)values.error.focus();Swal.fire('Nilai belum lengkap','Isi nilai setiap nomor dari 0 sampai bobot maksimum. Kolom kosong bukan nilai 0.','warning');return;}
+  var rid=S.rid,seq=S.seq,actor=S.actor,u=user(),payload={mode:'perNomor',schema:S.dto.schema,sourceHash:S.dto.sourceHash,items:values.items};S.saving=true;inputs().forEach(function(n){n.disabled=true;});summary();setNeighbors();if(el('sip-uraian-refresh'))el('sip-uraian-refresh').disabled=true;
+  function unlock(){S.saving=false;inputs().forEach(function(n){n.disabled=!S.dto.canGrade;});summary();setNeighbors();if(el('sip-uraian-refresh'))el('sip-uraian-refresh').disabled=false;}
+  google.script.run.withSuccessHandler(function(res){
+   if(!alive(seq,rid,actor))return;unlock();if(!res||!res.success){if(res&&res.stale){S.dto.canGrade=false;inputs().forEach(function(n){n.disabled=true;});summary();}Swal.fire('Koreksi belum tersimpan',res&&res.message||'Penyimpanan belum terkonfirmasi. Jangan reset siswa.','warning');return;}
+   if(String(res.responseId)!==rid||!res.perNomor){Swal.fire('Konfirmasi tidak sesuai','Penyimpanan tidak terkonfirmasi untuk respons ini. Buka ulang panel Admin untuk memeriksa.','error');return;}
+   try{if(window._answerDetailCache)delete window._answerDetailCache[rid];if(window._essayPack&&window._essayPack.byResponse)delete window._essayPack.byResponse[rid];var rows=typeof allResultsData!=='undefined'?allResultsData:[];rows.forEach(function(r){if(String(r.responseId)===rid){r.score=res.finalScore;r.nilai=res.finalScore;}});}catch(e){}
+   S.dirty=false;if(res.data&&res.data.perNomor)render(res.data);else load(rid);
+   Swal.fire({title:'Nilai per nomor tersimpan',text:'Poin uraian '+number(res.essayTotal)+'. Nilai total ujian: '+number(res.finalScore)+'. Jawaban asli siswa tetap.',icon:'success'});
+   /* Muat tabel Admin saja. Bukan refresh siswa/ujian. Isian yang sudah
+      terkonfirmasi tetap ditampilkan untuk memeriksa setiap nomor. */
+   var selected=el('select-result-exam');if(selected&&selected.value&&typeof window.loadResultsTable==='function')loadResultsTable(selected.value);
+  }).withFailureHandler(function(err){if(!alive(seq,rid,actor))return;unlock();Swal.fire('Konfirmasi simpan belum diterima',(err&&err.message||'Koneksi terputus')+'. Isian tetap di panel. Buka ulang panel Admin untuk memeriksa apakah nilai sudah tersimpan sebelum mengirim lagi.','warning');}).saveEssayGrade(rid,payload,u.userID,u.token);
+ };
+ var style=document.createElement('style');style.id='sip-uraian-style';style.textContent='.sip-uraian-panel{font:14px/1.65 system-ui;color:#1e293b;overflow-wrap:anywhere}.sip-uraian-note{padding:12px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;margin-bottom:12px}.sip-uraian-warning{background:#fffbeb;border-color:#fcd34d;color:#92400e}.sip-uraian-card{padding:18px;border:1px solid #dbe3ee;border-radius:14px;margin:18px 0;background:white}.sip-uraian-card header{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}.sip-uraian-card h4{font-size:16px;font-weight:800;color:#3730a3}.sip-uraian-card header span,.sip-uraian-id,.sip-uraian-small{font-size:12px;color:#64748b}.sip-uraian-soal{margin:14px 0}.sip-uraian-card img{max-width:100%;max-height:340px;object-fit:contain}.sip-uraian-card h5,.sip-uraian-label{display:block;font-weight:750;margin:12px 0 5px}.sip-uraian-answer{background:#f8fafc;border:1px solid #dbe3ee;border-radius:9px;padding:14px;max-height:420px;overflow:auto}.sip-uraian-answer pre,.sip-uraian-raw pre{white-space:pre-wrap;font:inherit;overflow-wrap:anywhere}.sip-uraian-raw{font-size:12px;margin-top:9px;color:#475569}.sip-uraian-raw pre{padding:9px;background:#f1f5f9}.sip-uraian-card input{display:block;width:165px;max-width:100%;border:2px solid #c7d2fe;background:white;border-radius:8px;padding:9px 12px;font-size:18px;font-weight:750;color:#1e293b}.sip-uraian-card input:focus{outline:3px solid #c7d2fe;border-color:#4f46e5}.sip-uraian-card input:disabled{background:#f1f5f9;color:#64748b}.sip-uraian-total{font-weight:800;margin:16px 0;color:#1d4ed8}.sip-uraian-refresh{padding:7px 12px;border:1px solid #cbd5e1;border-radius:8px;color:#1d4ed8;background:white;font-size:12px;font-weight:750}#modal-grading button:disabled{opacity:.5;cursor:not-allowed}@media(max-width:500px){.sip-uraian-card{padding:12px}#grading-content:has(.sip-uraian-panel){padding:12px}.sip-uraian-answer{padding:10px}.sip-uraian-action{font-size:10px}}';document.head.appendChild(style);
+ window.SIPINTAR_KOREKSI_URAIAN_VERSI='1.0.0';
+})();
+
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5c69782ab483fab',t:'MTc5NTAwMDg4OA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5c69782ab483fab',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 <!-- Lisensi MathJax tertanam:
 
                                  Apache License
