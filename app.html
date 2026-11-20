@@ -8626,7 +8626,7 @@ function renderInternalTable() {
 
     if(currentUser&&currentUser.role==='Admin'&&!currentUser._sipPeranTampilan&&!isDone){actionBtn += `<button type="button" onclick="openGradingModal('${r.responseId}')" class="h-8 px-2 text-xs text-blue-700 border border-blue-200 rounded-lg" title="Lihat jawaban uraian tersimpan (hanya baca)">Lihat Uraian</button>`;}
     return `
-       <tr class="border-b border-slate-50 hover:bg-slate-50/80 transition-colors duration-200 group">
+       <tr data-sip-ketuntasan-response="${escapeGradeHtml(r.responseId)}" class="border-b border-slate-50 hover:bg-slate-50/80 transition-colors duration-200 group">
           <td class="p-5 text-center text-slate-400 text-sm font-medium w-16">${realIndex}</td>
           <td class="p-5">
               <div class="flex items-center gap-4">
@@ -29617,7 +29617,145 @@ window.SIPINTAR_FITUR_NONAKTIF = {"pengawas":{"nonaktif":true,"aksi":["getPengaw
 })();
 
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5cd08de99c66494',t:'MTc5NTA2ODQ0Ng=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5cd08de99c66494',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+  <!-- NILAI KETUNTASAN PER MATA UJIAN, BAWAAN 75, KHUSUS ADMIN · sumber: web/nilai-ketuntasan.js -->
+  <script id="sipintar-nilai-ketuntasan">
+/* NILAI KETUNTASAN PER MATA UJIAN v1.0.0 — paket 63.
+   Hanya Admin asli. Bawaan 75. Tidak mengubah penilai/validasi/peringkat,
+   tampilan Nilai Saya, autosave, sesi atau layar ujian peserta. */
+(function(){
+ 'use strict';
+ if(window.SIPINTAR_NILAI_KETUNTASAN_VERSI)return;
+ window.SIPINTAR_NILAI_KETUNTASAN_VERSI='1.0.0';
+ var old={form:window.initExamModalComponent,open:window.openExamModal,submit:window.handleExamSubmit,exams:window.renderExamForm,results:window.renderResults,load:window.loadResultsTable,table:window.renderInternalTable},S={cap:null,probe:null,formExam:null,busy:false,actor:'',panelId:'',panelCfg:null,seq:0};
+ function el(id){return document.getElementById(id);}
+ function user(){try{return typeof currentUser!=='undefined'?currentUser:window.currentUser;}catch(e){return window.currentUser;}}
+ function admin(){var u=user();return !!(u&&u.userID&&u.token&&u.role==='Admin'&&!u._sipPeranTampilan);}
+ function actor(){var u=user();return u?String(u.userID)+'|'+String(u.token)+'|'+String(u.role)+'|'+String(u._sipPeranTampilan||''):'';}
+ function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+ function angka(v){var t=String(v==null?'':v).trim().replace(',','.');if(!/^\d+(?:\.\d{1,2})?$/.test(t))return null;var n=Number(t);return isFinite(n)&&n>=0&&n<=100?n:null;}
+ function fmt(n){return typeof n==='number'&&isFinite(n)?String(n).replace('.',','):'—';}
+ function list(){try{return typeof cachedExams!=='undefined'&&Array.isArray(cachedExams)?cachedExams:[];}catch(e){return [];}}
+ function find(id){return list().filter(function(x){return String(x.id)===String(id);})[0];}
+ function config(ex){var c=ex&&ex.ketuntasanConfig;return c&&c.versi==='1.0.0'?c:null;}
+ function selected(){return el('select-result-exam')&&el('select-result-exam').value||'';}
+ function api(name,args){return new Promise(function(ok,no){try{var r=google.script.run.withSuccessHandler(ok).withFailureHandler(no);r[name].apply(r,args||[]);}catch(e){no(e);}});}
+ function fail(title,message){if(window.Swal)Swal.fire(title,message,'warning');}
+ function putConfig(id,cfg){var ex=find(id);if(ex)ex.ketuntasanConfig=cfg;}
+ function supports(){
+  if(S.cap===true)return Promise.resolve(true);if(S.probe)return S.probe;
+  var who=actor();S.probe=api('apiInfo',[]).then(function(info){if(who!==actor()||!admin())return false;S.cap=!!(info&&info.nilaiKetuntasan&&info.nilaiKetuntasan.versi==='1.0.0'&&info.nilaiKetuntasan.hanyaAdmin);return S.cap;}).catch(function(){return false;}).finally(function(){S.probe=null;});return S.probe;
+ }
+ function field(){
+  var f=el('examForm');if(!f)return;
+  if(!admin()){var gone=el('sip-ketuntasan-form');if(gone)gone.remove();return;}
+  if(!el('sip-ketuntasan-form')){
+   var box=document.createElement('section');box.id='sip-ketuntasan-form';box.className='sip-ket-box';
+   box.innerHTML='<label for="input-nilai-ketuntasan">Nilai Ketuntasan <span>khusus Admin · skala 0–100</span></label><input id="input-nilai-ketuntasan" name="nilaiKetuntasan" type="number" min="0" max="100" step="0.01" value="75" inputmode="decimal" required aria-describedby="sip-ketuntasan-form-help"><input type="hidden" name="ketuntasanSourceHash" id="input-ketuntasan-hash"><p id="sip-ketuntasan-form-help">Memeriksa dukungan backend…</p>';
+   var grids=f.querySelectorAll(':scope > .grid');if(grids[0])grids[0].after(box);else f.prepend(box);
+  }
+ }
+ function fillField(data){
+  field();var input=el('input-nilai-ketuntasan'),hash=el('input-ketuntasan-hash'),help=el('sip-ketuntasan-form-help');if(!input||!admin())return;
+  var cfg=config(data),isEdit=!!(data&&data.id),valid=!!(S.cap&&(!isEdit||cfg&&cfg.sourceHash));
+  input.disabled=!valid;hash.value=cfg&&cfg.sourceHash||'';input.value=cfg&&typeof cfg.batas==='number'?String(cfg.batas):isEdit?'':'75';
+  help.textContent=!S.cap?'Backend ketuntasan belum terkonfirmasi. Pasang backend paket 63 terlebih dahulu.':isEdit&&!cfg?'Data batas belum dimuat. Tutup form, perbarui Jadwal Ujian, lalu buka lagi.':cfg&&!cfg.valid?cfg.message:'Nilai awal 75, dapat berbeda per mata ujian. Nilai akhir ≥ batas = Tuntas setelah koreksi lengkap. Hanya Admin yang melihat batas/status ini; bukan perintah remedial atau penilaian ulang.';
+ }
+ window.initExamModalComponent=function(){var out=old.form&&old.form.apply(this,arguments);field();return out;};
+ window.openExamModal=function(data){
+  /* Tombol Edit lama membawa JSON saat tabel pertama dirender. Sesudah
+     Simpan Batas Saja, gunakan revisi konfigurasi terbaru di cachedExams,
+     tanpa mengganti field jadwal lain atau memuat ulang siswa. */
+  var args=Array.prototype.slice.call(arguments),latest=data&&data.id&&config(find(data.id));
+  if(admin()&&latest){data=Object.assign({},data,{ketuntasanConfig:latest});args[0]=data;}
+  var out=old.open&&old.open.apply(this,args);if(!admin()){field();return out;}
+  S.formExam=data||null;S.actor=actor();var who=S.actor;fillField(data);
+  supports().then(function(){if(admin()&&actor()===who&&el('examModal')&&!el('examModal').classList.contains('hidden'))fillField(S.formExam);});return out;
+ };
+ window.handleExamSubmit=function(e){
+  if(admin()){
+   var input=el('input-nilai-ketuntasan'),v=input?angka(input.value):null,id=el('input-examId')&&el('input-examId').value;
+   if(!S.cap||!input||input.disabled||v===null||id&&!(el('input-ketuntasan-hash')||{}).value){e.preventDefault();e.stopPropagation();if(input)input.focus();fail('Periksa Nilai Ketuntasan',!S.cap?'Backend ketuntasan belum terkonfirmasi. Coba buka ulang form sesudah memasang backend paket 63.':'Isi angka 0–100 (maksimal dua desimal). Jika data batas belum dimuat, perbarui Jadwal Ujian lalu buka lagi. Kolom kosong bukan nilai 0.');return;}
+  }
+  return old.submit&&old.submit.apply(this,arguments);
+ };
+ function scheduleBadges(){
+  if(!admin())return;var rows=document.querySelectorAll('#admin-content .exam-row'),exams=list();
+  rows.forEach(function(tr,i){if(tr.querySelector('.sip-ket-schedule')||!exams[i])return;var ex=exams[i],cfg=config(ex),target=tr.cells[1];if(!target)return;
+   var box=document.createElement('div');box.className='sip-ket-schedule';box.setAttribute('data-sip-ketuntasan-exam',String(ex.id));
+   var label=document.createElement('span');label.textContent='Nilai Ketuntasan: '+(cfg?fmt(cfg.batas):'belum tersedia')+(cfg&&cfg.sumber==='bawaan'?' (bawaan)':'');box.appendChild(label);
+   var b=document.createElement('button');b.type='button';b.textContent='Ubah Ketuntasan';b.addEventListener('click',function(){editOnly(String(ex.id));});box.appendChild(b);target.appendChild(box);
+  });
+ }
+ window.renderExamForm=function(){var out=old.exams&&old.exams.apply(this,arguments);scheduleBadges();return out;};
+ async function freshList(){var u=user(),who=actor(),xs=await api('getExamList',[u.userID,u.token]);if(!admin()||actor()!==who||!Array.isArray(xs))return;try{cachedExams=xs;}catch(e){}return xs;}
+ async function editOnly(id){
+  if(!admin()||S.busy)return;var who=actor();if(!await supports()){if(admin()&&actor()===who)fail('Backend belum siap','Pasang backend paket 63 terlebih dahulu. Tidak mengubah jadwal atau nilai peserta.');return;}
+  try{await freshList();if(!admin()||actor()!==who)return;var ex=find(id),cfg=config(ex);if(!cfg||!cfg.sourceHash)throw new Error(cfg&&cfg.message||'Data batas belum tersedia. Perbarui daftar ujian.');
+   var result=await Swal.fire({title:'Nilai Ketuntasan',text:(ex.subject||id)+' · '+(ex.class||'')+' — khusus Admin, skala 0–100.',input:'number',inputValue:typeof cfg.batas==='number'?cfg.batas:'',inputAttributes:{min:'0',max:'100',step:'0.01','aria-label':'Nilai Ketuntasan'},showCancelButton:true,confirmButtonText:'Simpan Batas Saja',cancelButtonText:'Batal',inputValidator:function(v){return angka(v)===null?'Isi angka 0–100, maksimal dua desimal. Kosong bukan nilai 0.':undefined;}});
+   if(result.isConfirmed&&admin()&&actor()===who)await saveOnly(id,angka(result.value),cfg);
+  }catch(e){if(admin()&&actor()===who)fail('Ketuntasan belum disimpan',e.message||String(e));}
+ }
+ async function saveOnly(id,value,cfg){
+  if(!admin()||S.busy||value===null||!cfg||!cfg.sourceHash)return false;var u=user(),who=actor(),seq=++S.seq;S.busy=true;panelBusy(true);
+  try{
+   var result=await api('updateExam',[{examId:id,ketuntasanOnly:true,nilaiKetuntasan:value,ketuntasanSourceHash:cfg.sourceHash},u.userID,u.token]);
+   if(!admin()||actor()!==who||seq!==S.seq)return false;
+   if(!result||!result.success||!result.ketuntasanOnly||String(result.examId)!==String(id)||!result.ketuntasanConfig){
+    if(result&&result.stale){await freshList();if(admin()&&actor()===who){var c=config(find(id));if(selected()===id){paintPanel(id,c,true);if(typeof window.loadResultsTable==='function')window.loadResultsTable(id);}}}
+    throw new Error(result&&result.message||'Penyimpanan batas belum terkonfirmasi. Muat ulang data Admin untuk memeriksa.');
+   }
+   putConfig(id,result.ketuntasanConfig);if(selected()===id){S.panelCfg=result.ketuntasanConfig;paintPanel(id,S.panelCfg,true);if(typeof window.loadResultsTable==='function')window.loadResultsTable(id);}
+   else if(document.querySelector('#admin-content .exam-row')){document.querySelectorAll('.sip-ket-schedule').forEach(function(n){n.remove();});scheduleBadges();}
+   Swal.fire('Nilai Ketuntasan tersimpan',result.message,'success');return true;
+  }catch(e){if(admin()&&actor()===who)fail('Ketuntasan belum disimpan',e.message||String(e));return false;}
+  finally{if(seq===S.seq){S.busy=false;panelBusy(false);}}
+ }
+ function panelBusy(busy){var input=el('sip-ketuntasan-batas'),save=el('sip-ketuntasan-simpan');if(input)input.disabled=busy||!S.panelCfg||!S.panelCfg.sourceHash;if(save)save.disabled=busy||!S.panelCfg||!S.panelCfg.sourceHash;}
+ function panel(){
+  if(!admin()){var gone=el('sip-ketuntasan-panel');if(gone)gone.remove();return;}
+  var select=el('select-result-exam');if(!select||el('sip-ketuntasan-panel'))return;
+  var box=document.createElement('section');box.id='sip-ketuntasan-panel';box.className='sip-ket-box';box.hidden=true;
+  box.innerHTML='<div class="sip-ket-head"><div><h4>Nilai Ketuntasan <span>khusus Admin</span></h4><p id="sip-ketuntasan-asal"></p></div><div class="sip-ket-controls"><label for="sip-ketuntasan-batas">Batas (0–100)</label><input id="sip-ketuntasan-batas" type="number" min="0" max="100" step="0.01" inputmode="decimal" required><button id="sip-ketuntasan-simpan" type="button">Simpan Batas Saja</button></div></div><p>Nilai akhir ≥ batas = <b>Tuntas</b>; di bawahnya = <b>Belum Tuntas</b>. Uraian yang belum selesai dikoreksi, peserta aktif atau data belum pasti = <b>Belum final</b>. Tidak mengubah nilai, Validasi, Capaian atau peringkat.</p><p id="sip-ketuntasan-pesan" role="status" aria-live="polite"></p>';
+  var card=select.closest('.dash-card');(card||select.parentElement).appendChild(box);
+  el('sip-ketuntasan-simpan').addEventListener('click',function(){var input=el('sip-ketuntasan-batas'),n=angka(input.value);if(n===null){input.focus();el('sip-ketuntasan-pesan').textContent='Isi angka 0–100, maksimal dua desimal. Kolom kosong bukan nilai 0.';return;}saveOnly(S.panelId,n,S.panelCfg);});
+ }
+ function paintPanel(id,cfg,force){
+  panel();var p=el('sip-ketuntasan-panel');if(!p)return;p.hidden=!id;if(!id){S.panelId='';S.panelCfg=null;return;}
+  var changed=S.panelId!==id||!S.panelCfg||!cfg||S.panelCfg.sourceHash!==cfg.sourceHash;S.panelId=id;S.panelCfg=cfg||null;
+  if(changed||force){var input=el('sip-ketuntasan-batas');input.value=cfg&&typeof cfg.batas==='number'?String(cfg.batas):'';el('sip-ketuntasan-pesan').textContent=cfg&&!cfg.valid?cfg.message:'';}
+  el('sip-ketuntasan-asal').textContent=cfg?'Batas saat ini: '+fmt(cfg.batas)+(cfg.sumber==='bawaan'?' · bawaan 75 (belum disimpan khusus)':' · tersimpan untuk mata ujian ini'):'Backend ketuntasan belum tersedia. Pasang backend paket 63, lalu perbarui data Admin.';panelBusy(S.busy);
+ }
+ window.renderResults=function(){var out=old.results&&old.results.apply(this,arguments);panel();return out;};
+ window.loadResultsTable=function(id){
+  if(admin()){S.actor=actor();paintPanel(String(id||''),config(find(id)),true);}return old.load&&old.load.apply(this,arguments);
+ };
+ function resultRows(){try{return typeof allResultsData!=='undefined'&&Array.isArray(allResultsData)?allResultsData:[];}catch(e){return [];}}
+ function addStatus(){
+  if(!admin())return;var id=selected(),rows=resultRows().filter(function(r){return String(r.examId)===id;}),by={};rows.forEach(function(r){by[String(r.responseId)]=r;});
+  var one=rows.filter(function(r){return r.ketuntasanConfig;})[0],cfg=one&&one.ketuntasanConfig||config(find(id));if(one)putConfig(id,cfg);paintPanel(id,cfg,false);
+  var table=document.querySelector('#res-table-container table');if(!table)return;var heads=Array.from(table.querySelectorAll('thead th')),index=heads.findIndex(function(n){return n.textContent.trim()==='Nilai';});if(index<0||table.querySelector('.sip-ket-th'))return;
+  var th=document.createElement('th');th.className='sip-ket-th';th.textContent='Ketuntasan';heads[index].after(th);
+  table.querySelectorAll('tbody tr[data-sip-ketuntasan-response]').forEach(function(tr){var r=by[tr.getAttribute('data-sip-ketuntasan-response')],k=r&&r.ketuntasan,cell=document.createElement('td');cell.className='sip-ket-td';
+   var status=k&&k.versi==='1.0.0'?k.status:'Belum tersedia',tone=status==='Tuntas'?'yes':status==='Belum Tuntas'?'no':'wait';
+   cell.innerHTML='<span class="sip-ket-status '+tone+'">'+esc(status)+'</span><small>'+(k?'Batas '+esc(fmt(k.batas)):'Pasang backend 63')+'</small>';cell.title=k&&k.alasan||'Muat ulang data Admin setelah backend tersedia.';tr.cells[index].after(cell);
+   var score=tr.cells[index].firstElementChild;if(score&&k&&!/^curang$/i.test(String(r.status))){score.style.color=status==='Tuntas'?'#047857':status==='Belum Tuntas'?'#b91c1c':'#64748b';}
+  });
+ }
+ window.renderInternalTable=function(){var out=old.table&&old.table.apply(this,arguments);addStatus();return out;};
+ /* Bersihkan input/status saat sesi berganti atau Admin memakai peran tampilan.
+    Tidak mengubah currentUser, token, halaman atau sesi peserta. */
+ setInterval(function(){
+  var changed=!!(S.actor&&S.actor!==actor());if(admin()&&!changed)return;
+  if(el('sip-ketuntasan-panel'))el('sip-ketuntasan-panel').remove();if(el('sip-ketuntasan-form'))el('sip-ketuntasan-form').remove();
+  document.querySelectorAll('.sip-ket-schedule,.sip-ket-th,.sip-ket-td').forEach(function(n){n.remove();});
+  if(changed){S.seq++;S.busy=false;S.panelCfg=null;S.panelId='';S.formExam=null;S.cap=null;S.actor='';}
+ },400);
+ var style=document.createElement('style');style.id='sip-ketuntasan-style';style.textContent='.sip-ket-box{border:1px solid #a5b4fc;background:#eef2ff;border-radius:12px;padding:15px;color:#334155;max-width:100%;min-width:0}.sip-ket-box[hidden]{display:none!important}#sip-ketuntasan-panel{margin-top:16px}.sip-ket-box label,.sip-ket-box h4{font-size:14px;font-weight:800;display:block;margin:0 0 7px;color:#312e81}.sip-ket-box label span,.sip-ket-box h4 span{font-size:11px;font-weight:600;color:#6366f1;display:inline-block;margin-left:7px}.sip-ket-box input[type=number]{width:140px;max-width:100%;padding:9px 11px;border:1px solid #a5b4fc;border-radius:8px;background:#fff;color:#1e293b;font-size:17px;font-weight:750}.sip-ket-box input:focus{outline:3px solid #c7d2fe}.sip-ket-box p{font-size:12px;line-height:1.65;margin:7px 0 0;overflow-wrap:anywhere}.sip-ket-box button{border:1px solid #4f46e5;border-radius:8px;padding:9px 12px;background:#4f46e5;color:white;font-size:12px;font-weight:750}.sip-ket-box button:disabled,.sip-ket-box input:disabled{opacity:.55;cursor:not-allowed}.sip-ket-head{display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap}.sip-ket-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.sip-ket-controls label{font-size:11px;margin:0}.sip-ket-controls input[type=number]{width:105px}.sip-ket-schedule{margin:9px 0 0;font-size:11px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:#4338ca}.sip-ket-schedule button{padding:4px 7px;border:1px solid #c7d2fe;border-radius:6px;background:#eef2ff;font-weight:750;white-space:nowrap}.sip-ket-th{padding:16px 12px;min-width:135px;white-space:nowrap}.sip-ket-td{padding:14px 12px;min-width:135px}.sip-ket-status{display:inline-block;font-size:11px;font-weight:800;padding:5px 8px;border-radius:999px;white-space:nowrap}.sip-ket-status.yes{background:#d1fae5;color:#065f46}.sip-ket-status.no{background:#fee2e2;color:#991b1b}.sip-ket-status.wait{background:#f1f5f9;color:#475569}.sip-ket-td small{display:block;color:#64748b;font-size:10px;margin-top:5px}#sip-ketuntasan-pesan{font-weight:700;color:#92400e}@media(max-width:500px){.sip-ket-box{padding:12px}.sip-ket-controls{width:100%;gap:6px}.sip-ket-controls button{flex:1}.sip-ket-box label span{display:block;margin:4px 0 0}}';document.head.appendChild(style);
+})();
+
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5d3ae2edae99cc5',t:'MTc5NTEzODEzMg=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5d3ae2edae99cc5',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 <!-- Lisensi MathJax tertanam:
 
                                  Apache License
